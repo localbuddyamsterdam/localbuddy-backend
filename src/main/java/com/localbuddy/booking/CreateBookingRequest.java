@@ -27,6 +27,8 @@ public record CreateBookingRequest(
         String promoCode,
 
         @Size(max = 80, message = "Referral code cannot exceed 80 characters")
-        String referralCode
+        String referralCode,
+
+        Boolean privateBooking
 ) {
 }

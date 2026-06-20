@@ -42,6 +42,9 @@ public record BookingResponse(
         BigDecimal originalAmount,
         BigDecimal discountAmount,
         String promoCodeText,
-        String referralCodeText
+        String referralCodeText,
+        boolean privateBooking,
+        BigDecimal privateDiscountAmount,
+        Integer seatsBlocked
 ) {
 }

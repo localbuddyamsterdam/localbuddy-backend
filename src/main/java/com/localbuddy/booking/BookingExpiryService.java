@@ -96,7 +96,10 @@ public class BookingExpiryService {
                 booking.getAvailabilitySlot().getId()
         ).orElseThrow(() -> new ResourceNotFoundException("Availability slot not found"));
 
-        int updatedBookedCount = Math.max(0, slot.getBookedCount() - booking.getGuestsCount());
+        int seatsConsumed = booking.getSeatsBlocked() != null
+                ? booking.getSeatsBlocked()
+                : booking.getGuestsCount();
+        int updatedBookedCount = Math.max(0, slot.getBookedCount() - seatsConsumed);
         slot.setBookedCount(updatedBookedCount);
 
         if (slot.getStatus() == AvailabilityStatus.BLOCKED &&

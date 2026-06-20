@@ -12,6 +12,7 @@ public record AvailabilitySlotResponse(
         Integer capacity,
         Integer bookedCount,
         Integer remainingCapacity,
+        boolean privateBookingAvailable,
         AvailabilityStatus status,
         Instant createdAt,
         Instant updatedAt

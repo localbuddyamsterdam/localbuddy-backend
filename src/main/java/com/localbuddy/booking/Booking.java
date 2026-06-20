@@ -68,6 +68,12 @@ public class Booking {
     @Column(name = "guests_count", nullable = false)
     private Integer guestsCount = 1;
 
+    @Column(name = "is_private", nullable = false)
+    private boolean privateBooking = false;
+
+    @Column(name = "seats_blocked", nullable = false)
+    private Integer seatsBlocked;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 40)
     private BookingStatus status = BookingStatus.REQUESTED;
@@ -140,6 +146,9 @@ public class Booking {
     @Column(name = "discount_amount", nullable = false, precision = 10, scale = 2)
     private BigDecimal discountAmount = BigDecimal.ZERO;
 
+    @Column(name = "private_discount_amount", nullable = false, precision = 10, scale = 2)
+    private BigDecimal privateDiscountAmount = BigDecimal.ZERO;
+
     @Column(name = "promo_code_text", length = 80)
     private String promoCodeText;
 
@@ -170,6 +179,14 @@ public class Booking {
 
         if (guestsCount == null) {
             guestsCount = 1;
+        }
+
+        if (seatsBlocked == null) {
+            seatsBlocked = guestsCount;
+        }
+
+        if (privateDiscountAmount == null) {
+            privateDiscountAmount = BigDecimal.ZERO;
         }
 
         if (status == null) {

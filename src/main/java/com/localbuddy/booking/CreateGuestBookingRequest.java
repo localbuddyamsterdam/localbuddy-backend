@@ -43,6 +43,8 @@ public record CreateGuestBookingRequest(
 
         @NotBlank(message = "Consent version is required")
         @Size(max = 50, message = "Consent version cannot exceed 50 characters")
-        String consentVersion
+        String consentVersion,
+
+        Boolean privateBooking
 ) {
 }

@@ -88,6 +88,11 @@ public class AvailabilitySlotService {
     private AvailabilitySlotResponse toResponse(AvailabilitySlot slot) {
         int remainingCapacity = slot.getCapacity() - slot.getBookedCount();
 
+        // A private (whole-slot) booking is only offered while no seats have been
+        // booked yet, so a later individual booking can never collide with it.
+        boolean privateBookingAvailable =
+                slot.getStatus() == AvailabilityStatus.AVAILABLE && slot.getBookedCount() == 0;
+
         return new AvailabilitySlotResponse(
                 slot.getId(),
                 slot.getExperience().getId(),
@@ -97,6 +102,7 @@ public class AvailabilitySlotService {
                 slot.getCapacity(),
                 slot.getBookedCount(),
                 remainingCapacity,
+                privateBookingAvailable,
                 slot.getStatus(),
                 slot.getCreatedAt(),
                 slot.getUpdatedAt()

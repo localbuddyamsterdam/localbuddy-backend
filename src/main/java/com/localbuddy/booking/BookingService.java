@@ -44,6 +44,7 @@ public class BookingService {
 
     private static final String REFERENCE_PREFIX = "LB";
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+    private static final BigDecimal PRIVATE_DISCOUNT_RATE = new BigDecimal("0.20");
     private static final Logger log = LoggerFactory.getLogger(BookingService.class);
     private final BookingRepository bookingRepository;
     private final UserRepository userRepository;
@@ -142,30 +143,30 @@ public class BookingService {
         log.info("TRAVELER_BOOKING_TIMING validateSlotMs={}", System.currentTimeMillis() - stepStart);
 
         stepStart = System.currentTimeMillis();
-        int newBookedCount = slot.getBookedCount() + request.guestsCount();
+        boolean privateBooking = Boolean.TRUE.equals(request.privateBooking());
+        requirePrivateBookingAllowed(privateBooking, slot);
+
+        BigDecimal pricePerGuest = experience.getPriceAmount();
+        BookingPricing pricing = computePricing(privateBooking, slot, pricePerGuest, request.guestsCount());
+
+        int seatsToBook = pricing.seatsBlocked();
+        int newBookedCount = slot.getBookedCount() + seatsToBook;
         slot.setBookedCount(newBookedCount);
 
         if (newBookedCount >= slot.getCapacity()) {
             slot.setStatus(AvailabilityStatus.BLOCKED);
         }
-        log.info("TRAVELER_BOOKING_TIMING updateSlotMemoryMs={}", System.currentTimeMillis() - stepStart);
 
-        stepStart = System.currentTimeMillis();
-        BigDecimal pricePerGuest = experience.getPriceAmount();
-
-        BigDecimal originalAmount = pricePerGuest
-                .multiply(BigDecimal.valueOf(request.guestsCount()))
-                .setScale(2, RoundingMode.HALF_UP);
-
+        BigDecimal originalAmount = pricing.originalAmount();
         String currency = experience.getCurrency().toUpperCase(Locale.ROOT);
-        log.info("TRAVELER_BOOKING_TIMING calculateOriginalAmountMs={}", System.currentTimeMillis() - stepStart);
+        log.info("TRAVELER_BOOKING_TIMING updateSlotMemoryMs={}", System.currentTimeMillis() - stepStart);
 
         stepStart = System.currentTimeMillis();
         AppliedPromoCode appliedPromo = promoCodeService.applyPromoCodeForBooking(
                 travelerUserId,
                 request.promoCode(),
                 null,
-                originalAmount,
+                pricing.baseForPromo(),
                 currency
         );
         log.info("TRAVELER_BOOKING_TIMING applyPromoMs={}", System.currentTimeMillis() - stepStart);
@@ -189,10 +190,13 @@ public class BookingService {
         booking.setExperience(experience);
         booking.setAvailabilitySlot(slot);
         booking.setGuestsCount(request.guestsCount());
+        booking.setPrivateBooking(privateBooking);
+        booking.setSeatsBlocked(seatsToBook);
         booking.setStatus(BookingStatus.PENDING_PAYMENT);
 
         booking.setPricePerGuest(pricePerGuest);
         booking.setOriginalAmount(originalAmount);
+        booking.setPrivateDiscountAmount(pricing.privateDiscountAmount());
         booking.setDiscountAmount(appliedPromo.discountAmount());
         booking.setTotalAmount(totalAmount);
         booking.setCurrency(currency);
@@ -262,6 +266,68 @@ public class BookingService {
                 .stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    /**
+     * Resolved pricing + seat usage for a booking, accounting for the private
+     * (whole-slot buyout) option.
+     */
+    private record BookingPricing(
+            BigDecimal originalAmount,
+            BigDecimal privateDiscountAmount,
+            BigDecimal baseForPromo,
+            int seatsBlocked
+    ) {
+    }
+
+    /**
+     * Computes the pricing for a booking.
+     *
+     * <p>For a private buyout the price is based on the full slot
+     * ({@code capacity x pricePerGuest}) with a 20% private-tour discount applied;
+     * promo/referral discounts then apply on top of that discounted base. For a
+     * normal booking the base is simply {@code guestsCount x pricePerGuest}.
+     */
+    private BookingPricing computePricing(boolean privateBooking,
+                                          AvailabilitySlot slot,
+                                          BigDecimal pricePerGuest,
+                                          int guestsCount) {
+        if (privateBooking) {
+            BigDecimal originalAmount = pricePerGuest
+                    .multiply(BigDecimal.valueOf(slot.getCapacity()))
+                    .setScale(2, RoundingMode.HALF_UP);
+
+            BigDecimal privateDiscountAmount = originalAmount
+                    .multiply(PRIVATE_DISCOUNT_RATE)
+                    .setScale(2, RoundingMode.HALF_UP);
+
+            BigDecimal baseForPromo = originalAmount.subtract(privateDiscountAmount);
+
+            return new BookingPricing(originalAmount, privateDiscountAmount, baseForPromo, slot.getCapacity());
+        }
+
+        BigDecimal originalAmount = pricePerGuest
+                .multiply(BigDecimal.valueOf(guestsCount))
+                .setScale(2, RoundingMode.HALF_UP);
+
+        return new BookingPricing(
+                originalAmount,
+                BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP),
+                originalAmount,
+                guestsCount
+        );
+    }
+
+    /** Number of slot seats a booking consumes (whole capacity for a private buyout). */
+    private int seatsConsumed(Booking booking) {
+        return booking.getSeatsBlocked() != null ? booking.getSeatsBlocked() : booking.getGuestsCount();
+    }
+
+    private void requirePrivateBookingAllowed(boolean privateBooking, AvailabilitySlot slot) {
+        if (privateBooking && slot.getBookedCount() != 0) {
+            throw new BadRequestException(
+                    "Private booking is not available because seats are already booked for this slot");
+        }
     }
 
     private void validateSlot(Experience experience, AvailabilitySlot slot, int guestsCount) {
@@ -345,7 +411,10 @@ public class BookingService {
                 booking.getOriginalAmount(),
                 booking.getDiscountAmount(),
                 booking.getPromoCodeText(),
-                booking.getReferralCodeText()
+                booking.getReferralCodeText(),
+                booking.isPrivateBooking(),
+                booking.getPrivateDiscountAmount(),
+                booking.getSeatsBlocked()
         );
     }
 
@@ -410,7 +479,7 @@ public class BookingService {
         AvailabilitySlot slot = availabilitySlotRepository.findByIdForUpdate(booking.getAvailabilitySlot().getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Availability slot not found"));
 
-        int updatedBookedCount = Math.max(0, slot.getBookedCount() - booking.getGuestsCount());
+        int updatedBookedCount = Math.max(0, slot.getBookedCount() - seatsConsumed(booking));
         slot.setBookedCount(updatedBookedCount);
 
         if (slot.getStatus() == AvailabilityStatus.BLOCKED && updatedBookedCount < slot.getCapacity()) {
@@ -482,7 +551,7 @@ public class BookingService {
         AvailabilitySlot slot = availabilitySlotRepository.findByIdForUpdate(booking.getAvailabilitySlot().getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Availability slot not found"));
 
-        int updatedBookedCount = Math.max(0, slot.getBookedCount() - booking.getGuestsCount());
+        int updatedBookedCount = Math.max(0, slot.getBookedCount() - seatsConsumed(booking));
         slot.setBookedCount(updatedBookedCount);
 
         if (slot.getStatus() == AvailabilityStatus.BLOCKED && updatedBookedCount < slot.getCapacity()) {
@@ -584,30 +653,30 @@ public class BookingService {
         log.info("GUEST_BOOKING_TIMING validateSlotMs={}", System.currentTimeMillis() - stepStart);
 
         stepStart = System.currentTimeMillis();
-        int newBookedCount = slot.getBookedCount() + request.guestsCount();
+        boolean privateBooking = Boolean.TRUE.equals(request.privateBooking());
+        requirePrivateBookingAllowed(privateBooking, slot);
+
+        BigDecimal pricePerGuest = experience.getPriceAmount();
+        BookingPricing pricing = computePricing(privateBooking, slot, pricePerGuest, request.guestsCount());
+
+        int seatsToBook = pricing.seatsBlocked();
+        int newBookedCount = slot.getBookedCount() + seatsToBook;
         slot.setBookedCount(newBookedCount);
 
         if (newBookedCount >= slot.getCapacity()) {
             slot.setStatus(AvailabilityStatus.BLOCKED);
         }
-        log.info("GUEST_BOOKING_TIMING updateSlotMemoryMs={}", System.currentTimeMillis() - stepStart);
 
-        stepStart = System.currentTimeMillis();
-        BigDecimal pricePerGuest = experience.getPriceAmount();
-
-        BigDecimal originalAmount = pricePerGuest
-                .multiply(BigDecimal.valueOf(request.guestsCount()))
-                .setScale(2, RoundingMode.HALF_UP);
-
+        BigDecimal originalAmount = pricing.originalAmount();
         String currency = experience.getCurrency().toUpperCase(Locale.ROOT);
-        log.info("GUEST_BOOKING_TIMING calculateOriginalAmountMs={}", System.currentTimeMillis() - stepStart);
+        log.info("GUEST_BOOKING_TIMING updateSlotMemoryMs={}", System.currentTimeMillis() - stepStart);
 
         stepStart = System.currentTimeMillis();
         AppliedPromoCode appliedPromo = promoCodeService.applyPromoCodeForBooking(
                 null,
                 request.promoCode(),
                 normalizedGuestEmail,
-                originalAmount,
+                pricing.baseForPromo(),
                 currency
         );
         log.info("GUEST_BOOKING_TIMING applyPromoMs={}", System.currentTimeMillis() - stepStart);
@@ -647,10 +716,13 @@ public class BookingService {
         booking.setExperience(experience);
         booking.setAvailabilitySlot(slot);
         booking.setGuestsCount(request.guestsCount());
+        booking.setPrivateBooking(privateBooking);
+        booking.setSeatsBlocked(seatsToBook);
         booking.setStatus(BookingStatus.PENDING_PAYMENT);
 
         booking.setPricePerGuest(pricePerGuest);
         booking.setOriginalAmount(originalAmount);
+        booking.setPrivateDiscountAmount(pricing.privateDiscountAmount());
         booking.setDiscountAmount(appliedPromo.discountAmount());
         booking.setTotalAmount(totalAmount);
         booking.setCurrency(currency);
@@ -893,11 +965,13 @@ public class BookingService {
                 request.newAvailabilitySlotId()
         ).orElseThrow(() -> new ResourceNotFoundException("New availability slot not found"));
 
-        validateSlot(booking.getExperience(), newSlot, booking.getGuestsCount());
+        int seatsToMove = seatsConsumed(booking);
 
-        releaseAvailabilityCapacityFromSlot(oldSlot, booking.getGuestsCount());
+        validateSlot(booking.getExperience(), newSlot, seatsToMove);
 
-        int newBookedCount = newSlot.getBookedCount() + booking.getGuestsCount();
+        releaseAvailabilityCapacityFromSlot(oldSlot, seatsToMove);
+
+        int newBookedCount = newSlot.getBookedCount() + seatsToMove;
         newSlot.setBookedCount(newBookedCount);
 
         if (newBookedCount >= newSlot.getCapacity()) {
