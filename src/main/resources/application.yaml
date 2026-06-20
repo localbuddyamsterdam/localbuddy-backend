@@ -119,5 +119,10 @@ app:
 
   rate-limit:
     public-api:
+      enabled: ${PUBLIC_API_RATE_LIMIT_ENABLED:true}
       max-requests: ${PUBLIC_API_RATE_LIMIT_MAX_REQUESTS:20}
       window-seconds: ${PUBLIC_API_RATE_LIMIT_WINDOW_SECONDS:60}
+
+  social:
+    google:
+      client-id: ${GOOGLE_CLIENT_ID:}

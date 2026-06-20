@@ -393,7 +393,7 @@ public class LocalProfileService {
 
 
     @Transactional
-    public LocalProfileResponse rejectLocalProfile(UUID profileId) {
+    public LocalProfileResponse rejectLocalProfile(UUID profileId, AdminLocalProfileReviewRequest request) {
         LocalProfile profile = localProfileRepository.findById(profileId)
                 .orElseThrow(() -> new ResourceNotFoundException("Local profile not found"));
 
@@ -401,9 +401,18 @@ public class LocalProfileService {
             throw new BadRequestException("Blocked local profile cannot be rejected");
         }
 
+        if (profile.getApprovalStatus() != LocalApprovalStatus.SUBMITTED) {
+            throw new BadRequestException("Only submitted local profiles can be rejected");
+        }
+
         profile.setApprovalStatus(LocalApprovalStatus.REJECTED);
+        profile.setReviewedAt(Instant.now());
+        profile.setRejectionReason(requiredTrim(request.reason()));
+        profile.setAdminReviewNote(optionalTrim(request.adminNote()));
+        profile.setChangesRequestedReason(null);
 
         LocalProfile savedProfile = localProfileRepository.save(profile);
+        createLocalProfileRejectedNotification(savedProfile);
         return toResponse(savedProfile);
     }
 

@@ -7,13 +7,21 @@ import com.localbuddy.localprofile.LocalApprovalStatus;
 import com.localbuddy.localprofile.LocalProfile;
 import com.localbuddy.localprofile.LocalProfileRepository;
 import com.localbuddy.trustsafety.TrustSafetyService;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.text.Normalizer;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -181,6 +189,69 @@ public class ExperienceService {
     }
 
 
+    @Transactional(readOnly = true)
+    public ExperiencePageResponse searchApprovedExperiences(
+            String citySlug,
+            String categorySlug,
+            LocalDate date,
+            Integer adults,
+            Integer teens,
+            Integer children,
+            Integer infants,
+            int page,
+            int size
+    ) {
+        String city = normalizeSlug(citySlug);
+        String category = normalizeSlug(categorySlug);
+
+        int adultCount = adults == null ? 0 : Math.max(0, adults);
+        int teenCount = teens == null ? 0 : Math.max(0, teens);
+        int childCount = children == null ? 0 : Math.max(0, children);
+        int infantCount = infants == null ? 0 : Math.max(0, infants);
+
+        int totalGuests = adultCount + teenCount + childCount + infantCount;
+        Integer guests = totalGuests > 0 ? totalGuests : null;
+
+        // Exclude experiences whose minimum age would bar the youngest requested band.
+        Integer maxMinimumAge = infantCount > 0 ? 0
+                : childCount > 0 ? 2
+                : teenCount > 0 ? 13
+                : null;
+
+        Instant dateStart = null;
+        Instant dateEnd = null;
+        if (date != null) {
+            dateStart = date.atStartOfDay(ZoneOffset.UTC).toInstant();
+            dateEnd = date.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+        }
+
+        int pageNumber = Math.max(0, page);
+        int pageSize = size <= 0 ? 20 : Math.min(size, 100);
+        Pageable pageable = PageRequest.of(pageNumber, pageSize);
+
+        Page<Experience> result = experienceRepository.searchApproved(
+                city, category, maxMinimumAge, guests, Instant.now(), dateStart, dateEnd, pageable);
+
+        List<ExperienceResponse> content = result.getContent().stream()
+                .map(this::toResponse)
+                .toList();
+
+        return new ExperiencePageResponse(
+                content,
+                result.getNumber(),
+                result.getSize(),
+                result.getTotalElements(),
+                result.getTotalPages()
+        );
+    }
+
+    private String normalizeSlug(String slug) {
+        if (slug == null || slug.trim().isEmpty()) {
+            return null;
+        }
+        return slug.trim().toLowerCase(Locale.ROOT);
+    }
+
     private void applyCreateRequest(Experience experience, CreateExperienceRequest request) {
         experience.setTitle(requiredTrim(request.title()));
         experience.setDescription(requiredTrim(request.description()));
@@ -190,6 +261,15 @@ public class ExperienceService {
         experience.setCurrency(requiredTrim(request.currency()).toUpperCase(Locale.ROOT));
         experience.setMaxGuests(request.maxGuests());
         experience.setSafetyNotes(optionalTrim(request.safetyNotes()));
+        experience.setShortDescription(optionalTrim(request.shortDescription()));
+        experience.setTransportMode(request.transportMode());
+        experience.setInclusions(optionalTrim(request.inclusions()));
+        experience.setExclusions(optionalTrim(request.exclusions()));
+        experience.setEndLocation(optionalTrim(request.endLocation()));
+        experience.setReasonsToBook(optionalTrim(request.reasonsToBook()));
+        experience.setMinimumAge(request.minimumAge() == null ? 0 : request.minimumAge());
+        applyBookingMode(experience, request.bookingMode(), request.privatePrice());
+        applyCategories(experience, request.categoryIds());
     }
 
     private void applyUpdateRequest(Experience experience, UpdateExperienceRequest request) {
@@ -201,6 +281,48 @@ public class ExperienceService {
         experience.setCurrency(requiredTrim(request.currency()).toUpperCase(Locale.ROOT));
         experience.setMaxGuests(request.maxGuests());
         experience.setSafetyNotes(optionalTrim(request.safetyNotes()));
+        experience.setShortDescription(optionalTrim(request.shortDescription()));
+        experience.setTransportMode(request.transportMode());
+        experience.setInclusions(optionalTrim(request.inclusions()));
+        experience.setExclusions(optionalTrim(request.exclusions()));
+        experience.setEndLocation(optionalTrim(request.endLocation()));
+        experience.setReasonsToBook(optionalTrim(request.reasonsToBook()));
+        experience.setMinimumAge(request.minimumAge() == null ? 0 : request.minimumAge());
+        applyBookingMode(experience, request.bookingMode(), request.privatePrice());
+        applyCategories(experience, request.categoryIds());
+    }
+
+    private void applyCategories(Experience experience, Set<UUID> categoryIds) {
+        Set<ExperienceCategory> resolved = new LinkedHashSet<>();
+
+        if (categoryIds != null) {
+            for (UUID categoryId : categoryIds) {
+                if (categoryId == null) {
+                    continue;
+                }
+                ExperienceCategory category = categoryRepository.findById(categoryId)
+                        .orElseThrow(() -> new BadRequestException("Invalid experience category: " + categoryId));
+                if (!category.isActive()) {
+                    throw new BadRequestException("Experience category is inactive: " + category.getName());
+                }
+                resolved.add(category);
+            }
+        }
+
+        experience.getCategories().clear();
+        experience.getCategories().addAll(resolved);
+    }
+
+    private void applyBookingMode(Experience experience, BookingMode bookingMode, BigDecimal privatePrice) {
+        BookingMode mode = bookingMode == null ? BookingMode.SHARED : bookingMode;
+        BigDecimal normalizedPrivatePrice = normalizePrice(privatePrice);
+
+        if (mode != BookingMode.SHARED && normalizedPrivatePrice == null) {
+            throw new BadRequestException("Private price is required when private booking is allowed");
+        }
+
+        experience.setBookingMode(mode);
+        experience.setPrivatePrice(normalizedPrivatePrice);
     }
 
     private BigDecimal normalizePrice(BigDecimal price) {
@@ -252,6 +374,7 @@ public class ExperienceService {
                 experience.getCategory() != null ? experience.getCategory().getId() : null,
                 experience.getCategory() != null ? experience.getCategory().getName() : null,
                 experience.getCategory() != null ? experience.getCategory().getSlug() : null,
+                experience.getCategories().stream().map(ExperienceCategory::getId).toList(),
                 experience.getCity().getId(),
                 experience.getCity().getName(),
                 experience.getCity().getSlug(),
@@ -264,7 +387,16 @@ public class ExperienceService {
                 experience.getPriceAmount(),
                 experience.getCurrency(),
                 experience.getMaxGuests(),
+                experience.getBookingMode(),
+                experience.getPrivatePrice(),
                 experience.getSafetyNotes(),
+                experience.getShortDescription(),
+                experience.getTransportMode(),
+                experience.getInclusions(),
+                experience.getExclusions(),
+                experience.getEndLocation(),
+                experience.getReasonsToBook(),
+                experience.getMinimumAge(),
                 experience.getStatus(),
                 experience.getCreatedAt(),
                 experience.getUpdatedAt()

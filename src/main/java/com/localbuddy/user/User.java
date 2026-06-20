@@ -14,6 +14,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -55,6 +56,12 @@ public class User {
     @Column(name = "phone_verified", nullable = false)
     private boolean phoneVerified = false;
 
+    @Column(name = "rating_avg", nullable = false, precision = 3, scale = 2)
+    private BigDecimal ratingAvg = BigDecimal.ZERO;
+
+    @Column(name = "total_reviews", nullable = false)
+    private Integer totalReviews = 0;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -71,6 +78,14 @@ public class User {
 
         if (updatedAt == null) {
             updatedAt = now;
+        }
+
+        if (ratingAvg == null) {
+            ratingAvg = BigDecimal.ZERO;
+        }
+
+        if (totalReviews == null) {
+            totalReviews = 0;
         }
     }
 

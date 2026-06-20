@@ -94,27 +94,6 @@ public class LocalProfileController {
     }
 
     @Operation(
-            summary = "Request changes for a local profile (admin)",
-            description = "Allows an admin to request changes on a submitted local profile, identified by its profile ID."
-    )
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Change request recorded successfully"),
-            @ApiResponse(responseCode = "400", description = "Invalid request body"),
-            @ApiResponse(responseCode = "401", description = "Not authenticated"),
-            @ApiResponse(responseCode = "403", description = "Not authorized (admin only)"),
-            @ApiResponse(responseCode = "404", description = "Local profile not found")
-    })
-    @PostMapping("/admin/local-profiles/{profileId}/request-changes")
-    public ResponseEntity<LocalProfileResponse> requestChangesForLocalProfile(
-            @PathVariable UUID profileId,
-            @Valid @RequestBody AdminLocalProfileReviewRequest request
-    ) {
-        return ResponseEntity.ok(
-                localProfileService.requestChangesForLocalProfile(profileId, request)
-        );
-    }
-
-    @Operation(
             summary = "Get my onboarding status",
             description = "Returns the onboarding progress/status for the currently authenticated user."
     )

@@ -3,12 +3,15 @@ package com.localbuddy.experience;
 import jakarta.validation.constraints.*;
 
 import java.math.BigDecimal;
+import java.util.Set;
 import java.util.UUID;
 
 public record UpdateExperienceRequest(
 
         @NotNull(message = "Category is required")
         UUID categoryId,
+
+        Set<UUID> categoryIds,
 
         @NotNull(message = "City is required")
         UUID cityId,
@@ -43,6 +46,32 @@ public record UpdateExperienceRequest(
         Integer maxGuests,
 
         @Size(max = 2000, message = "Safety notes cannot exceed 2000 characters")
-        String safetyNotes
+        String safetyNotes,
+
+        @Size(max = 300, message = "Short description cannot exceed 300 characters")
+        String shortDescription,
+
+        TransportMode transportMode,
+
+        @Size(max = 2000, message = "Inclusions cannot exceed 2000 characters")
+        String inclusions,
+
+        @Size(max = 2000, message = "Exclusions cannot exceed 2000 characters")
+        String exclusions,
+
+        @Size(max = 255, message = "End location cannot exceed 255 characters")
+        String endLocation,
+
+        @Size(max = 2000, message = "Reasons to book cannot exceed 2000 characters")
+        String reasonsToBook,
+
+        @Min(value = 0, message = "Minimum age cannot be negative")
+        @Max(value = 120, message = "Minimum age cannot exceed 120")
+        Integer minimumAge,
+
+        BookingMode bookingMode,
+
+        @DecimalMin(value = "0.00", message = "Private price cannot be negative")
+        BigDecimal privatePrice
 ) {
 }

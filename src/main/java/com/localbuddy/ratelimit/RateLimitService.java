@@ -1,7 +1,6 @@
 package com.localbuddy.ratelimit;
 
 import com.localbuddy.common.exception.BadRequestException;
-import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -37,8 +36,11 @@ public class RateLimitService {
                 throw new BadRequestException("Too many requests. Please try again later.");
             }
 
-        } catch (RedisConnectionFailureException ex) {
-            // Fail open for now so Redis outage does not break core app.
+        } catch (BadRequestException ex) {
+            // Rate limit exceeded — propagate to the caller.
+            throw ex;
+        } catch (RuntimeException ex) {
+            // Any Redis/infrastructure failure: fail open so the core app keeps working.
         }
     }
 }

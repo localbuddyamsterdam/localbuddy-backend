@@ -1,5 +1,6 @@
 package com.localbuddy.user;
 
+import com.localbuddy.common.exception.BadRequestException;
 import com.localbuddy.common.exception.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,6 +31,27 @@ public class AdminUserService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         return toResponse(user);
+    }
+
+    @Transactional
+    public AdminUserResponse updateUserStatus(UUID userId, AdminUserStatusRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        if (user.getRole() == UserRole.ADMIN) {
+            throw new BadRequestException("Admin users cannot have their status changed from this API");
+        }
+        if (user.getStatus() == UserStatus.DELETED) {
+            throw new BadRequestException("Deleted users cannot be modified");
+        }
+
+        UserStatus target = request.status();
+        if (target != UserStatus.ACTIVE && target != UserStatus.SUSPENDED) {
+            throw new BadRequestException("Status can only be set to ACTIVE or SUSPENDED");
+        }
+
+        user.setStatus(target);
+        return toResponse(userRepository.save(user));
     }
 
     private AdminUserResponse toResponse(User user) {

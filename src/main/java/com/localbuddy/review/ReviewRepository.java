@@ -10,7 +10,21 @@ public interface ReviewRepository extends JpaRepository<Review, UUID> {
 
     boolean existsByBookingId(UUID bookingId);
 
+    boolean existsByBookingIdAndDirection(UUID bookingId, ReviewDirection direction);
+
     Optional<Review> findByBookingId(UUID bookingId);
+
+    List<Review> findByLocalProfileIdAndDirectionAndStatusOrderByCreatedAtDesc(
+            UUID localProfileId, ReviewDirection direction, ReviewStatus status);
+
+    List<Review> findByExperienceIdAndDirectionAndStatusOrderByCreatedAtDesc(
+            UUID experienceId, ReviewDirection direction, ReviewStatus status);
+
+    List<Review> findByRevieweeUserIdAndDirectionAndStatusOrderByCreatedAtDesc(
+            UUID revieweeUserId, ReviewDirection direction, ReviewStatus status);
+
+    List<Review> findByRevieweeUserIdAndStatusOrderByCreatedAtDesc(
+            UUID revieweeUserId, ReviewStatus status);
 
     List<Review> findByLocalProfileIdAndStatusOrderByCreatedAtDesc(
             UUID localProfileId,

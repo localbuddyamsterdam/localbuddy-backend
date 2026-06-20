@@ -8,6 +8,8 @@ import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.UUID;
 
 @Entity
@@ -34,6 +36,15 @@ public class Experience {
     @JoinColumn(name = "city_id", nullable = false)
     private City city;
 
+    /** Full set of categories this experience belongs to (in addition to the primary {@link #category}). */
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+            name = "experience_category_links",
+            joinColumns = @JoinColumn(name = "experience_id"),
+            inverseJoinColumns = @JoinColumn(name = "category_id")
+    )
+    private Set<ExperienceCategory> categories = new LinkedHashSet<>();
+
     @Column(name = "title", nullable = false, length = 150)
     private String title;
 
@@ -43,14 +54,43 @@ public class Experience {
     @Column(name = "description", nullable = false, columnDefinition = "TEXT")
     private String description;
 
+    @Column(name = "short_description", length = 300)
+    private String shortDescription;
+
     @Column(name = "meeting_area", length = 150)
     private String meetingArea;
+
+    @Column(name = "end_location", length = 255)
+    private String endLocation;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "transport_mode", length = 40)
+    private TransportMode transportMode;
+
+    @Column(name = "inclusions", columnDefinition = "TEXT")
+    private String inclusions;
+
+    @Column(name = "exclusions", columnDefinition = "TEXT")
+    private String exclusions;
+
+    @Column(name = "reasons_to_book", columnDefinition = "TEXT")
+    private String reasonsToBook;
+
+    @Column(name = "minimum_age", nullable = false)
+    private Integer minimumAge = 0;
 
     @Column(name = "duration_minutes", nullable = false)
     private Integer durationMinutes;
 
     @Column(name = "price_amount", nullable = false, precision = 10, scale = 2)
     private BigDecimal priceAmount;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "booking_mode", nullable = false, length = 40)
+    private BookingMode bookingMode = BookingMode.SHARED;
+
+    @Column(name = "private_price", precision = 10, scale = 2)
+    private BigDecimal privatePrice;
 
     @Column(name = "currency", nullable = false, length = 3)
     private String currency = "EUR";
@@ -89,6 +129,14 @@ public class Experience {
 
         if (status == null) {
             status = ExperienceStatus.DRAFT;
+        }
+
+        if (minimumAge == null) {
+            minimumAge = 0;
+        }
+
+        if (bookingMode == null) {
+            bookingMode = BookingMode.SHARED;
         }
     }
 

@@ -70,33 +70,14 @@ public class UserService {
     }
 
     @Transactional
-    public UserResponse blockUser(UUID userId) {
+    public UserResponse updateOwnProfile(UUID userId, UpdateProfileRequest request) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        if (user.getRole() == UserRole.ADMIN) {
-            throw new BadRequestException("Admin users cannot be blocked from this API");
-        }
+        user.setFullName(request.fullName().trim());
 
-        if (user.getStatus() == UserStatus.DELETED) {
-            throw new BadRequestException("Deleted user cannot be blocked");
-        }
-
-        user.setStatus(UserStatus.SUSPENDED);
-
-        return toResponse(userRepository.save(user));
-    }
-
-    @Transactional
-    public UserResponse reactivateUser(UUID userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-
-        if (user.getStatus() == UserStatus.DELETED) {
-            throw new BadRequestException("Deleted user cannot be reactivated");
-        }
-
-        user.setStatus(UserStatus.ACTIVE);
+        String phone = request.phone();
+        user.setPhone(phone == null || phone.trim().isEmpty() ? null : phone.trim());
 
         return toResponse(userRepository.save(user));
     }

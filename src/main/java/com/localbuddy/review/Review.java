@@ -24,13 +24,21 @@ public class Review {
     @Column(name = "id", updatable = false, nullable = false)
     private UUID id;
 
-    @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "booking_id", nullable = false, unique = true)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "booking_id", nullable = false)
     private Booking booking;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "direction", nullable = false, length = 40)
+    private ReviewDirection direction = ReviewDirection.TRAVELER_TO_HOST;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "reviewer_user_id")
     private User reviewerUser;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "reviewee_user_id")
+    private User revieweeUser;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "local_profile_id", nullable = false)
@@ -49,6 +57,12 @@ public class Review {
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 40)
     private ReviewStatus status = ReviewStatus.VISIBLE;
+
+    @Column(name = "moderation_reason", columnDefinition = "TEXT")
+    private String moderationReason;
+
+    @Column(name = "moderated_at")
+    private Instant moderatedAt;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -70,6 +84,10 @@ public class Review {
 
         if (status == null) {
             status = ReviewStatus.VISIBLE;
+        }
+
+        if (direction == null) {
+            direction = ReviewDirection.TRAVELER_TO_HOST;
         }
     }
 

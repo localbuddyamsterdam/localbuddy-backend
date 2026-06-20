@@ -2,6 +2,7 @@ package com.localbuddy.experience;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 public record ExperienceResponse(
@@ -10,6 +11,7 @@ public record ExperienceResponse(
         UUID categoryId,
         String categoryName,
         String categorySlug,
+        List<UUID> categoryIds,
         UUID cityId,
         String cityName,
         String citySlug,
@@ -22,7 +24,16 @@ public record ExperienceResponse(
         BigDecimal priceAmount,
         String currency,
         Integer maxGuests,
+        BookingMode bookingMode,
+        BigDecimal privatePrice,
         String safetyNotes,
+        String shortDescription,
+        TransportMode transportMode,
+        String inclusions,
+        String exclusions,
+        String endLocation,
+        String reasonsToBook,
+        Integer minimumAge,
         ExperienceStatus status,
         Instant createdAt,
         Instant updatedAt
