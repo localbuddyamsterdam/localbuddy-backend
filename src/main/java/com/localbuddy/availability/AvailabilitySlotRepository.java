@@ -29,4 +29,20 @@ public interface AvailabilitySlotRepository extends JpaRepository<AvailabilitySl
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select slot from AvailabilitySlot slot where slot.id = :slotId")
     Optional<AvailabilitySlot> findByIdForUpdate(@Param("slotId") UUID slotId);
+
+    @Query("""
+            select slot from AvailabilitySlot slot
+            where slot.startTime > :windowStart
+              and slot.startTime <= :windowEnd
+              and slot.status = :status
+              and slot.capacity >= :minGuests
+              and slot.bookedCount < :minGuests
+            order by slot.startTime asc
+            """)
+    List<AvailabilitySlot> findUnderbookedSlotsForNotice(
+            @Param("windowStart") Instant windowStart,
+            @Param("windowEnd") Instant windowEnd,
+            @Param("status") AvailabilityStatus status,
+            @Param("minGuests") int minGuests
+    );
 }

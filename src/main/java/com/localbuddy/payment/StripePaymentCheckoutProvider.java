@@ -10,9 +10,15 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Instant;
 
 @Component
 public class StripePaymentCheckoutProvider implements PaymentCheckoutProvider {
+
+    // Stripe requires a checkout session to live at least 30 minutes; we add a
+    // small buffer over that floor. The booking expiry job proactively expires
+    // the session earlier (at the internal hold), so this is only a fallback.
+    private static final long SESSION_EXPIRATION_SECONDS = 31L * 60L;
 
     private final StripeProperties stripeProperties;
     private final StripeClient stripeClient;
@@ -51,6 +57,7 @@ public class StripePaymentCheckoutProvider implements PaymentCheckoutProvider {
                     .setMode(SessionCreateParams.Mode.PAYMENT)
                     .setSuccessUrl(successUrl)
                     .setCancelUrl(cancelUrl)
+                    .setExpiresAt(Instant.now().getEpochSecond() + SESSION_EXPIRATION_SECONDS)
                     .setClientReferenceId(payment.getId().toString())
                     .putMetadata("paymentId", payment.getId().toString())
                     .putMetadata("bookingId", payment.getBooking().getId().toString())
@@ -140,6 +147,19 @@ public class StripePaymentCheckoutProvider implements PaymentCheckoutProvider {
 
         } catch (Exception ex) {
             throw new BadRequestException("Unable to refund Stripe payment: " + ex.getMessage());
+        }
+    }
+
+    @Override
+    public void expireCheckout(String providerCheckoutSessionId) {
+        if (providerCheckoutSessionId == null || providerCheckoutSessionId.trim().isEmpty()) {
+            return;
+        }
+
+        try {
+            stripeClient.checkout().sessions().expire(providerCheckoutSessionId.trim());
+        } catch (Exception ex) {
+            // Best-effort: the session may already be completed or expired.
         }
     }
 

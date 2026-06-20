@@ -93,8 +93,12 @@ app:
       success-url: ${STRIPE_SUCCESS_URL:http://localhost:3000/payment/success}
       cancel-url: ${STRIPE_CANCEL_URL:http://localhost:3000/payment/cancel}
   booking:
-    pending-payment-expiration-minutes: ${BOOKING_PENDING_PAYMENT_EXPIRATION_MINUTES:30}
+    pending-payment-expiration-minutes: ${BOOKING_PENDING_PAYMENT_EXPIRATION_MINUTES:15}
     expiry-processor-delay-ms: ${BOOKING_EXPIRY_PROCESSOR_DELAY_MS:60000}
+    minimum-guests-to-confirm: ${BOOKING_MINIMUM_GUESTS_TO_CONFIRM:3}
+    underbooked-notice-hours: ${BOOKING_UNDERBOOKED_NOTICE_HOURS:36}
+    underbooked-cancel-deadline-hours: ${BOOKING_UNDERBOOKED_CANCEL_DEADLINE_HOURS:24}
+    underbooked-processor-delay-ms: ${BOOKING_UNDERBOOKED_PROCESSOR_DELAY_MS:300000}
   email:
     provider: ${EMAIL_PROVIDER:console}
     from-address: ${EMAIL_FROM_ADDRESS:no-reply@localbuddy.dev}

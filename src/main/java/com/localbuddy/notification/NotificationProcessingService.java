@@ -45,6 +45,17 @@ public class NotificationProcessingService {
     }
 
     private void processNotification(Notification notification) {
+        if (notification.getChannel() == NotificationChannel.IN_APP) {
+            // In-app notifications are "delivered" simply by being persisted;
+            // the recipient reads them through the notification feed.
+            notification.setStatus(NotificationStatus.SENT);
+            notification.setSentAt(Instant.now());
+            notification.setFailureReason(null);
+            notification.setUpdatedAt(Instant.now());
+            notificationRepository.save(notification);
+            return;
+        }
+
         if (notification.getChannel() != NotificationChannel.EMAIL) {
             notification.setStatus(NotificationStatus.SKIPPED);
             notification.setFailureReason("Notification channel not supported yet: " + notification.getChannel());

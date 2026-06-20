@@ -30,10 +30,11 @@ public class PaymentService {
     private final ReferralService referralService;
     private final CancellationRefundPolicyService cancellationRefundPolicyService;
     private final PaymentTransactionService paymentTransactionService;
+    private final BookingExpiryService bookingExpiryService;
 
     public PaymentService(PaymentRepository paymentRepository,
                           BookingRepository bookingRepository,
-                          @Value("${app.platform.commission-percentage:20}") BigDecimal commissionPercentage, PaymentCheckoutProvider paymentCheckoutProvider, PaymentWebhookEventRepository paymentWebhookEventRepository, PromoCodeService promoCodeService, ReferralService referralService, CancellationRefundPolicyService cancellationRefundPolicyService, PaymentTransactionService paymentTransactionService) {
+                          @Value("${app.platform.commission-percentage:20}") BigDecimal commissionPercentage, PaymentCheckoutProvider paymentCheckoutProvider, PaymentWebhookEventRepository paymentWebhookEventRepository, PromoCodeService promoCodeService, ReferralService referralService, CancellationRefundPolicyService cancellationRefundPolicyService, PaymentTransactionService paymentTransactionService, BookingExpiryService bookingExpiryService) {
         this.paymentRepository = paymentRepository;
         this.bookingRepository = bookingRepository;
         this.commissionPercentage = commissionPercentage;
@@ -43,6 +44,7 @@ public class PaymentService {
         this.referralService = referralService;
         this.cancellationRefundPolicyService = cancellationRefundPolicyService;
         this.paymentTransactionService = paymentTransactionService;
+        this.bookingExpiryService = bookingExpiryService;
     }
 
     @Transactional
@@ -377,6 +379,10 @@ public class PaymentService {
             if ("checkout.session.completed".equals(eventType)) {
                 Session session = extractCheckoutSession(event);
                 markPaymentPaidFromStripeSession(session);
+            } else if ("checkout.session.expired".equals(eventType) ||
+                    "checkout.session.async_payment_failed".equals(eventType)) {
+                Session session = extractCheckoutSession(event);
+                handleFailedOrExpiredCheckoutSession(session);
             }
 
             webhookEvent.setProcessed(true);
@@ -527,6 +533,16 @@ public class PaymentService {
 
         paymentRepository.save(payment);
 
+        // Safety net: the booking's hold may have expired and released the seat
+        // before this (late) payment landed. If the booking can no longer be
+        // honored, refund in full instead of confirming it.
+        if (booking.getStatus() != BookingStatus.PENDING_PAYMENT &&
+                booking.getStatus() != BookingStatus.ACCEPTED &&
+                booking.getStatus() != BookingStatus.CONFIRMED) {
+            refundFullPayment(payment, "Booking was released before the payment completed");
+            return;
+        }
+
         promoCodeService.redeemPromoCodeForPaidBooking(booking);
         referralService.redeemReferralCodeForPaidBooking(booking);
 
@@ -577,6 +593,95 @@ public class PaymentService {
             return;
         }
 
+        payment.setPaymentStatus(PaymentStatus.REFUND_PENDING);
+        paymentRepository.save(payment);
+
+        try {
+            PaymentRefundResult refundResult =
+                    paymentCheckoutProvider.refundPayment(payment, refundAmount, reason);
+
+            payment.setProviderRefundId(refundResult.providerRefundId());
+            payment.setRefundedAmount(refundResult.refundedAmount());
+            payment.setPaymentStatus(refundResult.paymentStatus());
+
+            if (refundResult.paymentStatus() == PaymentStatus.REFUNDED ||
+                    refundResult.paymentStatus() == PaymentStatus.PARTIALLY_REFUNDED) {
+                payment.setRefundedAt(Instant.now());
+            }
+
+            paymentRepository.save(payment);
+
+        } catch (Exception ex) {
+            payment.setPaymentStatus(PaymentStatus.REFUND_FAILED);
+            payment.setFailureReason(ex.getMessage());
+            paymentRepository.save(payment);
+        }
+    }
+
+    private void handleFailedOrExpiredCheckoutSession(Session session) {
+        if (session.getId() == null || session.getId().trim().isEmpty()) {
+            return;
+        }
+
+        Payment payment = paymentRepository
+                .findByProviderAndProviderCheckoutSessionId(PaymentProvider.STRIPE, session.getId())
+                .orElse(null);
+
+        if (payment == null) {
+            return;
+        }
+
+        if (payment.getPaymentStatus() == PaymentStatus.PAID ||
+                payment.getPaymentStatus() == PaymentStatus.REFUNDED ||
+                payment.getPaymentStatus() == PaymentStatus.PARTIALLY_REFUNDED) {
+            return;
+        }
+
+        if (payment.getPaymentStatus() == PaymentStatus.PENDING ||
+                payment.getPaymentStatus() == PaymentStatus.PROCESSING) {
+            payment.setPaymentStatus(PaymentStatus.FAILED);
+            payment.setFailedAt(Instant.now());
+            payment.setFailureReason("Stripe checkout session expired or payment failed");
+            paymentRepository.save(payment);
+        }
+
+        // Free the seat immediately instead of waiting for the periodic expiry sweep.
+        bookingExpiryService.releaseBookingSlotAfterFailedPayment(payment.getBooking().getId());
+    }
+
+    /**
+     * Fully refunds a paid booking, used when the platform/host cancels (e.g. a
+     * slot is cancelled for not meeting its minimum). Pending/processing payments
+     * are simply cancelled.
+     */
+    @Transactional
+    public void fullyRefundBookingPayment(Booking booking, String reason) {
+        Payment payment = paymentRepository.findByBookingId(booking.getId()).orElse(null);
+
+        if (payment == null) {
+            return;
+        }
+
+        if (payment.getPaymentStatus() == PaymentStatus.PENDING ||
+                payment.getPaymentStatus() == PaymentStatus.PROCESSING) {
+            payment.setPaymentStatus(PaymentStatus.CANCELLED);
+            payment.setCancelledAt(Instant.now());
+            payment.setRefundReason(optionalTrim(reason));
+            paymentRepository.save(payment);
+            return;
+        }
+
+        if (payment.getPaymentStatus() != PaymentStatus.PAID) {
+            return;
+        }
+
+        refundFullPayment(payment, reason);
+    }
+
+    private void refundFullPayment(Payment payment, String reason) {
+        BigDecimal refundAmount = payment.getAmount();
+
+        payment.setRefundReason(optionalTrim(reason));
         payment.setPaymentStatus(PaymentStatus.REFUND_PENDING);
         paymentRepository.save(payment);
 

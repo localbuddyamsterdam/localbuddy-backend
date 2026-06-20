@@ -42,6 +42,11 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
             Collection<BookingStatus> statuses
     );
 
+    List<Booking> findByAvailabilitySlotIdAndStatusIn(
+            UUID availabilitySlotId,
+            Collection<BookingStatus> statuses
+    );
+
     long countByStatus(BookingStatus status);
 
     List<Booking> findTop100ByStatusAndRequestedAtBeforeOrderByRequestedAtAsc(

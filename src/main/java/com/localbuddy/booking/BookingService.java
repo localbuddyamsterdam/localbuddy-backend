@@ -23,6 +23,7 @@ import com.localbuddy.trustsafety.TrustSafetyService;
 import com.localbuddy.user.User;
 import com.localbuddy.user.UserRepository;
 import com.localbuddy.user.UserRole;
+import com.localbuddy.waitlist.WaitlistService;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -60,12 +61,13 @@ public class BookingService {
     private final TrustSafetyService trustSafetyService;
     private final ApplicationEventPublisher eventPublisher;
     private final BookingReferenceGenerator bookingReferenceGenerator;
+    private final WaitlistService waitlistService;
 
     public BookingService(BookingRepository bookingRepository,
                           UserRepository userRepository,
                           ExperienceRepository experienceRepository,
                           AvailabilitySlotRepository availabilitySlotRepository,
-                          LocalProfileRepository localProfileRepository, NotificationService notificationService, ConsentService consentService, PromoCodeService promoCodeService, ReferralService referralService, BookingSafetyChecklistRepository bookingSafetyChecklistRepository, PaymentService paymentService, TrustSafetyService trustSafetyService, ApplicationEventPublisher eventPublisher, BookingReferenceGenerator bookingReferenceGenerator) {
+                          LocalProfileRepository localProfileRepository, NotificationService notificationService, ConsentService consentService, PromoCodeService promoCodeService, ReferralService referralService, BookingSafetyChecklistRepository bookingSafetyChecklistRepository, PaymentService paymentService, TrustSafetyService trustSafetyService, ApplicationEventPublisher eventPublisher, BookingReferenceGenerator bookingReferenceGenerator, WaitlistService waitlistService) {
         this.bookingRepository = bookingRepository;
         this.userRepository = userRepository;
         this.experienceRepository = experienceRepository;
@@ -80,6 +82,7 @@ public class BookingService {
         this.trustSafetyService = trustSafetyService;
         this.eventPublisher = eventPublisher;
         this.bookingReferenceGenerator = bookingReferenceGenerator;
+        this.waitlistService = waitlistService;
     }
 
     @Transactional
@@ -491,6 +494,7 @@ public class BookingService {
         booking.setLocalResponseNote(optionalTrim(request.note()));
 
         availabilitySlotRepository.save(slot);
+        waitlistService.notifyOpenedSpots(slot);
         Booking savedBooking = bookingRepository.save(booking);
         createBookingDeclinedNotification(savedBooking);
         return toResponse(savedBooking);
@@ -559,6 +563,7 @@ public class BookingService {
         }
 
         availabilitySlotRepository.save(slot);
+        waitlistService.notifyOpenedSpots(slot);
     }
 
     @Transactional(readOnly = true)
@@ -983,6 +988,7 @@ public class BookingService {
 
         availabilitySlotRepository.save(oldSlot);
         availabilitySlotRepository.save(newSlot);
+        waitlistService.notifyOpenedSpots(oldSlot);
 
         Booking savedBooking = bookingRepository.save(booking);
         createBookingRescheduledNotification(savedBooking);

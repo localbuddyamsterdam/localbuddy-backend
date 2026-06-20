@@ -20,6 +20,16 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
 
     List<Notification> findByRecipientUserIdOrderByCreatedAtDesc(UUID recipientUserId);
 
+    List<Notification> findByRecipientUserIdAndChannelOrderByCreatedAtDesc(
+            UUID recipientUserId,
+            NotificationChannel channel
+    );
+
+    List<Notification> findByRecipientUserIdAndChannelAndReadAtIsNull(
+            UUID recipientUserId,
+            NotificationChannel channel
+    );
+
     List<Notification> findByRelatedEntityTypeAndRelatedEntityIdOrderByCreatedAtDesc(
             String relatedEntityType,
             UUID relatedEntityId
