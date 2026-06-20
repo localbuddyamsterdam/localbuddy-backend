@@ -38,4 +38,10 @@ public interface PaymentRepository extends JpaRepository<Payment, UUID> {
             UUID bookingId,
             List<PaymentStatus> statuses
     );
+
+    /** Host earnings: payments for a host's bookings in a given status (read-only). */
+    List<Payment> findByBooking_LocalProfile_IdAndPaymentStatus(
+            UUID localProfileId,
+            PaymentStatus paymentStatus
+    );
 }

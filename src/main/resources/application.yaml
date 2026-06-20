@@ -85,6 +85,8 @@ app:
 
   notifications:
     processor-delay-ms: 10000
+    reminder-processor-delay-ms: ${NOTIFICATION_REMINDER_PROCESSOR_DELAY_MS:900000}
+    reminder-lead-hours: ${NOTIFICATION_REMINDER_LEAD_HOURS:24}
 
   payments:
     stripe:
@@ -108,6 +110,12 @@ app:
     communication:
       connection-string: ${AZURE_COMMUNICATION_CONNECTION_STRING:}
 
+  media:
+    azure:
+      connection-string: ${AZURE_BLOB_CONNECTION_STRING:}
+      container: ${AZURE_BLOB_CONTAINER:experience-photos}
+      public-base-url: ${AZURE_BLOB_PUBLIC_BASE_URL:}
+
   dev-admin:
     email: ${DEV_ADMIN_EMAIL:admin@test.com}
     password: ${DEV_ADMIN_PASSWORD:Password@123}
@@ -126,3 +134,10 @@ app:
   social:
     google:
       client-id: ${GOOGLE_CLIENT_ID:}
+
+  ai:
+    anthropic:
+      api-key: ${ANTHROPIC_API_KEY:}
+      model: ${ANTHROPIC_MODEL:claude-sonnet-4-6}
+      base-url: ${ANTHROPIC_BASE_URL:https://api.anthropic.com/v1/messages}
+      max-tokens: ${ANTHROPIC_MAX_TOKENS:1024}

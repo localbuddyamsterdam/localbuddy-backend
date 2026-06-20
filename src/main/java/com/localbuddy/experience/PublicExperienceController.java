@@ -72,6 +72,43 @@ public class PublicExperienceController {
     }
 
     @Operation(
+            summary = "Advanced search of approved experiences",
+            description = "Public endpoint. Extends search with price range, minimum host rating, maximum duration, and a "
+                    + "keyword matched against title/description, in addition to city/category/date/party filters."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Search results retrieved successfully"),
+            @ApiResponse(responseCode = "400", description = "Invalid search parameters")
+    })
+    @GetMapping("/search/advanced")
+    public ResponseEntity<ExperiencePageResponse> advancedSearch(
+            @RequestParam(required = false) String citySlug,
+            @RequestParam(required = false) String categorySlug,
+            @Parameter(description = "Desired experience date (ISO-8601, yyyy-MM-dd)")
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam(required = false) Integer adults,
+            @RequestParam(required = false) Integer teens,
+            @RequestParam(required = false) Integer children,
+            @RequestParam(required = false) Integer infants,
+            @Parameter(description = "Minimum price per guest")
+            @RequestParam(required = false) java.math.BigDecimal minPrice,
+            @Parameter(description = "Maximum price per guest")
+            @RequestParam(required = false) java.math.BigDecimal maxPrice,
+            @Parameter(description = "Maximum duration in minutes")
+            @RequestParam(required = false) Integer maxDurationMinutes,
+            @Parameter(description = "Minimum host rating (0-5)")
+            @RequestParam(required = false) java.math.BigDecimal minHostRating,
+            @Parameter(description = "Free-text keyword matched against title and description")
+            @RequestParam(required = false) String keyword,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        return ResponseEntity.ok(experienceService.advancedSearch(
+                citySlug, categorySlug, date, adults, teens, children, infants,
+                minPrice, maxPrice, maxDurationMinutes, minHostRating, keyword, page, size));
+    }
+
+    @Operation(
             summary = "Get approved experience by ID",
             description = "Public endpoint. Returns a single approved experience by its ID."
     )

@@ -245,6 +245,80 @@ public class ExperienceService {
         );
     }
 
+    @Transactional(readOnly = true)
+    public ExperiencePageResponse advancedSearch(
+            String citySlug,
+            String categorySlug,
+            LocalDate date,
+            Integer adults,
+            Integer teens,
+            Integer children,
+            Integer infants,
+            BigDecimal minPrice,
+            BigDecimal maxPrice,
+            Integer maxDurationMinutes,
+            BigDecimal minHostRating,
+            String keyword,
+            int page,
+            int size
+    ) {
+        String city = normalizeSlug(citySlug);
+        String category = normalizeSlug(categorySlug);
+
+        int adultCount = adults == null ? 0 : Math.max(0, adults);
+        int teenCount = teens == null ? 0 : Math.max(0, teens);
+        int childCount = children == null ? 0 : Math.max(0, children);
+        int infantCount = infants == null ? 0 : Math.max(0, infants);
+
+        int totalGuests = adultCount + teenCount + childCount + infantCount;
+        Integer guests = totalGuests > 0 ? totalGuests : null;
+
+        Integer maxMinimumAge = infantCount > 0 ? 0
+                : childCount > 0 ? 2
+                : teenCount > 0 ? 13
+                : null;
+
+        Instant dateStart = null;
+        Instant dateEnd = null;
+        if (date != null) {
+            dateStart = date.atStartOfDay(ZoneOffset.UTC).toInstant();
+            dateEnd = date.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+        }
+
+        BigDecimal normalizedMinPrice = normalizePrice(minPrice);
+        BigDecimal normalizedMaxPrice = normalizePrice(maxPrice);
+        Integer normalizedMaxDuration = (maxDurationMinutes != null && maxDurationMinutes > 0)
+                ? maxDurationMinutes : null;
+        BigDecimal normalizedMinRating = (minHostRating != null && minHostRating.signum() > 0)
+                ? minHostRating : null;
+
+        String keywordPattern = null;
+        if (keyword != null && !keyword.trim().isEmpty()) {
+            keywordPattern = "%" + keyword.trim().toLowerCase(Locale.ROOT) + "%";
+        }
+
+        int pageNumber = Math.max(0, page);
+        int pageSize = size <= 0 ? 20 : Math.min(size, 100);
+        Pageable pageable = PageRequest.of(pageNumber, pageSize);
+
+        Page<Experience> result = experienceRepository.searchApprovedAdvanced(
+                city, category, maxMinimumAge, guests, Instant.now(), dateStart, dateEnd,
+                normalizedMinPrice, normalizedMaxPrice, normalizedMaxDuration, normalizedMinRating,
+                keywordPattern, pageable);
+
+        List<ExperienceResponse> content = result.getContent().stream()
+                .map(this::toResponse)
+                .toList();
+
+        return new ExperiencePageResponse(
+                content,
+                result.getNumber(),
+                result.getSize(),
+                result.getTotalElements(),
+                result.getTotalPages()
+        );
+    }
+
     private String normalizeSlug(String slug) {
         if (slug == null || slug.trim().isEmpty()) {
             return null;

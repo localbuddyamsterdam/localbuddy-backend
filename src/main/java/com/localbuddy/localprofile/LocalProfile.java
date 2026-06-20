@@ -126,6 +126,12 @@ public class LocalProfile {
     @Column(name = "swift_code", length = 32)
     private String swiftCode;
 
+    @Column(name = "stripe_connect_account_id", length = 255)
+    private String stripeConnectAccountId;
+
+    @Column(name = "payouts_enabled", nullable = false)
+    private boolean payoutsEnabled = false;
+
     @Column(name = "verification_provider", length = 80)
     private String verificationProvider;
 
