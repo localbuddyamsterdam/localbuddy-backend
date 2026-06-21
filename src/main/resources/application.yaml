@@ -144,6 +144,21 @@ app:
     phone-number-id: ${WHATSAPP_PHONE_NUMBER_ID:}
     api-base-url: ${WHATSAPP_API_BASE_URL:https://graph.facebook.com/v21.0}
 
+  wallet:
+    google:
+      issuer-id: ${GOOGLE_WALLET_ISSUER_ID:}
+      class-id: ${GOOGLE_WALLET_CLASS_ID:}
+      service-account-email: ${GOOGLE_WALLET_SA_EMAIL:}
+      service-account-private-key: ${GOOGLE_WALLET_SA_PRIVATE_KEY:}
+      origin: ${GOOGLE_WALLET_ORIGIN:}
+    apple:
+      pass-type-id: ${APPLE_WALLET_PASS_TYPE_ID:}
+      team-id: ${APPLE_WALLET_TEAM_ID:}
+      organization-name: ${APPLE_WALLET_ORG_NAME:LocalBuddy}
+      certificate-base64: ${APPLE_WALLET_CERT_BASE64:}
+      certificate-password: ${APPLE_WALLET_CERT_PASSWORD:}
+      wwdr-base64: ${APPLE_WALLET_WWDR_BASE64:}
+
   dev-admin:
     email: ${DEV_ADMIN_EMAIL:admin@test.com}
     password: ${DEV_ADMIN_PASSWORD:Password@123}
