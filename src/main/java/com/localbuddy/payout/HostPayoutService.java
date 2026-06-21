@@ -4,58 +4,48 @@ import com.localbuddy.common.exception.BadRequestException;
 import com.localbuddy.common.exception.ResourceNotFoundException;
 import com.localbuddy.localprofile.LocalProfile;
 import com.localbuddy.localprofile.LocalProfileRepository;
-import com.localbuddy.payment.Payment;
-import com.localbuddy.payment.PaymentRepository;
-import com.localbuddy.payment.PaymentStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * Host earnings and payouts, backed by the {@link HostLedgerService} ledger.
+ * Earnings/holds/clawbacks live in the ledger; a payout batches a host's payable
+ * (AVAILABLE, not-yet-attached) entries and disburses via Stripe Connect.
+ */
 @Service
 public class HostPayoutService {
 
     private final PayoutRepository payoutRepository;
-    private final PayoutItemRepository payoutItemRepository;
-    private final PaymentRepository paymentRepository;
     private final LocalProfileRepository localProfileRepository;
     private final ConnectPayoutProvider connectPayoutProvider;
+    private final HostLedgerService ledgerService;
 
     public HostPayoutService(PayoutRepository payoutRepository,
-                             PayoutItemRepository payoutItemRepository,
-                             PaymentRepository paymentRepository,
                              LocalProfileRepository localProfileRepository,
-                             ConnectPayoutProvider connectPayoutProvider) {
+                             ConnectPayoutProvider connectPayoutProvider,
+                             HostLedgerService ledgerService) {
         this.payoutRepository = payoutRepository;
-        this.payoutItemRepository = payoutItemRepository;
-        this.paymentRepository = paymentRepository;
         this.localProfileRepository = localProfileRepository;
         this.connectPayoutProvider = connectPayoutProvider;
+        this.ledgerService = ledgerService;
     }
 
     @Transactional(readOnly = true)
     public HostEarningsResponse getMyEarnings(UUID hostUserId) {
         LocalProfile host = requireHostProfile(hostUserId);
-
-        List<Payment> paid = paymentRepository.findByBooking_LocalProfile_IdAndPaymentStatus(
-                host.getId(), PaymentStatus.PAID);
-        BigDecimal earned = sum(paid.stream().map(Payment::getLocalPayoutAmount).toList());
-
-        List<Payout> payouts = payoutRepository.findByLocalProfileIdOrderByCreatedAtDesc(host.getId());
-        BigDecimal paidOut = sum(payouts.stream()
-                .filter(p -> p.getStatus() == PayoutStatus.PAID)
-                .map(Payout::getAmount).toList());
-        BigDecimal committed = sum(payouts.stream()
-                .filter(p -> p.getStatus() != PayoutStatus.FAILED)
-                .map(Payout::getAmount).toList());
-
-        BigDecimal pending = earned.subtract(committed).max(BigDecimal.ZERO);
-        String currency = paid.isEmpty() ? "EUR" : paid.get(0).getCurrency();
-
-        return new HostEarningsResponse(earned, paidOut, pending, currency);
+        HostLedgerBalances balances = ledgerService.balances(host.getId());
+        return new HostEarningsResponse(
+                balances.lifetimeNet(),
+                balances.paidOut(),
+                balances.availableNow(),
+                balances.onHold(),
+                balances.currency());
     }
 
     @Transactional(readOnly = true)
@@ -84,24 +74,20 @@ public class HostPayoutService {
                 .stream().map(this::toResponse).toList();
     }
 
-    /** Admin: disburse all not-yet-paid-out host earnings as a single payout. */
+    /** Batches a host's payable ledger entries into a payout and (if onboarded) disburses it. */
     @Transactional
     public PayoutResponse createPayoutForHost(UUID localProfileId) {
         LocalProfile host = localProfileRepository.findById(localProfileId)
                 .orElseThrow(() -> new ResourceNotFoundException("Local profile not found"));
 
-        List<Payment> unpaid = paymentRepository
-                .findByBooking_LocalProfile_IdAndPaymentStatus(host.getId(), PaymentStatus.PAID)
-                .stream()
-                .filter(p -> !payoutItemRepository.existsByPaymentId(p.getId()))
-                .toList();
+        List<HostLedgerEntry> entries = ledgerService.payableEntries(host.getId());
+        BigDecimal amount = sum(entries).setScale(2, RoundingMode.HALF_UP);
 
-        if (unpaid.isEmpty()) {
+        if (entries.isEmpty() || amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new BadRequestException("No earnings available to pay out for this host");
         }
 
-        BigDecimal amount = sum(unpaid.stream().map(Payment::getLocalPayoutAmount).toList());
-        String currency = unpaid.get(0).getCurrency();
+        String currency = entries.get(0).getCurrency();
 
         Payout payout = new Payout();
         payout.setLocalProfile(host);
@@ -110,13 +96,8 @@ public class HostPayoutService {
         payout.setStatus(PayoutStatus.PENDING);
         Payout saved = payoutRepository.save(payout);
 
-        for (Payment payment : unpaid) {
-            PayoutItem item = new PayoutItem();
-            item.setPayout(saved);
-            item.setPayment(payment);
-            item.setAmount(payment.getLocalPayoutAmount());
-            payoutItemRepository.save(item);
-        }
+        // Reserve the entries against this payout so they can't be paid twice.
+        ledgerService.attachToPayout(entries, saved.getId());
 
         // Auto-disburse via Stripe Connect when the host is onboarded; otherwise leave
         // PENDING for manual/offline disbursement (admin marks it paid).
@@ -129,11 +110,14 @@ public class HostPayoutService {
                 saved.setProviderTransferId(transferId);
                 saved.setStatus(PayoutStatus.PAID);
                 saved.setPaidAt(Instant.now());
+                saved = payoutRepository.save(saved);
+                ledgerService.settlePayout(saved.getId());
             } catch (Exception ex) {
                 saved.setStatus(PayoutStatus.FAILED);
                 saved.setFailureReason(ex.getMessage());
+                saved = payoutRepository.save(saved);
+                ledgerService.detachPayout(saved.getId());
             }
-            saved = payoutRepository.save(saved);
         }
 
         return toResponse(saved);
@@ -148,7 +132,9 @@ public class HostPayoutService {
         if (notes != null && !notes.trim().isEmpty()) {
             payout.setNotes(notes.trim());
         }
-        return toResponse(payoutRepository.save(payout));
+        PayoutResponse response = toResponse(payoutRepository.save(payout));
+        ledgerService.settlePayout(payoutId);
+        return response;
     }
 
     private LocalProfile requireHostProfile(UUID hostUserId) {
@@ -156,8 +142,11 @@ public class HostPayoutService {
                 .orElseThrow(() -> new ResourceNotFoundException("Local profile not found"));
     }
 
-    private BigDecimal sum(List<BigDecimal> values) {
-        return values.stream().filter(v -> v != null).reduce(BigDecimal.ZERO, BigDecimal::add);
+    private BigDecimal sum(List<HostLedgerEntry> entries) {
+        return entries.stream()
+                .map(HostLedgerEntry::getAmount)
+                .filter(a -> a != null)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     private PayoutResponse toResponse(Payout payout) {

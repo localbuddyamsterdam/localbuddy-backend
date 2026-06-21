@@ -19,16 +19,16 @@ public class PaymentTransactionService {
 
     private final PaymentRepository paymentRepository;
     private final BookingRepository bookingRepository;
-    private final BigDecimal commissionPercentage;
+    private final com.localbuddy.pricing.PricingEngine pricingEngine;
 
     public PaymentTransactionService(
             PaymentRepository paymentRepository,
             BookingRepository bookingRepository,
-            @Value("${app.platform.commission-percentage:20}") BigDecimal commissionPercentage
+            com.localbuddy.pricing.PricingEngine pricingEngine
     ) {
         this.paymentRepository = paymentRepository;
         this.bookingRepository = bookingRepository;
-        this.commissionPercentage = commissionPercentage;
+        this.pricingEngine = pricingEngine;
     }
 
     @Transactional
@@ -91,23 +91,12 @@ public class PaymentTransactionService {
     }
 
     private Payment createPaymentEntityForBooking(Booking booking) {
-        BigDecimal amount = booking.getTotalAmount().setScale(2, RoundingMode.HALF_UP);
-
-        BigDecimal platformFee = amount
-                .multiply(commissionPercentage)
-                .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
-
-        BigDecimal localPayout = amount.subtract(platformFee).setScale(2, RoundingMode.HALF_UP);
-
         Payment payment = new Payment();
         payment.setBooking(booking);
         payment.setProvider(PaymentProvider.STRIPE);
         payment.setPaymentMethodType(PaymentMethodType.UNKNOWN);
         payment.setPaymentStatus(PaymentStatus.PENDING);
-        payment.setAmount(amount);
-        payment.setCurrency(booking.getCurrency());
-        payment.setPlatformFeeAmount(platformFee);
-        payment.setLocalPayoutAmount(localPayout);
+        pricingEngine.applyTo(payment, booking);
 
         return paymentRepository.save(payment);
     }

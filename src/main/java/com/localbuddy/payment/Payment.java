@@ -50,6 +50,47 @@ public class Payment {
     @Column(name = "local_payout_amount", nullable = false, precision = 10, scale = 2)
     private BigDecimal localPayoutAmount = BigDecimal.ZERO;
 
+    // ---- Financial snapshot (resolved at booking time; immutable) ----
+
+    @Column(name = "commission_rate", precision = 5, scale = 4)
+    private BigDecimal commissionRate;
+
+    @Column(name = "commission_amount", nullable = false, precision = 10, scale = 2)
+    private BigDecimal commissionAmount = BigDecimal.ZERO;
+
+    @Column(name = "commission_vat_rate", precision = 5, scale = 4)
+    private BigDecimal commissionVatRate;
+
+    @Column(name = "commission_vat_amount", nullable = false, precision = 10, scale = 2)
+    private BigDecimal commissionVatAmount = BigDecimal.ZERO;
+
+    @Column(name = "commission_vat_treatment", length = 20)
+    private String commissionVatTreatment;
+
+    @Column(name = "service_fee_amount", nullable = false, precision = 10, scale = 2)
+    private BigDecimal serviceFeeAmount = BigDecimal.ZERO;
+
+    @Column(name = "service_fee_vat_amount", nullable = false, precision = 10, scale = 2)
+    private BigDecimal serviceFeeVatAmount = BigDecimal.ZERO;
+
+    @Column(name = "experience_gross_amount", nullable = false, precision = 10, scale = 2)
+    private BigDecimal experienceGrossAmount = BigDecimal.ZERO;
+
+    @Column(name = "experience_net_amount", nullable = false, precision = 10, scale = 2)
+    private BigDecimal experienceNetAmount = BigDecimal.ZERO;
+
+    @Column(name = "experience_vat_rate", precision = 5, scale = 4)
+    private BigDecimal experienceVatRate;
+
+    @Column(name = "experience_vat_amount", nullable = false, precision = 10, scale = 2)
+    private BigDecimal experienceVatAmount = BigDecimal.ZERO;
+
+    @Column(name = "place_of_supply_country", length = 2)
+    private String placeOfSupplyCountry;
+
+    @Column(name = "host_payout_amount", nullable = false, precision = 10, scale = 2)
+    private BigDecimal hostPayoutAmount = BigDecimal.ZERO;
+
     @Column(name = "provider_checkout_session_id")
     private String providerCheckoutSessionId;
 

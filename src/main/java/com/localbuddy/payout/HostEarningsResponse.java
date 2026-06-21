@@ -5,7 +5,8 @@ import java.math.BigDecimal;
 public record HostEarningsResponse(
         BigDecimal totalEarned,
         BigDecimal totalPaidOut,
-        BigDecimal pendingBalance,
+        BigDecimal availableBalance,
+        BigDecimal onHoldBalance,
         String currency
 ) {
 }

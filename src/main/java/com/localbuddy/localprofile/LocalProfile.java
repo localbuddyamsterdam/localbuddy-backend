@@ -12,6 +12,7 @@ import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -125,6 +126,35 @@ public class LocalProfile {
 
     @Column(name = "swift_code", length = 32)
     private String swiftCode;
+
+    // ---- Tax / VAT / DAC7 + per-host commission override ----
+
+    @Column(name = "vat_registered", nullable = false)
+    private boolean vatRegistered = false;
+
+    @Column(name = "vat_number", length = 40)
+    private String vatNumber;
+
+    /** ISO-2 country of tax residence (e.g. NL); drives VAT treatment. */
+    @Column(name = "tax_country", length = 2)
+    private String taxCountry;
+
+    @Column(name = "legal_entity_type", length = 20)
+    private String legalEntityType;
+
+    /** DAC7 tax identification number. */
+    @Column(name = "tax_identification_number", length = 60)
+    private String taxIdentificationNumber;
+
+    @Column(name = "business_registration_number", length = 60)
+    private String businessRegistrationNumber;
+
+    @Column(name = "date_of_birth")
+    private LocalDate dateOfBirth;
+
+    /** Optional per-host commission override; used when an experience has none. */
+    @Column(name = "commission_rate", precision = 5, scale = 4)
+    private BigDecimal commissionRate;
 
     @Column(name = "stripe_connect_account_id", length = 255)
     private String stripeConnectAccountId;

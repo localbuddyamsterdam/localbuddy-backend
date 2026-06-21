@@ -81,7 +81,22 @@ app:
 
   platform:
     default-city: Amsterdam
-    commission-percentage: 20
+    commission-percentage: 20          # fallback when no PLATFORM commission_rule row exists
+
+  fees:
+    service-fee-percentage: ${SERVICE_FEE_PERCENTAGE:2.5}
+
+  vat:
+    default-country: ${VAT_DEFAULT_COUNTRY:NL}
+    standard-rate-percentage: ${VAT_STANDARD_RATE_PERCENTAGE:21}
+    merchant-of-record: ${VAT_MERCHANT_OF_RECORD:INTERMEDIARY}   # INTERMEDIARY | DEEMED_SUPPLIER
+
+  payout:
+    schedule: ${PAYOUT_SCHEDULE:MONTHLY}             # WEEKLY | BIWEEKLY | MONTHLY
+    hold-hours: ${PAYOUT_HOLD_HOURS:72}
+    minimum-amount: ${PAYOUT_MINIMUM_AMOUNT:25}
+    day-of-month: ${PAYOUT_DAY_OF_MONTH:1}
+    processor-delay-ms: ${PAYOUT_PROCESSOR_DELAY_MS:3600000}
 
   notifications:
     processor-delay-ms: 10000

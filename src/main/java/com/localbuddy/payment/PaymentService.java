@@ -3,6 +3,8 @@ package com.localbuddy.payment;
 import com.localbuddy.booking.*;
 import com.localbuddy.common.exception.BadRequestException;
 import com.localbuddy.common.exception.ResourceNotFoundException;
+import com.localbuddy.payout.HostLedgerService;
+import com.localbuddy.pricing.PricingEngine;
 import com.localbuddy.promo.PromoCodeService;
 import com.localbuddy.referral.ReferralService;
 import org.springframework.beans.factory.annotation.Value;
@@ -31,10 +33,12 @@ public class PaymentService {
     private final CancellationRefundPolicyService cancellationRefundPolicyService;
     private final PaymentTransactionService paymentTransactionService;
     private final BookingExpiryService bookingExpiryService;
+    private final PricingEngine pricingEngine;
+    private final HostLedgerService hostLedgerService;
 
     public PaymentService(PaymentRepository paymentRepository,
                           BookingRepository bookingRepository,
-                          @Value("${app.platform.commission-percentage:20}") BigDecimal commissionPercentage, PaymentCheckoutProvider paymentCheckoutProvider, PaymentWebhookEventRepository paymentWebhookEventRepository, PromoCodeService promoCodeService, ReferralService referralService, CancellationRefundPolicyService cancellationRefundPolicyService, PaymentTransactionService paymentTransactionService, BookingExpiryService bookingExpiryService) {
+                          @Value("${app.platform.commission-percentage:20}") BigDecimal commissionPercentage, PaymentCheckoutProvider paymentCheckoutProvider, PaymentWebhookEventRepository paymentWebhookEventRepository, PromoCodeService promoCodeService, ReferralService referralService, CancellationRefundPolicyService cancellationRefundPolicyService, PaymentTransactionService paymentTransactionService, BookingExpiryService bookingExpiryService, PricingEngine pricingEngine, HostLedgerService hostLedgerService) {
         this.paymentRepository = paymentRepository;
         this.bookingRepository = bookingRepository;
         this.commissionPercentage = commissionPercentage;
@@ -45,6 +49,8 @@ public class PaymentService {
         this.cancellationRefundPolicyService = cancellationRefundPolicyService;
         this.paymentTransactionService = paymentTransactionService;
         this.bookingExpiryService = bookingExpiryService;
+        this.pricingEngine = pricingEngine;
+        this.hostLedgerService = hostLedgerService;
     }
 
     @Transactional
@@ -64,21 +70,12 @@ public class PaymentService {
             throw new BadRequestException("Active payment already exists for this booking");
         }
 
-        BigDecimal amount = booking.getTotalAmount().setScale(2, RoundingMode.HALF_UP);
-        BigDecimal platformFee = amount
-                .multiply(commissionPercentage)
-                .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
-        BigDecimal localPayout = amount.subtract(platformFee).setScale(2, RoundingMode.HALF_UP);
-
         Payment payment = new Payment();
         payment.setBooking(booking);
         payment.setProvider(PaymentProvider.STRIPE);
         payment.setPaymentMethodType(PaymentMethodType.UNKNOWN);
         payment.setPaymentStatus(PaymentStatus.PENDING);
-        payment.setAmount(amount);
-        payment.setCurrency(booking.getCurrency());
-        payment.setPlatformFeeAmount(platformFee);
-        payment.setLocalPayoutAmount(localPayout);
+        pricingEngine.applyTo(payment, booking);
 
         return toResponse(paymentRepository.save(payment));
     }
@@ -152,21 +149,12 @@ public class PaymentService {
             throw new BadRequestException("Active payment already exists for this booking");
         }
 
-        BigDecimal amount = booking.getTotalAmount().setScale(2, RoundingMode.HALF_UP);
-        BigDecimal platformFee = amount
-                .multiply(commissionPercentage)
-                .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
-        BigDecimal localPayout = amount.subtract(platformFee).setScale(2, RoundingMode.HALF_UP);
-
         Payment payment = new Payment();
         payment.setBooking(booking);
         payment.setProvider(PaymentProvider.STRIPE);
         payment.setPaymentMethodType(PaymentMethodType.UNKNOWN);
         payment.setPaymentStatus(PaymentStatus.PENDING);
-        payment.setAmount(amount);
-        payment.setCurrency(booking.getCurrency());
-        payment.setPlatformFeeAmount(platformFee);
-        payment.setLocalPayoutAmount(localPayout);
+        pricingEngine.applyTo(payment, booking);
 
         return toResponse(paymentRepository.save(payment));
     }
@@ -444,6 +432,7 @@ public class PaymentService {
 
         Booking booking = payment.getBooking();
         confirmBookingAfterPayment(booking);
+        hostLedgerService.recordEarning(booking, payment);
     }
 
 
@@ -464,23 +453,12 @@ public class PaymentService {
     }
 
     private Payment createPaymentEntityForBooking(Booking booking) {
-        BigDecimal amount = booking.getTotalAmount().setScale(2, RoundingMode.HALF_UP);
-
-        BigDecimal platformFee = amount
-                .multiply(commissionPercentage)
-                .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
-
-        BigDecimal localPayout = amount.subtract(platformFee).setScale(2, RoundingMode.HALF_UP);
-
         Payment payment = new Payment();
         payment.setBooking(booking);
         payment.setProvider(PaymentProvider.STRIPE);
         payment.setPaymentMethodType(PaymentMethodType.UNKNOWN);
         payment.setPaymentStatus(PaymentStatus.PENDING);
-        payment.setAmount(amount);
-        payment.setCurrency(booking.getCurrency());
-        payment.setPlatformFeeAmount(platformFee);
-        payment.setLocalPayoutAmount(localPayout);
+        pricingEngine.applyTo(payment, booking);
 
         return paymentRepository.save(payment);
     }
@@ -547,6 +525,7 @@ public class PaymentService {
         referralService.redeemReferralCodeForPaidBooking(booking);
 
         confirmBookingAfterPayment(booking);
+        hostLedgerService.recordEarning(booking, payment);
     }
 
     @Transactional
@@ -580,6 +559,8 @@ public class PaymentService {
         if (payment.getPaymentStatus() != PaymentStatus.PAID) {
             return;
         }
+
+        hostLedgerService.reverseForPayment(payment.getId(), reason);
 
         RefundCalculationResult refundCalculation =
                 cancellationRefundPolicyService.calculateRefund(booking, cancelledBy);
@@ -675,6 +656,7 @@ public class PaymentService {
             return;
         }
 
+        hostLedgerService.reverseForPayment(payment.getId(), reason);
         refundFullPayment(payment, reason);
     }
 

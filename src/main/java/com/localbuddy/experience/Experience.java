@@ -92,6 +92,22 @@ public class Experience {
     @Column(name = "private_price", precision = 10, scale = 2)
     private BigDecimal privatePrice;
 
+    /** Optional per-experience commission override; supersedes the host's rate. */
+    @Column(name = "commission_rate", precision = 5, scale = 4)
+    private BigDecimal commissionRate;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "price_input_mode", nullable = false, length = 10)
+    private PriceInputMode priceInputMode = PriceInputMode.GROSS;
+
+    /** Net counterpart of {@link #priceAmount}, computed from the VAT rate. */
+    @Column(name = "price_net_amount", precision = 10, scale = 2)
+    private BigDecimal priceNetAmount;
+
+    /** Optional VAT-category override (e.g. CULTURAL_9); otherwise category mapping applies. */
+    @Column(name = "vat_category", length = 30)
+    private String vatCategory;
+
     @Column(name = "currency", nullable = false, length = 3)
     private String currency = "EUR";
 
@@ -137,6 +153,10 @@ public class Experience {
 
         if (bookingMode == null) {
             bookingMode = BookingMode.SHARED;
+        }
+
+        if (priceInputMode == null) {
+            priceInputMode = PriceInputMode.GROSS;
         }
     }
 
