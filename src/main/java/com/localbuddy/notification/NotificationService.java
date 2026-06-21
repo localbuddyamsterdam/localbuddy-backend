@@ -128,6 +128,64 @@ public class NotificationService {
         );
     }
 
+    @Transactional
+    public void createWhatsAppNotificationForUser(
+            User recipientUser,
+            NotificationType notificationType,
+            String subject,
+            String message,
+            String relatedEntityType,
+            UUID relatedEntityId,
+            String dedupeKey
+    ) {
+        if (recipientUser == null || recipientUser.getPhone() == null
+                || recipientUser.getPhone().trim().isEmpty()) {
+            return;
+        }
+
+        createNotification(
+                recipientUser,
+                recipientUser.getEmail(),
+                recipientUser.getPhone(),
+                NotificationChannel.WHATSAPP,
+                notificationType,
+                subject,
+                message,
+                relatedEntityType,
+                relatedEntityId,
+                dedupeKey
+        );
+    }
+
+    @Transactional
+    public void createWhatsAppNotificationForGuest(
+            String recipientEmail,
+            String recipientPhone,
+            NotificationType notificationType,
+            String subject,
+            String message,
+            String relatedEntityType,
+            UUID relatedEntityId,
+            String dedupeKey
+    ) {
+        if (recipientPhone == null || recipientPhone.trim().isEmpty()) {
+            return;
+        }
+
+        createNotification(
+                null,
+                recipientEmail,
+                recipientPhone,
+                NotificationChannel.WHATSAPP,
+                notificationType,
+                subject,
+                message,
+                relatedEntityType,
+                relatedEntityId,
+                dedupeKey
+        );
+    }
+
     private void createNotification(
             User recipientUser,
             String recipientEmail,

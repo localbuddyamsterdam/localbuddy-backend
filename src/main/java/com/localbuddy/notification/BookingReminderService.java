@@ -71,11 +71,19 @@ public class BookingReminderService {
             notificationService.createEmailAndInAppNotificationForUser(
                     traveler, NotificationType.BOOKING_REMINDER, subject, message,
                     "BOOKING", booking.getId(), dedupeBase);
+            // Also deliver over WhatsApp when the traveler has a phone (no-op if WhatsApp is unconfigured).
+            notificationService.createWhatsAppNotificationForUser(
+                    traveler, NotificationType.BOOKING_REMINDER, subject, message,
+                    "BOOKING", booking.getId(), dedupeBase + ":WHATSAPP");
         } else if (booking.getGuestEmail() != null && !booking.getGuestEmail().isBlank()) {
             notificationService.createEmailNotificationForGuest(
                     booking.getGuestEmail(), booking.getGuestPhone(),
                     NotificationType.BOOKING_REMINDER, subject, message,
                     "BOOKING", booking.getId(), dedupeBase + ":EMAIL");
+            notificationService.createWhatsAppNotificationForGuest(
+                    booking.getGuestEmail(), booking.getGuestPhone(),
+                    NotificationType.BOOKING_REMINDER, subject, message,
+                    "BOOKING", booking.getId(), dedupeBase + ":WHATSAPP");
         }
     }
 }

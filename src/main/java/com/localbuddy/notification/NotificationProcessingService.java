@@ -3,6 +3,8 @@ package com.localbuddy.notification;
 import com.localbuddy.notification.email.EmailProviderService;
 import com.localbuddy.notification.email.EmailSendRequest;
 import com.localbuddy.notification.email.EmailSendResult;
+import com.localbuddy.whatsapp.WhatsAppSendResult;
+import com.localbuddy.whatsapp.WhatsAppService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,11 +16,14 @@ public class NotificationProcessingService {
 
     private final NotificationRepository notificationRepository;
     private final EmailProviderService emailProviderService;
+    private final WhatsAppService whatsAppService;
 
     public NotificationProcessingService(NotificationRepository notificationRepository,
-                                         EmailProviderService emailProviderService) {
+                                         EmailProviderService emailProviderService,
+                                         WhatsAppService whatsAppService) {
         this.notificationRepository = notificationRepository;
         this.emailProviderService = emailProviderService;
+        this.whatsAppService = whatsAppService;
     }
 
     @Transactional
@@ -53,6 +58,11 @@ public class NotificationProcessingService {
             notification.setFailureReason(null);
             notification.setUpdatedAt(Instant.now());
             notificationRepository.save(notification);
+            return;
+        }
+
+        if (notification.getChannel() == NotificationChannel.WHATSAPP) {
+            processWhatsApp(notification);
             return;
         }
 
@@ -91,6 +101,37 @@ public class NotificationProcessingService {
             notification.setFailureReason(result.failureReason());
         }
 
+        notification.setUpdatedAt(Instant.now());
+        notificationRepository.save(notification);
+    }
+
+    private void processWhatsApp(Notification notification) {
+        if (!whatsAppService.isConfigured()) {
+            notification.setStatus(NotificationStatus.SKIPPED);
+            notification.setFailureReason("WhatsApp Business API is not configured");
+            notification.setUpdatedAt(Instant.now());
+            notificationRepository.save(notification);
+            return;
+        }
+
+        if (notification.getRecipientPhone() == null || notification.getRecipientPhone().trim().isEmpty()) {
+            notification.setStatus(NotificationStatus.SKIPPED);
+            notification.setFailureReason("Recipient phone is missing");
+            notification.setUpdatedAt(Instant.now());
+            notificationRepository.save(notification);
+            return;
+        }
+
+        // NOTE: business-initiated WhatsApp messages outside the 24h customer-service
+        // window require pre-approved message templates; free-form text only delivers
+        // within an open session. Template support can be layered on later.
+        WhatsAppSendResult result = whatsAppService.sendMessage(
+                notification.getRecipientPhone(), notification.getMessage());
+
+        notification.setStatus(NotificationStatus.SENT);
+        notification.setProviderMessageId(result.providerMessageId());
+        notification.setFailureReason(null);
+        notification.setSentAt(Instant.now());
         notification.setUpdatedAt(Instant.now());
         notificationRepository.save(notification);
     }
