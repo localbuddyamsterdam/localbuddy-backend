@@ -1,6 +1,7 @@
 package com.localbuddy.booking;
 
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -22,6 +23,14 @@ public class AdminBookingController {
             @RequestParam(required = false) BookingStatus status
     ) {
         return ResponseEntity.ok(bookingService.getAdminBookings(status));
+    }
+
+    @PostMapping
+    public ResponseEntity<BookingResponse> createBookingByAdmin(
+            @Valid @RequestBody AdminCreateBookingRequest request
+    ) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(bookingService.createBookingByAdmin(request));
     }
 
     @GetMapping("/{bookingId}")

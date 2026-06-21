@@ -62,12 +62,13 @@ public class BookingService {
     private final ApplicationEventPublisher eventPublisher;
     private final BookingReferenceGenerator bookingReferenceGenerator;
     private final WaitlistService waitlistService;
+    private final AgeBandPricing ageBandPricing;
 
     public BookingService(BookingRepository bookingRepository,
                           UserRepository userRepository,
                           ExperienceRepository experienceRepository,
                           AvailabilitySlotRepository availabilitySlotRepository,
-                          LocalProfileRepository localProfileRepository, NotificationService notificationService, ConsentService consentService, PromoCodeService promoCodeService, ReferralService referralService, BookingSafetyChecklistRepository bookingSafetyChecklistRepository, PaymentService paymentService, TrustSafetyService trustSafetyService, ApplicationEventPublisher eventPublisher, BookingReferenceGenerator bookingReferenceGenerator, WaitlistService waitlistService) {
+                          LocalProfileRepository localProfileRepository, NotificationService notificationService, ConsentService consentService, PromoCodeService promoCodeService, ReferralService referralService, BookingSafetyChecklistRepository bookingSafetyChecklistRepository, PaymentService paymentService, TrustSafetyService trustSafetyService, ApplicationEventPublisher eventPublisher, BookingReferenceGenerator bookingReferenceGenerator, WaitlistService waitlistService, AgeBandPricing ageBandPricing) {
         this.bookingRepository = bookingRepository;
         this.userRepository = userRepository;
         this.experienceRepository = experienceRepository;
@@ -83,6 +84,7 @@ public class BookingService {
         this.eventPublisher = eventPublisher;
         this.bookingReferenceGenerator = bookingReferenceGenerator;
         this.waitlistService = waitlistService;
+        this.ageBandPricing = ageBandPricing;
     }
 
     @Transactional
@@ -141,8 +143,12 @@ public class BookingService {
                 .orElseThrow(() -> new ResourceNotFoundException("Availability slot not found"));
         log.info("TRAVELER_BOOKING_TIMING slotLockLookupMs={}", System.currentTimeMillis() - stepStart);
 
+        AgeBandPricing.AgeBands bands = ageBandPricing.resolve(
+                request.adults(), request.teens(), request.children(), request.infants(), request.guestsCount());
+        ageBandPricing.validateAgeGate(experience.getMinimumAge(), bands);
+
         stepStart = System.currentTimeMillis();
-        validateSlot(experience, slot, request.guestsCount());
+        validateSlot(experience, slot, bands.totalGuests());
         log.info("TRAVELER_BOOKING_TIMING validateSlotMs={}", System.currentTimeMillis() - stepStart);
 
         stepStart = System.currentTimeMillis();
@@ -150,7 +156,8 @@ public class BookingService {
         requirePrivateBookingAllowed(privateBooking, slot);
 
         BigDecimal pricePerGuest = experience.getPriceAmount();
-        BookingPricing pricing = computePricing(privateBooking, slot, pricePerGuest, request.guestsCount());
+        BookingPricing pricing = computePricing(privateBooking, slot, pricePerGuest,
+                bands.totalGuests(), ageBandPricing.billableUnits(bands));
 
         int seatsToBook = pricing.seatsBlocked();
         int newBookedCount = slot.getBookedCount() + seatsToBook;
@@ -192,7 +199,8 @@ public class BookingService {
         booking.setLocalProfile(experience.getLocalProfile());
         booking.setExperience(experience);
         booking.setAvailabilitySlot(slot);
-        booking.setGuestsCount(request.guestsCount());
+        booking.setGuestsCount(bands.totalGuests());
+        applyBands(booking, bands);
         booking.setPrivateBooking(privateBooking);
         booking.setSeatsBlocked(seatsToBook);
         booking.setStatus(BookingStatus.PENDING_PAYMENT);
@@ -294,7 +302,8 @@ public class BookingService {
     private BookingPricing computePricing(boolean privateBooking,
                                           AvailabilitySlot slot,
                                           BigDecimal pricePerGuest,
-                                          int guestsCount) {
+                                          int seats,
+                                          BigDecimal billableUnits) {
         if (privateBooking) {
             BigDecimal originalAmount = pricePerGuest
                     .multiply(BigDecimal.valueOf(slot.getCapacity()))
@@ -309,16 +318,24 @@ public class BookingService {
             return new BookingPricing(originalAmount, privateDiscountAmount, baseForPromo, slot.getCapacity());
         }
 
+        // Shared booking: price by weighted billable units (age bands), seats by head count.
         BigDecimal originalAmount = pricePerGuest
-                .multiply(BigDecimal.valueOf(guestsCount))
+                .multiply(billableUnits)
                 .setScale(2, RoundingMode.HALF_UP);
 
         return new BookingPricing(
                 originalAmount,
                 BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP),
                 originalAmount,
-                guestsCount
+                seats
         );
+    }
+
+    private void applyBands(Booking booking, AgeBandPricing.AgeBands bands) {
+        booking.setAdultsCount(bands.adults());
+        booking.setTeensCount(bands.teens());
+        booking.setChildrenCount(bands.children());
+        booking.setInfantsCount(bands.infants());
     }
 
     /** Number of slot seats a booking consumes (whole capacity for a private buyout). */
@@ -653,8 +670,12 @@ public class BookingService {
                 .orElseThrow(() -> new ResourceNotFoundException("Availability slot not found"));
         log.info("GUEST_BOOKING_TIMING slotLockLookupMs={}", System.currentTimeMillis() - stepStart);
 
+        AgeBandPricing.AgeBands bands = ageBandPricing.resolve(
+                request.adults(), request.teens(), request.children(), request.infants(), request.guestsCount());
+        ageBandPricing.validateAgeGate(experience.getMinimumAge(), bands);
+
         stepStart = System.currentTimeMillis();
-        validateSlot(experience, slot, request.guestsCount());
+        validateSlot(experience, slot, bands.totalGuests());
         log.info("GUEST_BOOKING_TIMING validateSlotMs={}", System.currentTimeMillis() - stepStart);
 
         stepStart = System.currentTimeMillis();
@@ -662,7 +683,8 @@ public class BookingService {
         requirePrivateBookingAllowed(privateBooking, slot);
 
         BigDecimal pricePerGuest = experience.getPriceAmount();
-        BookingPricing pricing = computePricing(privateBooking, slot, pricePerGuest, request.guestsCount());
+        BookingPricing pricing = computePricing(privateBooking, slot, pricePerGuest,
+                bands.totalGuests(), ageBandPricing.billableUnits(bands));
 
         int seatsToBook = pricing.seatsBlocked();
         int newBookedCount = slot.getBookedCount() + seatsToBook;
@@ -720,7 +742,8 @@ public class BookingService {
         booking.setLocalProfile(experience.getLocalProfile());
         booking.setExperience(experience);
         booking.setAvailabilitySlot(slot);
-        booking.setGuestsCount(request.guestsCount());
+        booking.setGuestsCount(bands.totalGuests());
+        applyBands(booking, bands);
         booking.setPrivateBooking(privateBooking);
         booking.setSeatsBlocked(seatsToBook);
         booking.setStatus(BookingStatus.PENDING_PAYMENT);
@@ -768,6 +791,73 @@ public class BookingService {
                     System.currentTimeMillis() - totalStart);
             throw new BadRequestException("You already have an active guest booking for this slot");
         }
+    }
+
+    /**
+     * Admin creates a booking on behalf of a guest, confirmed immediately with no
+     * online payment (collected offline). Blocks seats and supports age bands.
+     */
+    @Transactional
+    public BookingResponse createBookingByAdmin(AdminCreateBookingRequest request) {
+        Experience experience = experienceRepository.findWithLocalProfileAndUserById(request.experienceId())
+                .orElseThrow(() -> new ResourceNotFoundException("Experience not found"));
+        if (experience.getStatus() != ExperienceStatus.APPROVED) {
+            throw new BadRequestException("Experience is not available for booking");
+        }
+
+        AvailabilitySlot slot = availabilitySlotRepository.findByIdForUpdate(request.availabilitySlotId())
+                .orElseThrow(() -> new ResourceNotFoundException("Availability slot not found"));
+
+        AgeBandPricing.AgeBands bands = ageBandPricing.resolve(
+                request.adults(), request.teens(), request.children(), request.infants(), request.guestsCount());
+        ageBandPricing.validateAgeGate(experience.getMinimumAge(), bands);
+        validateSlot(experience, slot, bands.totalGuests());
+
+        boolean privateBooking = Boolean.TRUE.equals(request.privateBooking());
+        requirePrivateBookingAllowed(privateBooking, slot);
+
+        BigDecimal pricePerGuest = experience.getPriceAmount();
+        BookingPricing pricing = computePricing(privateBooking, slot, pricePerGuest,
+                bands.totalGuests(), ageBandPricing.billableUnits(bands));
+
+        int seatsToBook = pricing.seatsBlocked();
+        int newBookedCount = slot.getBookedCount() + seatsToBook;
+        slot.setBookedCount(newBookedCount);
+        if (newBookedCount >= slot.getCapacity()) {
+            slot.setStatus(AvailabilityStatus.BLOCKED);
+        }
+
+        String currency = experience.getCurrency().toUpperCase(Locale.ROOT);
+        Instant now = Instant.now();
+
+        Booking booking = new Booking();
+        booking.setBookingReference(generateUniqueBookingReference());
+        booking.setBookingSource(BookingSource.ADMIN);
+        booking.setGuestName(requiredTrim(request.guestName()));
+        booking.setGuestEmail(requiredTrim(request.guestEmail()).toLowerCase(Locale.ROOT));
+        booking.setGuestPhone(optionalTrim(request.guestPhone()));
+        booking.setTravelerUser(null);
+        booking.setLocalProfile(experience.getLocalProfile());
+        booking.setExperience(experience);
+        booking.setAvailabilitySlot(slot);
+        booking.setGuestsCount(bands.totalGuests());
+        applyBands(booking, bands);
+        booking.setPrivateBooking(privateBooking);
+        booking.setSeatsBlocked(seatsToBook);
+        booking.setStatus(BookingStatus.CONFIRMED);
+        booking.setPricePerGuest(pricePerGuest);
+        booking.setOriginalAmount(pricing.originalAmount());
+        booking.setPrivateDiscountAmount(pricing.privateDiscountAmount());
+        booking.setDiscountAmount(BigDecimal.ZERO);
+        booking.setTotalAmount(pricing.baseForPromo());
+        booking.setCurrency(currency);
+        booking.setTravelerNote(optionalTrim(request.note()));
+        booking.setRequestedAt(now);
+        booking.setAcceptedAt(now);
+
+        availabilitySlotRepository.save(slot);
+        Booking saved = bookingRepository.save(booking);
+        return toResponse(saved);
     }
 
     @Transactional(readOnly = true)

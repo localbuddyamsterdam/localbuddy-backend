@@ -68,6 +68,18 @@ public class Booking {
     @Column(name = "guests_count", nullable = false)
     private Integer guestsCount = 1;
 
+    @Column(name = "adults_count", nullable = false)
+    private Integer adultsCount = 0;
+
+    @Column(name = "teens_count", nullable = false)
+    private Integer teensCount = 0;
+
+    @Column(name = "children_count", nullable = false)
+    private Integer childrenCount = 0;
+
+    @Column(name = "infants_count", nullable = false)
+    private Integer infantsCount = 0;
+
     @Column(name = "is_private", nullable = false)
     private boolean privateBooking = false;
 
@@ -179,6 +191,22 @@ public class Booking {
 
         if (guestsCount == null) {
             guestsCount = 1;
+        }
+
+        if (adultsCount == null) {
+            adultsCount = 0;
+        }
+
+        if (teensCount == null) {
+            teensCount = 0;
+        }
+
+        if (childrenCount == null) {
+            childrenCount = 0;
+        }
+
+        if (infantsCount == null) {
+            infantsCount = 0;
         }
 
         if (seatsBlocked == null) {

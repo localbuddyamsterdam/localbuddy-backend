@@ -87,6 +87,13 @@ app:
   fees:
     service-fee-percentage: ${SERVICE_FEE_PERCENTAGE:2.5}
 
+  pricing:
+    age-band:
+      adult-rate: ${AGE_BAND_ADULT_RATE:1.0}     # adults pay full price
+      teen-rate: ${AGE_BAND_TEEN_RATE:1.0}        # teens full price; band exists to age-gate 18+ experiences
+      child-rate: ${AGE_BAND_CHILD_RATE:0.5}      # children half price
+      infant-rate: ${AGE_BAND_INFANT_RATE:0.0}    # infants free
+
   vat:
     default-country: ${VAT_DEFAULT_COUNTRY:NL}
     standard-rate-percentage: ${VAT_STANDARD_RATE_PERCENTAGE:21}
@@ -131,6 +138,11 @@ app:
       connection-string: ${AZURE_BLOB_CONNECTION_STRING:}
       container: ${AZURE_BLOB_CONTAINER:experience-photos}
       public-base-url: ${AZURE_BLOB_PUBLIC_BASE_URL:}
+
+  whatsapp:
+    access-token: ${WHATSAPP_ACCESS_TOKEN:}
+    phone-number-id: ${WHATSAPP_PHONE_NUMBER_ID:}
+    api-base-url: ${WHATSAPP_API_BASE_URL:https://graph.facebook.com/v21.0}
 
   dev-admin:
     email: ${DEV_ADMIN_EMAIL:admin@test.com}
