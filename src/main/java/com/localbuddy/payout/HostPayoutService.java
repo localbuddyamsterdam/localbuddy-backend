@@ -2,6 +2,7 @@ package com.localbuddy.payout;
 
 import com.localbuddy.common.exception.BadRequestException;
 import com.localbuddy.common.exception.ResourceNotFoundException;
+import com.localbuddy.invoice.InvoiceService;
 import com.localbuddy.localprofile.LocalProfile;
 import com.localbuddy.localprofile.LocalProfileRepository;
 import org.springframework.stereotype.Service;
@@ -25,15 +26,18 @@ public class HostPayoutService {
     private final LocalProfileRepository localProfileRepository;
     private final ConnectPayoutProvider connectPayoutProvider;
     private final HostLedgerService ledgerService;
+    private final InvoiceService invoiceService;
 
     public HostPayoutService(PayoutRepository payoutRepository,
                              LocalProfileRepository localProfileRepository,
                              ConnectPayoutProvider connectPayoutProvider,
-                             HostLedgerService ledgerService) {
+                             HostLedgerService ledgerService,
+                             InvoiceService invoiceService) {
         this.payoutRepository = payoutRepository;
         this.localProfileRepository = localProfileRepository;
         this.connectPayoutProvider = connectPayoutProvider;
         this.ledgerService = ledgerService;
+        this.invoiceService = invoiceService;
     }
 
     @Transactional(readOnly = true)
@@ -112,6 +116,7 @@ public class HostPayoutService {
                 saved.setPaidAt(Instant.now());
                 saved = payoutRepository.save(saved);
                 ledgerService.settlePayout(saved.getId());
+                invoiceService.generatePayoutStatement(saved);
             } catch (Exception ex) {
                 saved.setStatus(PayoutStatus.FAILED);
                 saved.setFailureReason(ex.getMessage());
@@ -134,6 +139,7 @@ public class HostPayoutService {
         }
         PayoutResponse response = toResponse(payoutRepository.save(payout));
         ledgerService.settlePayout(payoutId);
+        invoiceService.generatePayoutStatement(payout);
         return response;
     }
 

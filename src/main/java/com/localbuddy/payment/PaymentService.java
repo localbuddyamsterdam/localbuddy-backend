@@ -3,6 +3,7 @@ package com.localbuddy.payment;
 import com.localbuddy.booking.*;
 import com.localbuddy.common.exception.BadRequestException;
 import com.localbuddy.common.exception.ResourceNotFoundException;
+import com.localbuddy.invoice.InvoiceService;
 import com.localbuddy.payout.HostLedgerService;
 import com.localbuddy.pricing.PricingEngine;
 import com.localbuddy.promo.PromoCodeService;
@@ -35,10 +36,11 @@ public class PaymentService {
     private final BookingExpiryService bookingExpiryService;
     private final PricingEngine pricingEngine;
     private final HostLedgerService hostLedgerService;
+    private final InvoiceService invoiceService;
 
     public PaymentService(PaymentRepository paymentRepository,
                           BookingRepository bookingRepository,
-                          @Value("${app.platform.commission-percentage:20}") BigDecimal commissionPercentage, PaymentCheckoutProvider paymentCheckoutProvider, PaymentWebhookEventRepository paymentWebhookEventRepository, PromoCodeService promoCodeService, ReferralService referralService, CancellationRefundPolicyService cancellationRefundPolicyService, PaymentTransactionService paymentTransactionService, BookingExpiryService bookingExpiryService, PricingEngine pricingEngine, HostLedgerService hostLedgerService) {
+                          @Value("${app.platform.commission-percentage:20}") BigDecimal commissionPercentage, PaymentCheckoutProvider paymentCheckoutProvider, PaymentWebhookEventRepository paymentWebhookEventRepository, PromoCodeService promoCodeService, ReferralService referralService, CancellationRefundPolicyService cancellationRefundPolicyService, PaymentTransactionService paymentTransactionService, BookingExpiryService bookingExpiryService, PricingEngine pricingEngine, HostLedgerService hostLedgerService, InvoiceService invoiceService) {
         this.paymentRepository = paymentRepository;
         this.bookingRepository = bookingRepository;
         this.commissionPercentage = commissionPercentage;
@@ -51,6 +53,7 @@ public class PaymentService {
         this.bookingExpiryService = bookingExpiryService;
         this.pricingEngine = pricingEngine;
         this.hostLedgerService = hostLedgerService;
+        this.invoiceService = invoiceService;
     }
 
     @Transactional
@@ -433,6 +436,7 @@ public class PaymentService {
         Booking booking = payment.getBooking();
         confirmBookingAfterPayment(booking);
         hostLedgerService.recordEarning(booking, payment);
+        invoiceService.generateForConfirmedPayment(booking, payment);
     }
 
 
@@ -526,6 +530,7 @@ public class PaymentService {
 
         confirmBookingAfterPayment(booking);
         hostLedgerService.recordEarning(booking, payment);
+        invoiceService.generateForConfirmedPayment(booking, payment);
     }
 
     @Transactional
