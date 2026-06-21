@@ -71,6 +71,9 @@ public record CreateExperienceRequest(
         BookingMode bookingMode,
 
         @DecimalMin(value = "0.00", message = "Private price cannot be negative")
-        BigDecimal privatePrice
+        BigDecimal privatePrice,
+
+        /** Whether priceAmount is the gross (customer) price or the host's net; the other is computed. */
+        PriceInputMode priceInputMode
 ) {
 }

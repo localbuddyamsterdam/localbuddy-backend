@@ -26,6 +26,8 @@ public record ExperienceResponse(
         Integer maxGuests,
         BookingMode bookingMode,
         BigDecimal privatePrice,
+        BigDecimal priceNetAmount,
+        PriceInputMode priceInputMode,
         String safetyNotes,
         String shortDescription,
         TransportMode transportMode,

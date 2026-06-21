@@ -255,6 +255,8 @@ public class AdminOpsService {
                 experience.getMaxGuests(),
                 experience.getBookingMode(),
                 experience.getPrivatePrice(),
+                experience.getPriceNetAmount(),
+                experience.getPriceInputMode(),
                 experience.getSafetyNotes(),
                 experience.getShortDescription(),
                 experience.getTransportMode(),

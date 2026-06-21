@@ -82,6 +82,7 @@ app:
   platform:
     default-city: Amsterdam
     commission-percentage: 20          # fallback when no PLATFORM commission_rule row exists
+    max-commission-rate: ${MAX_COMMISSION_RATE:0.50}   # hard cap (fraction) admins can assign; guards against negative host payouts
 
   fees:
     service-fee-percentage: ${SERVICE_FEE_PERCENTAGE:2.5}

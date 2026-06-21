@@ -6,6 +6,7 @@ import com.localbuddy.consent.ConsentService;
 import com.localbuddy.localprofile.LocalApprovalStatus;
 import com.localbuddy.localprofile.LocalProfile;
 import com.localbuddy.localprofile.LocalProfileRepository;
+import com.localbuddy.pricing.VatService;
 import com.localbuddy.trustsafety.TrustSafetyService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -33,17 +34,19 @@ public class ExperienceService {
     private final LocalProfileRepository localProfileRepository;
     private final ConsentService consentService;
     private final TrustSafetyService trustSafetyService;
+    private final VatService vatService;
 
     public ExperienceService(ExperienceRepository experienceRepository,
                              ExperienceCategoryRepository categoryRepository,
                              CityRepository cityRepository,
-                             LocalProfileRepository localProfileRepository  , ConsentService consentService, TrustSafetyService trustSafetyService) {
+                             LocalProfileRepository localProfileRepository  , ConsentService consentService, TrustSafetyService trustSafetyService, VatService vatService) {
         this.experienceRepository = experienceRepository;
         this.categoryRepository = categoryRepository;
         this.cityRepository = cityRepository;
         this.localProfileRepository = localProfileRepository;
         this.consentService = consentService;
         this.trustSafetyService = trustSafetyService;
+        this.vatService = vatService;
     }
 
     @Transactional
@@ -331,7 +334,7 @@ public class ExperienceService {
         experience.setDescription(requiredTrim(request.description()));
         experience.setMeetingArea(optionalTrim(request.meetingArea()));
         experience.setDurationMinutes(request.durationMinutes());
-        experience.setPriceAmount(normalizePrice(request.priceAmount()));
+        applyPricing(experience, request.priceAmount(), request.priceInputMode());
         experience.setCurrency(requiredTrim(request.currency()).toUpperCase(Locale.ROOT));
         experience.setMaxGuests(request.maxGuests());
         experience.setSafetyNotes(optionalTrim(request.safetyNotes()));
@@ -351,7 +354,7 @@ public class ExperienceService {
         experience.setDescription(requiredTrim(request.description()));
         experience.setMeetingArea(optionalTrim(request.meetingArea()));
         experience.setDurationMinutes(request.durationMinutes());
-        experience.setPriceAmount(normalizePrice(request.priceAmount()));
+        applyPricing(experience, request.priceAmount(), request.priceInputMode());
         experience.setCurrency(requiredTrim(request.currency()).toUpperCase(Locale.ROOT));
         experience.setMaxGuests(request.maxGuests());
         experience.setSafetyNotes(optionalTrim(request.safetyNotes()));
@@ -397,6 +400,34 @@ public class ExperienceService {
 
         experience.setBookingMode(mode);
         experience.setPrivatePrice(normalizedPrivatePrice);
+    }
+
+    /**
+     * Stores both the gross (customer-facing) and net price. The host enters one
+     * (per priceInputMode); the other is derived from the experience's VAT rate.
+     */
+    private void applyPricing(Experience experience, BigDecimal enteredPrice, PriceInputMode mode) {
+        PriceInputMode inputMode = mode == null ? PriceInputMode.GROSS : mode;
+        BigDecimal entered = normalizePrice(enteredPrice);
+        experience.setPriceInputMode(inputMode);
+
+        if (entered == null) {
+            experience.setPriceAmount(null);
+            experience.setPriceNetAmount(null);
+            return;
+        }
+
+        BigDecimal vatRate = vatService.experienceVatRate(
+                experience, vatService.placeOfSupply(experience, experience.getLocalProfile()), Instant.now());
+        BigDecimal onePlus = BigDecimal.ONE.add(vatRate);
+
+        if (inputMode == PriceInputMode.NET) {
+            experience.setPriceNetAmount(entered);
+            experience.setPriceAmount(entered.multiply(onePlus).setScale(2, java.math.RoundingMode.HALF_UP));
+        } else {
+            experience.setPriceAmount(entered);
+            experience.setPriceNetAmount(entered.divide(onePlus, 2, java.math.RoundingMode.HALF_UP));
+        }
     }
 
     private BigDecimal normalizePrice(BigDecimal price) {
@@ -463,6 +494,8 @@ public class ExperienceService {
                 experience.getMaxGuests(),
                 experience.getBookingMode(),
                 experience.getPrivatePrice(),
+                experience.getPriceNetAmount(),
+                experience.getPriceInputMode(),
                 experience.getSafetyNotes(),
                 experience.getShortDescription(),
                 experience.getTransportMode(),
