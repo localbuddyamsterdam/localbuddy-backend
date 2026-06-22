@@ -4,6 +4,8 @@ import com.localbuddy.common.exception.BadRequestException;
 import com.localbuddy.common.exception.ResourceNotFoundException;
 import com.localbuddy.experience.Experience;
 import com.localbuddy.experience.ExperienceRepository;
+import com.localbuddy.notification.NotificationService;
+import com.localbuddy.notification.NotificationType;
 import com.localbuddy.user.User;
 import com.localbuddy.user.UserRepository;
 import org.springframework.stereotype.Service;
@@ -20,15 +22,18 @@ public class ConversationService {
     private final MessageRepository messageRepository;
     private final ExperienceRepository experienceRepository;
     private final UserRepository userRepository;
+    private final NotificationService notificationService;
 
     public ConversationService(ConversationRepository conversationRepository,
                                MessageRepository messageRepository,
                                ExperienceRepository experienceRepository,
-                               UserRepository userRepository) {
+                               UserRepository userRepository,
+                               NotificationService notificationService) {
         this.conversationRepository = conversationRepository;
         this.messageRepository = messageRepository;
         this.experienceRepository = experienceRepository;
         this.userRepository = userRepository;
+        this.notificationService = notificationService;
     }
 
     /** Start (or reuse) the traveler's conversation with the host of an experience. */
@@ -74,7 +79,30 @@ public class ConversationService {
         conversation.setLastMessageAt(Instant.now());
         conversationRepository.save(conversation);
 
+        notifyRecipient(conversation, sender, saved);
+
         return toMessageResponse(saved);
+    }
+
+    /** Pings the other party (in-app) when they receive a new message. */
+    private void notifyRecipient(Conversation conversation, User sender, Message message) {
+        User recipient = conversation.getTravelerUser().getId().equals(sender.getId())
+                ? conversation.getHostUser()
+                : conversation.getTravelerUser();
+
+        String senderName = sender.getFullName() != null ? sender.getFullName() : "Someone";
+        String body = message.getBody();
+        String preview = body != null && body.length() > 140 ? body.substring(0, 140) + "…" : body;
+
+        notificationService.createInAppNotificationForUser(
+                recipient,
+                NotificationType.NEW_MESSAGE,
+                "New message from " + senderName,
+                senderName + ": " + (preview == null ? "" : preview),
+                "CONVERSATION",
+                conversation.getId(),
+                "NEW_MESSAGE:" + message.getId()
+        );
     }
 
     @Transactional(readOnly = true)
