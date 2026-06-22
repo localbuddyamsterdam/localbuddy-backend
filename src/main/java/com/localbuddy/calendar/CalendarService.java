@@ -87,6 +87,20 @@ public class CalendarService {
         return new CalendarLinksResponse(google, outlook, icsPath);
     }
 
+    /** Public Google "add to calendar" link for a booking (no auth) — used in confirmation messages. */
+    public String googleCalendarLink(Booking booking) {
+        Instant start = slotStart(booking);
+        Instant end = slotEnd(booking);
+        String title = experienceTitle(booking);
+        String location = location(booking);
+        String details = "LocalBuddy booking " + booking.getBookingReference();
+        return "https://calendar.google.com/calendar/render?action=TEMPLATE"
+                + "&text=" + enc(title)
+                + "&dates=" + ICS_UTC.format(start) + "/" + ICS_UTC.format(end)
+                + "&details=" + enc(details)
+                + (location != null ? "&location=" + enc(location) : "");
+    }
+
     private Booking requireParticipant(UUID userId, UUID bookingId) {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));

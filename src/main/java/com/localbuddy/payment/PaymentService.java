@@ -37,10 +37,11 @@ public class PaymentService {
     private final PricingEngine pricingEngine;
     private final HostLedgerService hostLedgerService;
     private final InvoiceService invoiceService;
+    private final BookingConfirmationNotifier bookingConfirmationNotifier;
 
     public PaymentService(PaymentRepository paymentRepository,
                           BookingRepository bookingRepository,
-                          @Value("${app.platform.commission-percentage:20}") BigDecimal commissionPercentage, PaymentCheckoutProvider paymentCheckoutProvider, PaymentWebhookEventRepository paymentWebhookEventRepository, PromoCodeService promoCodeService, ReferralService referralService, CancellationRefundPolicyService cancellationRefundPolicyService, PaymentTransactionService paymentTransactionService, BookingExpiryService bookingExpiryService, PricingEngine pricingEngine, HostLedgerService hostLedgerService, InvoiceService invoiceService) {
+                          @Value("${app.platform.commission-percentage:20}") BigDecimal commissionPercentage, PaymentCheckoutProvider paymentCheckoutProvider, PaymentWebhookEventRepository paymentWebhookEventRepository, PromoCodeService promoCodeService, ReferralService referralService, CancellationRefundPolicyService cancellationRefundPolicyService, PaymentTransactionService paymentTransactionService, BookingExpiryService bookingExpiryService, PricingEngine pricingEngine, HostLedgerService hostLedgerService, InvoiceService invoiceService, BookingConfirmationNotifier bookingConfirmationNotifier) {
         this.paymentRepository = paymentRepository;
         this.bookingRepository = bookingRepository;
         this.commissionPercentage = commissionPercentage;
@@ -54,6 +55,7 @@ public class PaymentService {
         this.pricingEngine = pricingEngine;
         this.hostLedgerService = hostLedgerService;
         this.invoiceService = invoiceService;
+        this.bookingConfirmationNotifier = bookingConfirmationNotifier;
     }
 
     @Transactional
@@ -709,6 +711,8 @@ public class PaymentService {
                 booking.getStatus() == BookingStatus.ACCEPTED) {
             booking.setStatus(BookingStatus.CONFIRMED);
             bookingRepository.save(booking);
+            // Send the customer their confirmation with one-tap wallet + calendar links.
+            bookingConfirmationNotifier.sendConfirmation(booking);
         }
     }
 

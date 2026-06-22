@@ -3,11 +3,9 @@ package com.localbuddy.wallet;
 import com.localbuddy.booking.Booking;
 import com.localbuddy.common.exception.BadRequestException;
 import com.localbuddy.common.exception.ResourceNotFoundException;
-import com.localbuddy.experience.Experience;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Instant;
 import java.util.UUID;
 
 /** Resolves a booking into wallet-pass data and delegates to the Apple/Google providers. */
@@ -49,32 +47,7 @@ public class WalletService {
     }
 
     private WalletPassData buildData(Booking booking) {
-        Experience experience = booking.getExperience();
-        String title = experience != null && experience.getTitle() != null
-                ? experience.getTitle() : "LocalBuddy experience";
-
-        String hostName = null;
-        if (booking.getLocalProfile() != null && booking.getLocalProfile().getUser() != null) {
-            hostName = booking.getLocalProfile().getUser().getFullName();
-        }
-
-        Instant start = booking.getAvailabilitySlot() != null
-                ? booking.getAvailabilitySlot().getStartTime() : null;
-        Instant end = booking.getAvailabilitySlot() != null
-                ? booking.getAvailabilitySlot().getEndTime() : null;
-
-        String location = null;
-        if (experience != null) {
-            if (experience.getMeetingArea() != null && !experience.getMeetingArea().isBlank()) {
-                location = experience.getMeetingArea();
-            } else if (experience.getCity() != null) {
-                location = experience.getCity().getName();
-            }
-        }
-
-        int guests = booking.getGuestsCount() != null ? booking.getGuestsCount() : 1;
-
-        return new WalletPassData(booking.getBookingReference(), title, hostName, start, end, location, guests);
+        return WalletPassData.from(booking);
     }
 
     private Booking requireParticipant(UUID userId, UUID bookingId) {

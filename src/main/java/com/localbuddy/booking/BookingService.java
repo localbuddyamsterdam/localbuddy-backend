@@ -63,12 +63,13 @@ public class BookingService {
     private final BookingReferenceGenerator bookingReferenceGenerator;
     private final WaitlistService waitlistService;
     private final AgeBandPricing ageBandPricing;
+    private final BookingConfirmationNotifier bookingConfirmationNotifier;
 
     public BookingService(BookingRepository bookingRepository,
                           UserRepository userRepository,
                           ExperienceRepository experienceRepository,
                           AvailabilitySlotRepository availabilitySlotRepository,
-                          LocalProfileRepository localProfileRepository, NotificationService notificationService, ConsentService consentService, PromoCodeService promoCodeService, ReferralService referralService, BookingSafetyChecklistRepository bookingSafetyChecklistRepository, PaymentService paymentService, TrustSafetyService trustSafetyService, ApplicationEventPublisher eventPublisher, BookingReferenceGenerator bookingReferenceGenerator, WaitlistService waitlistService, AgeBandPricing ageBandPricing) {
+                          LocalProfileRepository localProfileRepository, NotificationService notificationService, ConsentService consentService, PromoCodeService promoCodeService, ReferralService referralService, BookingSafetyChecklistRepository bookingSafetyChecklistRepository, PaymentService paymentService, TrustSafetyService trustSafetyService, ApplicationEventPublisher eventPublisher, BookingReferenceGenerator bookingReferenceGenerator, WaitlistService waitlistService, AgeBandPricing ageBandPricing, BookingConfirmationNotifier bookingConfirmationNotifier) {
         this.bookingRepository = bookingRepository;
         this.userRepository = userRepository;
         this.experienceRepository = experienceRepository;
@@ -85,6 +86,7 @@ public class BookingService {
         this.bookingReferenceGenerator = bookingReferenceGenerator;
         this.waitlistService = waitlistService;
         this.ageBandPricing = ageBandPricing;
+        this.bookingConfirmationNotifier = bookingConfirmationNotifier;
     }
 
     @Transactional
@@ -857,6 +859,7 @@ public class BookingService {
 
         availabilitySlotRepository.save(slot);
         Booking saved = bookingRepository.save(booking);
+        bookingConfirmationNotifier.sendConfirmation(saved);
         return toResponse(saved);
     }
 
