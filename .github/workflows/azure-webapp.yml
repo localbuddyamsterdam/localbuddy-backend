@@ -1,0 +1,38 @@
+name: Deploy to Azure Web App
+
+# Manual trigger by default so it never auto-runs (and fails) on feature pushes
+# before Azure is configured. Once your App Service + secret are set up, you can
+# add a push trigger (e.g. on push to main) below.
+on:
+  workflow_dispatch:
+  # push:
+  #   branches: [ "main" ]
+
+env:
+  AZURE_WEBAPP_NAME: localbuddy-backend            # <-- change to your Azure App Service name
+  ARTIFACT: target/localbuddy-backend-0.0.1-SNAPSHOT.jar
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: maven
+
+      - name: Build (skip tests — deploy artifact)
+        run: |
+          chmod +x ./mvnw
+          ./mvnw -B -ntp -DskipTests clean package
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: ${{ env.ARTIFACT }}
