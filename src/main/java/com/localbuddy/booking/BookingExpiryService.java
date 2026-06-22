@@ -26,6 +26,7 @@ public class BookingExpiryService {
     private final PaymentRepository paymentRepository;
     private final WaitlistService waitlistService;
     private final PaymentCheckoutProvider paymentCheckoutProvider;
+    private final BookingConfirmationNotifier bookingConfirmationNotifier;
     private final long pendingPaymentExpirationMinutes;
 
     public BookingExpiryService(
@@ -34,6 +35,7 @@ public class BookingExpiryService {
             PaymentRepository paymentRepository,
             WaitlistService waitlistService,
             PaymentCheckoutProvider paymentCheckoutProvider,
+            BookingConfirmationNotifier bookingConfirmationNotifier,
             @Value("${app.booking.pending-payment-expiration-minutes:15}") long pendingPaymentExpirationMinutes
     ) {
         this.bookingRepository = bookingRepository;
@@ -41,6 +43,7 @@ public class BookingExpiryService {
         this.paymentRepository = paymentRepository;
         this.waitlistService = waitlistService;
         this.paymentCheckoutProvider = paymentCheckoutProvider;
+        this.bookingConfirmationNotifier = bookingConfirmationNotifier;
         this.pendingPaymentExpirationMinutes = pendingPaymentExpirationMinutes;
     }
 
@@ -94,6 +97,7 @@ public class BookingExpiryService {
         if (hasPaidPayment) {
             booking.setStatus(BookingStatus.CONFIRMED);
             bookingRepository.save(booking);
+            bookingConfirmationNotifier.sendConfirmation(booking);
             return;
         }
 
