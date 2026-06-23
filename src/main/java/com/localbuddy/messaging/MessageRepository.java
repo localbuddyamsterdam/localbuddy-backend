@@ -1,7 +1,6 @@
 package com.localbuddy.messaging;
 
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -13,16 +12,14 @@ public interface MessageRepository extends JpaRepository<Message, UUID> {
 
     List<Message> findByConversationIdOrderByCreatedAtAsc(UUID conversationId);
 
-    long countByConversationIdAndSenderUserIdNotAndReadAtIsNull(UUID conversationId, UUID senderUserId);
-
-    @Modifying
+    /** Messages in a conversation not sent by the viewer and newer than their read cursor. */
     @Query("""
-            update Message m set m.readAt = :now
+            select count(m) from Message m
             where m.conversation.id = :conversationId
               and m.senderUser.id <> :userId
-              and m.readAt is null
+              and (:since is null or m.createdAt > :since)
             """)
-    int markReadForRecipient(@Param("conversationId") UUID conversationId,
-                             @Param("userId") UUID userId,
-                             @Param("now") Instant now);
+    long countUnread(@Param("conversationId") UUID conversationId,
+                     @Param("userId") UUID userId,
+                     @Param("since") Instant since);
 }

@@ -9,12 +9,13 @@ import lombok.Setter;
 import java.time.Instant;
 import java.util.UUID;
 
+/** Membership of a user in a conversation, with the role they hold and their read cursor. */
 @Entity
-@Table(name = "messages")
+@Table(name = "conversation_participants")
 @Getter
 @Setter
 @NoArgsConstructor
-public class Message {
+public class ConversationParticipant {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -26,16 +27,16 @@ public class Message {
     private Conversation conversation;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "sender_user_id", nullable = false)
-    private User senderUser;
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
 
-    /** Role the sender posted as; drives labelling (ADMIN -> "Admin (Name)"). Snapshotted at send time. */
     @Enumerated(EnumType.STRING)
-    @Column(name = "sender_role", nullable = false, length = 20)
-    private ParticipantRole senderRole;
+    @Column(name = "role", nullable = false, length = 20)
+    private ParticipantRole role;
 
-    @Column(name = "body", nullable = false, columnDefinition = "TEXT")
-    private String body;
+    /** Messages created after this instant are unread for this participant. Null = nothing read yet. */
+    @Column(name = "last_read_at")
+    private Instant lastReadAt;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
