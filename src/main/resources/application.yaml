@@ -124,6 +124,8 @@ app:
     underbooked-notice-hours: ${BOOKING_UNDERBOOKED_NOTICE_HOURS:36}
     underbooked-cancel-deadline-hours: ${BOOKING_UNDERBOOKED_CANCEL_DEADLINE_HOURS:24}
     underbooked-processor-delay-ms: ${BOOKING_UNDERBOOKED_PROCESSOR_DELAY_MS:300000}
+    auto-complete-after-hours: ${BOOKING_AUTO_COMPLETE_AFTER_HOURS:48}
+    auto-complete-processor-delay-ms: ${BOOKING_AUTO_COMPLETE_PROCESSOR_DELAY_MS:300000}
   email:
     provider: ${EMAIL_PROVIDER:console}
     from-address: ${EMAIL_FROM_ADDRESS:no-reply@localbuddy.dev}

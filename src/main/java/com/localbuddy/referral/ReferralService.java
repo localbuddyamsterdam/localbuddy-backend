@@ -162,7 +162,7 @@ public class ReferralService {
 
         ReferralRedemption redemption = new ReferralRedemption();
         redemption.setReferralCode(booking.getReferralCode());
-        redemption.setReferredUser(booking.getTravelerUser());
+        redemption.setReferredUser(booking.getLoggedInUser());
         redemption.setReferredGuestEmail(booking.getGuestEmail());
         redemption.setBooking(booking);
         redemption.setRewardStatus(ReferralRewardStatus.ELIGIBLE);

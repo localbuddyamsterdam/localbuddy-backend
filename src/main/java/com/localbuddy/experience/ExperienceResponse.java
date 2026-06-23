@@ -38,6 +38,8 @@ public record ExperienceResponse(
         Integer minimumAge,
         ExperienceStatus status,
         Instant createdAt,
-        Instant updatedAt
+        Instant updatedAt,
+        ExternalListingType externalListingType,
+        String externalListingDetails
 ) {
 }

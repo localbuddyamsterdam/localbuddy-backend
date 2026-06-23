@@ -127,7 +127,7 @@ public class InvoiceService {
         saveLine(saved.getId(), "LocalBuddy service fee for booking " + booking.getBookingReference(),
                 serviceFee, serviceFeeRate, serviceFeeVat, 0);
 
-        notifyUser(booking.getTravelerUser() != null ? booking.getTravelerUser().getId() : null,
+        notifyUser(booking.getLoggedInUser() != null ? booking.getLoggedInUser().getId() : null,
                 booking.getLocalProfile(), booking, saved,
                 "Your service-fee receipt " + saved.getInvoiceNumber() + " is available.");
     }
@@ -173,7 +173,7 @@ public class InvoiceService {
                 invoiceRepository.findByLocalProfileIdOrderByIssuedAtDesc(lp.getId())
                         .forEach(i -> byId.putIfAbsent(i.getId(), i)));
 
-        List<UUID> bookingIds = bookingRepository.findByTravelerUserIdOrderByRequestedAtDesc(userId)
+        List<UUID> bookingIds = bookingRepository.findByLoggedInUserIdOrderByRequestedAtDesc(userId)
                 .stream().map(Booking::getId).toList();
         if (!bookingIds.isEmpty()) {
             invoiceRepository.findByBookingIdInOrderByIssuedAtDesc(bookingIds)
@@ -209,8 +209,8 @@ public class InvoiceService {
         }
         if (invoice.getBookingId() != null) {
             Booking booking = bookingRepository.findById(invoice.getBookingId()).orElse(null);
-            return booking != null && booking.getTravelerUser() != null
-                    && booking.getTravelerUser().getId().equals(userId);
+            return booking != null && booking.getLoggedInUser() != null
+                    && booking.getLoggedInUser().getId().equals(userId);
         }
         return false;
     }
@@ -255,9 +255,9 @@ public class InvoiceService {
             com.localbuddy.user.User user = null;
             if (host != null && host.getUser() != null && host.getUser().getId().equals(userId)) {
                 user = host.getUser();
-            } else if (booking != null && booking.getTravelerUser() != null
-                    && booking.getTravelerUser().getId().equals(userId)) {
-                user = booking.getTravelerUser();
+            } else if (booking != null && booking.getLoggedInUser() != null
+                    && booking.getLoggedInUser().getId().equals(userId)) {
+                user = booking.getLoggedInUser();
             }
             if (user != null) {
                 notificationService.createEmailNotificationForUser(user, NotificationType.INVOICE_ISSUED,
@@ -293,15 +293,15 @@ public class InvoiceService {
     }
 
     private String customerName(Booking booking) {
-        if (booking.getTravelerUser() != null) {
-            return booking.getTravelerUser().getFullName();
+        if (booking.getLoggedInUser() != null) {
+            return booking.getLoggedInUser().getFullName();
         }
         return booking.getGuestName();
     }
 
     private String customerEmail(Booking booking) {
-        if (booking.getTravelerUser() != null) {
-            return booking.getTravelerUser().getEmail();
+        if (booking.getLoggedInUser() != null) {
+            return booking.getLoggedInUser().getEmail();
         }
         return booking.getGuestEmail();
     }

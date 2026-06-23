@@ -1,7 +1,7 @@
 package com.localbuddy.booking;
 
 public enum BookingCancellationActor {
-    TRAVELER,
+    LOGGED_IN_USER,
     LOCAL,
     ADMIN
 }

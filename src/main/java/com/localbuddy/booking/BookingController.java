@@ -58,13 +58,13 @@ public class BookingController {
     }
 
     @PostMapping("/{bookingId}/cancel-by-traveler")
-    public ResponseEntity<BookingResponse> cancelBookingByTraveler(
+    public ResponseEntity<BookingResponse> cancelBookingByLoggedInUser(
             Authentication authentication,
             @PathVariable UUID bookingId,
             @Valid @RequestBody CancelBookingRequest request
     ) {
         UUID userId = UUID.fromString(authentication.getName());
-        return ResponseEntity.ok(bookingService.cancelBookingByTraveler(userId, bookingId, request));
+        return ResponseEntity.ok(bookingService.cancelBookingByLoggedInUser(userId, bookingId, request));
     }
 
     @PostMapping("/{bookingId}/cancel-by-local")
@@ -113,9 +113,9 @@ public class BookingController {
             Authentication authentication,
             @Valid @RequestBody CreateBookingRequest request
     ) {
-        UUID travelerUserId = UUID.fromString(authentication.getName());
+        UUID loggedInUserId = UUID.fromString(authentication.getName());
 
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(bookingCheckoutService.createBookingAndCheckout(travelerUserId, request));
+                .body(bookingCheckoutService.createBookingAndCheckout(loggedInUserId, request));
     }
 }

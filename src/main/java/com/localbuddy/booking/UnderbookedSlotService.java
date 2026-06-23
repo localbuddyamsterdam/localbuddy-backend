@@ -165,9 +165,9 @@ public class UnderbookedSlotService {
                 + " was cancelled because it did not reach the minimum number of guests. "
                 + "You have been refunded in full.";
 
-        if (booking.getTravelerUser() != null) {
+        if (booking.getLoggedInUser() != null) {
             notificationService.createEmailAndInAppNotificationForUser(
-                    booking.getTravelerUser(), NotificationType.SLOT_CANCELLED_MINIMUM_NOT_MET,
+                    booking.getLoggedInUser(), NotificationType.SLOT_CANCELLED_MINIMUM_NOT_MET,
                     subject, message, "BOOKING", booking.getId(),
                     "SLOT_CANCELLED_MIN:" + booking.getId());
         } else {

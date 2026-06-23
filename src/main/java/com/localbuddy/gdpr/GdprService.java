@@ -66,7 +66,7 @@ public class GdprService {
                 .toList();
 
         List<GdprExportResponse.ExportBooking> bookings =
-                bookingRepository.findByTravelerUserIdOrderByCreatedAtDesc(userId).stream()
+                bookingRepository.findByLoggedInUserIdOrderByCreatedAtDesc(userId).stream()
                         .map(b -> new GdprExportResponse.ExportBooking(
                                 b.getBookingReference(),
                                 b.getStatus() != null ? b.getStatus().name() : null,
@@ -79,7 +79,7 @@ public class GdprService {
                         .toList();
 
         List<GdprExportResponse.ExportPayment> payments =
-                paymentRepository.findByBooking_TravelerUser_IdOrderByCreatedAtDesc(userId).stream()
+                paymentRepository.findByBooking_LoggedInUser_IdOrderByCreatedAtDesc(userId).stream()
                         .map(p -> new GdprExportResponse.ExportPayment(
                                 p.getBooking() != null ? p.getBooking().getBookingReference() : null,
                                 p.getPaymentStatus() != null ? p.getPaymentStatus().name() : null,

@@ -169,7 +169,7 @@ public class TrustSafetyService {
 
 
     private User resolveReportedUser(UUID reporterUserId, Booking booking) {
-        User traveler = booking.getTravelerUser();
+        User traveler = booking.getLoggedInUser();
         LocalProfile localProfile = booking.getLocalProfile();
         User localUser = localProfile != null ? localProfile.getUser() : null;
 

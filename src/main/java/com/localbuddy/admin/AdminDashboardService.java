@@ -41,7 +41,7 @@ public class AdminDashboardService {
     @Transactional(readOnly = true)
     public AdminDashboardSummaryResponse getSummary() {
         long cancelledBookings =
-                bookingRepository.countByStatus(BookingStatus.CANCELLED_BY_TRAVELER)
+                bookingRepository.countByStatus(BookingStatus.CANCELLED_BY_LOGGED_IN_USER)
                         + bookingRepository.countByStatus(BookingStatus.CANCELLED_BY_LOCAL);
 
         return new AdminDashboardSummaryResponse(

@@ -9,5 +9,5 @@ import java.util.UUID;
 /** Read-only view over bookings for GDPR export; leaves the booking module untouched. */
 public interface GdprBookingRepository extends JpaRepository<Booking, UUID> {
 
-    List<Booking> findByTravelerUserIdOrderByCreatedAtDesc(UUID travelerUserId);
+    List<Booking> findByLoggedInUserIdOrderByCreatedAtDesc(UUID loggedInUserId);
 }

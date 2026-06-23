@@ -42,9 +42,9 @@ public class BookingNotificationService {
                 "BOOKING_CREATED:LOCAL:" + booking.getId()
         );
 
-        if (booking.getTravelerUser() != null) {
+        if (booking.getLoggedInUser() != null) {
             notificationService.createEmailNotificationForUser(
-                    booking.getTravelerUser(),
+                    booking.getLoggedInUser(),
                     NotificationType.BOOKING_CREATED,
                     "Complete payment to confirm your booking",
                     "Your booking has been created. Complete payment to confirm it. Reference: "

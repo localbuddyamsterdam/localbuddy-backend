@@ -1,7 +1,7 @@
 package com.localbuddy.user;
 
 public enum UserRole {
-    TRAVELER,
+    LOGGED_IN_USER,
     LOCAL,
     ADMIN,
     SUPPORT

@@ -63,7 +63,7 @@ public class BookingReminderService {
 
         String dedupeBase = "booking-reminder:" + booking.getId();
 
-        User traveler = booking.getTravelerUser();
+        User traveler = booking.getLoggedInUser();
         if (traveler != null) {
             if (!preferenceService.isBookingRemindersEnabled(traveler.getId())) {
                 return;

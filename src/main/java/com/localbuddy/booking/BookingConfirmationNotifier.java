@@ -65,7 +65,7 @@ public class BookingConfirmationNotifier {
         String dedupe = "BOOKING_CONFIRMED:" + booking.getId();
         String message = body.toString();
 
-        User traveler = booking.getTravelerUser();
+        User traveler = booking.getLoggedInUser();
         if (traveler != null) {
             notificationService.createEmailAndInAppNotificationForUser(
                     traveler, NotificationType.BOOKING_CONFIRMED, subject, message,

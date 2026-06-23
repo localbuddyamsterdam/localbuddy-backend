@@ -98,8 +98,8 @@ public class BookingSafetyChecklistService {
     }
 
     private BookingSafetyRoleContext resolveRoleContext(UUID userId, Booking booking) {
-        if (booking.getTravelerUser() != null &&
-                booking.getTravelerUser().getId().equals(userId)) {
+        if (booking.getLoggedInUser() != null &&
+                booking.getLoggedInUser().getId().equals(userId)) {
             return BookingSafetyRoleContext.TRAVELER;
         }
 

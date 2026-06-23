@@ -35,7 +35,7 @@ public class AuthService {
         }
 
         if (request.role() == UserRole.ADMIN || request.role() == UserRole.SUPPORT) {
-            throw new BadRequestException("Public signup is allowed only for TRAVELER or LOCAL");
+            throw new BadRequestException("Public signup is allowed only for LOGGED_IN_USER or LOCAL");
         }
 
         User user = new User();

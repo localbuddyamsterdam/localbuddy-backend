@@ -82,7 +82,7 @@ public class Experience {
     @Column(name = "duration_minutes", nullable = false)
     private Integer durationMinutes;
 
-    @Column(name = "price_amount", nullable = false, precision = 10, scale = 2)
+    @Column(name = "price_amount", precision = 10, scale = 2)
     private BigDecimal priceAmount;
 
     @Enumerated(EnumType.STRING)
@@ -91,6 +91,18 @@ public class Experience {
 
     @Column(name = "private_price", precision = 10, scale = 2)
     private BigDecimal privatePrice;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "external_listing_type", nullable = false, length = 40)
+    private ExternalListingType externalListingType = ExternalListingType.NONE;
+
+    @Column(name = "external_listing_details", columnDefinition = "TEXT")
+    private String externalListingDetails;
+
+    /** True only for aggregator-platform listings, which cannot offer private bookings. */
+    public boolean isListedOnExternalPlatform() {
+        return externalListingType != null && externalListingType.blocksPrivateBooking();
+    }
 
     /** Optional per-experience commission override; supersedes the host's rate. */
     @Column(name = "commission_rate", precision = 5, scale = 4)

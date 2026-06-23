@@ -10,12 +10,12 @@ import java.util.UUID;
 
 public interface ConversationRepository extends JpaRepository<Conversation, UUID> {
 
-    Optional<Conversation> findByTravelerUserIdAndHostUserIdAndExperienceId(
-            UUID travelerUserId, UUID hostUserId, UUID experienceId);
+    Optional<Conversation> findByLoggedInUserIdAndHostUserIdAndExperienceId(
+            UUID loggedInUserId, UUID hostUserId, UUID experienceId);
 
     @Query("""
             select c from Conversation c
-            where c.travelerUser.id = :userId or c.hostUser.id = :userId
+            where c.loggedInUser.id = :userId or c.hostUser.id = :userId
             order by coalesce(c.lastMessageAt, c.createdAt) desc
             """)
     List<Conversation> findMyConversations(@Param("userId") UUID userId);

@@ -345,7 +345,8 @@ public class ExperienceService {
         experience.setEndLocation(optionalTrim(request.endLocation()));
         experience.setReasonsToBook(optionalTrim(request.reasonsToBook()));
         experience.setMinimumAge(request.minimumAge() == null ? 0 : request.minimumAge());
-        applyBookingMode(experience, request.bookingMode(), request.privatePrice());
+        applyBookingMode(experience, request.bookingMode(), request.privatePrice(),
+                request.externalListingType(), request.externalListingDetails());
         applyCategories(experience, request.categoryIds());
     }
 
@@ -365,7 +366,8 @@ public class ExperienceService {
         experience.setEndLocation(optionalTrim(request.endLocation()));
         experience.setReasonsToBook(optionalTrim(request.reasonsToBook()));
         experience.setMinimumAge(request.minimumAge() == null ? 0 : request.minimumAge());
-        applyBookingMode(experience, request.bookingMode(), request.privatePrice());
+        applyBookingMode(experience, request.bookingMode(), request.privatePrice(),
+                request.externalListingType(), request.externalListingDetails());
         applyCategories(experience, request.categoryIds());
     }
 
@@ -390,14 +392,50 @@ public class ExperienceService {
         experience.getCategories().addAll(resolved);
     }
 
-    private void applyBookingMode(Experience experience, BookingMode bookingMode, BigDecimal privatePrice) {
+    private void applyBookingMode(Experience experience, BookingMode bookingMode, BigDecimal privatePrice,
+                                   ExternalListingType externalListingType, String externalListingDetails) {
         BookingMode mode = bookingMode == null ? BookingMode.SHARED : bookingMode;
-        BigDecimal normalizedPrivatePrice = normalizePrice(privatePrice);
+        ExternalListingType listingType =
+                externalListingType == null ? ExternalListingType.NONE : externalListingType;
 
-        if (mode != BookingMode.SHARED && normalizedPrivatePrice == null) {
-            throw new BadRequestException("Private price is required when private booking is allowed");
+        // Experiences listed on a third-party aggregator (Airbnb, Viator, GetYourGuide, etc.) cannot offer
+        // private-buyout bookings because LocalBuddy cannot guarantee slot exclusivity when external
+        // bookings exist. Own website / social media (and not-listed) do not trigger this rule.
+        if (listingType.blocksPrivateBooking() && mode != BookingMode.SHARED) {
+            throw new BadRequestException(
+                    "Experiences listed on an external aggregator platform can only offer shared bookings. " +
+                    "Set booking mode to Shared, or change the external listing option.");
         }
 
+        // PRIVATE_ONLY: host sets a flat total price — per-person priceAmount is not required.
+        // PRIVATE_ALLOWED: host sets a flat private price charged as-is (no discount).
+        BigDecimal normalizedPrivatePrice = normalizePrice(privatePrice);
+
+        if (mode == BookingMode.PRIVATE_ONLY && normalizedPrivatePrice == null) {
+            throw new BadRequestException("A flat private price is required for private-only experiences");
+        }
+        if (mode == BookingMode.PRIVATE_ALLOWED && normalizedPrivatePrice == null) {
+            throw new BadRequestException("A private price is required when private booking is allowed");
+        }
+        // For SHARED or PRIVATE_ALLOWED, a per-person priceAmount must have been set by applyPricing.
+        if (mode != BookingMode.PRIVATE_ONLY && experience.getPriceAmount() == null) {
+            throw new BadRequestException("Price per person is required for shared and private-allowed experiences");
+        }
+
+        // When both shared and private are offered, the flat private (whole-slot) price may not exceed
+        // the full shared price for a sold-out slot: maxGuests × per-person price.
+        if (mode == BookingMode.PRIVATE_ALLOWED) {
+            BigDecimal cap = experience.getPriceAmount()
+                    .multiply(BigDecimal.valueOf(experience.getMaxGuests()))
+                    .setScale(2, java.math.RoundingMode.HALF_UP);
+            if (normalizedPrivatePrice.compareTo(cap) > 0) {
+                throw new BadRequestException(
+                        "The private price cannot exceed maximum guests × per-person price (" + cap + ")");
+            }
+        }
+
+        experience.setExternalListingType(listingType);
+        experience.setExternalListingDetails(optionalTrim(externalListingDetails));
         experience.setBookingMode(mode);
         experience.setPrivatePrice(normalizedPrivatePrice);
     }
@@ -506,7 +544,9 @@ public class ExperienceService {
                 experience.getMinimumAge(),
                 experience.getStatus(),
                 experience.getCreatedAt(),
-                experience.getUpdatedAt()
+                experience.getUpdatedAt(),
+                experience.getExternalListingType(),
+                experience.getExternalListingDetails()
         );
     }
 

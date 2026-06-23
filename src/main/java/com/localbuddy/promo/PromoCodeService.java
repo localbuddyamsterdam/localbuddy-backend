@@ -249,7 +249,7 @@ public class PromoCodeService {
 
         PromoCodeRedemption redemption = new PromoCodeRedemption();
         redemption.setPromoCode(booking.getPromoCode());
-        redemption.setUser(booking.getTravelerUser());
+        redemption.setUser(booking.getLoggedInUser());
         redemption.setBooking(booking);
         redemption.setGuestEmail(booking.getGuestEmail());
         redemption.setDiscountAmount(booking.getDiscountAmount());

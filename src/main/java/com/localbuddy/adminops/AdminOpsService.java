@@ -267,7 +267,9 @@ public class AdminOpsService {
                 experience.getMinimumAge(),
                 experience.getStatus(),
                 experience.getCreatedAt(),
-                experience.getUpdatedAt()
+                experience.getUpdatedAt(),
+                experience.getExternalListingType(),
+                experience.getExternalListingDetails()
         );
     }
 

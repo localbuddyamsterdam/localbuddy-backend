@@ -41,15 +41,15 @@ public class ReviewService {
         User reviewer = userRepository.findById(reviewerUserId)
                 .orElseThrow(() -> new BadRequestException("Invalid user"));
 
-        if (reviewer.getRole() != UserRole.TRAVELER) {
+        if (reviewer.getRole() != UserRole.LOGGED_IN_USER) {
             throw new BadRequestException("Only travelers can create reviews");
         }
 
         Booking booking = bookingRepository.findById(request.bookingId())
                 .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
 
-        if (booking.getTravelerUser() == null ||
-                !booking.getTravelerUser().getId().equals(reviewerUserId)) {
+        if (booking.getLoggedInUser() == null ||
+                !booking.getLoggedInUser().getId().equals(reviewerUserId)) {
             throw new ResourceNotFoundException("Booking not found");
         }
 
@@ -91,7 +91,7 @@ public class ReviewService {
             throw new ResourceNotFoundException("Booking not found");
         }
 
-        if (booking.getTravelerUser() == null) {
+        if (booking.getLoggedInUser() == null) {
             throw new BadRequestException("Guest bookings cannot be reviewed");
         }
 
@@ -107,7 +107,7 @@ public class ReviewService {
         review.setBooking(booking);
         review.setDirection(ReviewDirection.HOST_TO_TRAVELER);
         review.setReviewerUser(host);
-        review.setRevieweeUser(booking.getTravelerUser());
+        review.setRevieweeUser(booking.getLoggedInUser());
         review.setLocalProfile(booking.getLocalProfile());
         review.setExperience(booking.getExperience());
         review.setRating(request.rating());
@@ -115,7 +115,7 @@ public class ReviewService {
         review.setStatus(ReviewStatus.VISIBLE);
 
         Review saved = reviewRepository.save(review);
-        recomputeTravelerRating(booking.getTravelerUser());
+        recomputeTravelerRating(booking.getLoggedInUser());
         return toResponse(saved);
     }
 

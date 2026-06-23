@@ -51,10 +51,10 @@ public class ConversationService {
                 .orElseThrow(() -> new BadRequestException("Invalid user"));
 
         Conversation conversation = conversationRepository
-                .findByTravelerUserIdAndHostUserIdAndExperienceId(traveler.getId(), host.getId(), experience.getId())
+                .findByLoggedInUserIdAndHostUserIdAndExperienceId(traveler.getId(), host.getId(), experience.getId())
                 .orElseGet(() -> {
                     Conversation created = new Conversation();
-                    created.setTravelerUser(traveler);
+                    created.setLoggedInUser(traveler);
                     created.setHostUser(host);
                     created.setExperience(experience);
                     return conversationRepository.save(created);
@@ -86,9 +86,9 @@ public class ConversationService {
 
     /** Pings the other party (in-app) when they receive a new message. */
     private void notifyRecipient(Conversation conversation, User sender, Message message) {
-        User recipient = conversation.getTravelerUser().getId().equals(sender.getId())
+        User recipient = conversation.getLoggedInUser().getId().equals(sender.getId())
                 ? conversation.getHostUser()
-                : conversation.getTravelerUser();
+                : conversation.getLoggedInUser();
 
         String senderName = sender.getFullName() != null ? sender.getFullName() : "Someone";
         String body = message.getBody();
@@ -130,7 +130,7 @@ public class ConversationService {
         Conversation conversation = conversationRepository.findById(conversationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Conversation not found"));
 
-        boolean isMember = conversation.getTravelerUser().getId().equals(currentUserId)
+        boolean isMember = conversation.getLoggedInUser().getId().equals(currentUserId)
                 || conversation.getHostUser().getId().equals(currentUserId);
         if (!isMember) {
             // Hide existence from non-members.
@@ -145,7 +145,7 @@ public class ConversationService {
 
         return new ConversationResponse(
                 conversation.getId(),
-                conversation.getTravelerUser().getId(),
+                conversation.getLoggedInUser().getId(),
                 conversation.getHostUser().getId(),
                 conversation.getExperience() != null ? conversation.getExperience().getId() : null,
                 conversation.getBooking() != null ? conversation.getBooking().getId() : null,

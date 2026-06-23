@@ -6,6 +6,7 @@ import com.localbuddy.availability.AvailabilityStatus;
 import com.localbuddy.common.exception.BadRequestException;
 import com.localbuddy.common.exception.ResourceNotFoundException;
 import com.localbuddy.consent.ConsentService;
+import com.localbuddy.experience.BookingMode;
 import com.localbuddy.experience.Experience;
 import com.localbuddy.experience.ExperienceRepository;
 import com.localbuddy.experience.ExperienceStatus;
@@ -32,6 +33,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.security.SecureRandom;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
@@ -44,8 +46,9 @@ import org.slf4j.LoggerFactory;
 public class BookingService {
 
     private static final String REFERENCE_PREFIX = "LB";
+    /** A host may only cancel a booking more than this many hours before the experience starts. */
+    private static final long HOST_CANCEL_MIN_HOURS = 24;
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
-    private static final BigDecimal PRIVATE_DISCOUNT_RATE = new BigDecimal("0.20");
     private static final Logger log = LoggerFactory.getLogger(BookingService.class);
     private final BookingRepository bookingRepository;
     private final UserRepository userRepository;
@@ -90,60 +93,60 @@ public class BookingService {
     }
 
     @Transactional
-    public BookingResponse createBooking(UUID travelerUserId, CreateBookingRequest request) {
+    public BookingResponse createBooking(UUID loggedInUserId, CreateBookingRequest request) {
         long totalStart = System.currentTimeMillis();
 
         long stepStart = System.currentTimeMillis();
-        User traveler = userRepository.findById(travelerUserId)
+        User traveler = userRepository.findById(loggedInUserId)
                 .orElseThrow(() -> new BadRequestException("Invalid user"));
-        log.info("TRAVELER_BOOKING_TIMING userLookupMs={}", System.currentTimeMillis() - stepStart);
+        log.info("LOGGED_IN_BOOKING_TIMING userLookupMs={}", System.currentTimeMillis() - stepStart);
 
         stepStart = System.currentTimeMillis();
-        if (traveler.getRole() != UserRole.TRAVELER) {
+        if (traveler.getRole() != UserRole.LOGGED_IN_USER) {
             throw new BadRequestException("Only travelers can create bookings");
         }
-        log.info("TRAVELER_BOOKING_TIMING roleCheckMs={}", System.currentTimeMillis() - stepStart);
+        log.info("LOGGED_IN_BOOKING_TIMING roleCheckMs={}", System.currentTimeMillis() - stepStart);
 
         stepStart = System.currentTimeMillis();
-        trustSafetyService.requireUserCanBook(travelerUserId);
-        log.info("TRAVELER_BOOKING_TIMING travelerRestrictionCheckMs={}", System.currentTimeMillis() - stepStart);
+        trustSafetyService.requireUserCanBook(loggedInUserId);
+        log.info("LOGGED_IN_BOOKING_TIMING travelerRestrictionCheckMs={}", System.currentTimeMillis() - stepStart);
 
         stepStart = System.currentTimeMillis();
-        consentService.requireTravelerConsents(travelerUserId);
-        log.info("TRAVELER_BOOKING_TIMING travelerConsentCheckMs={}", System.currentTimeMillis() - stepStart);
+        consentService.requireTravelerConsents(loggedInUserId);
+        log.info("LOGGED_IN_BOOKING_TIMING travelerConsentCheckMs={}", System.currentTimeMillis() - stepStart);
 
         stepStart = System.currentTimeMillis();
-        if (bookingRepository.existsByTravelerUserIdAndAvailabilitySlotIdAndStatusIn(
-                travelerUserId,
+        if (bookingRepository.existsByLoggedInUserIdAndAvailabilitySlotIdAndStatusIn(
+                loggedInUserId,
                 request.availabilitySlotId(),
                 activeBookingStatuses()
         )) {
             throw new BadRequestException("You already have an active booking for this slot");
         }
-        log.info("TRAVELER_BOOKING_TIMING duplicateCheckMs={}", System.currentTimeMillis() - stepStart);
+        log.info("LOGGED_IN_BOOKING_TIMING duplicateCheckMs={}", System.currentTimeMillis() - stepStart);
 
         stepStart = System.currentTimeMillis();
         Experience experience = experienceRepository.findWithLocalProfileAndUserById(request.experienceId())
                 .orElseThrow(() -> new ResourceNotFoundException("Experience not found"));
 
-        log.info("TRAVELER_BOOKING_TIMING experienceLookupMs={}", System.currentTimeMillis() - stepStart);
+        log.info("LOGGED_IN_BOOKING_TIMING experienceLookupMs={}", System.currentTimeMillis() - stepStart);
 
         stepStart = System.currentTimeMillis();
         trustSafetyService.requireUserCanHost(
                 experience.getLocalProfile().getUser().getId()
         );
-        log.info("TRAVELER_BOOKING_TIMING hostRestrictionCheckMs={}", System.currentTimeMillis() - stepStart);
+        log.info("LOGGED_IN_BOOKING_TIMING hostRestrictionCheckMs={}", System.currentTimeMillis() - stepStart);
 
         stepStart = System.currentTimeMillis();
         if (experience.getStatus() != ExperienceStatus.APPROVED) {
             throw new BadRequestException("Experience is not available for booking");
         }
-        log.info("TRAVELER_BOOKING_TIMING experienceStatusCheckMs={}", System.currentTimeMillis() - stepStart);
+        log.info("LOGGED_IN_BOOKING_TIMING experienceStatusCheckMs={}", System.currentTimeMillis() - stepStart);
 
         stepStart = System.currentTimeMillis();
         AvailabilitySlot slot = availabilitySlotRepository.findByIdForUpdate(request.availabilitySlotId())
                 .orElseThrow(() -> new ResourceNotFoundException("Availability slot not found"));
-        log.info("TRAVELER_BOOKING_TIMING slotLockLookupMs={}", System.currentTimeMillis() - stepStart);
+        log.info("LOGGED_IN_BOOKING_TIMING slotLockLookupMs={}", System.currentTimeMillis() - stepStart);
 
         AgeBandPricing.AgeBands bands = ageBandPricing.resolve(
                 request.adults(), request.teens(), request.children(), request.infants(), request.guestsCount());
@@ -151,14 +154,15 @@ public class BookingService {
 
         stepStart = System.currentTimeMillis();
         validateSlot(experience, slot, bands.totalGuests());
-        log.info("TRAVELER_BOOKING_TIMING validateSlotMs={}", System.currentTimeMillis() - stepStart);
+        log.info("LOGGED_IN_BOOKING_TIMING validateSlotMs={}", System.currentTimeMillis() - stepStart);
 
         stepStart = System.currentTimeMillis();
         boolean privateBooking = Boolean.TRUE.equals(request.privateBooking());
-        requirePrivateBookingAllowed(privateBooking, slot);
+        requirePrivateBookingAllowed(privateBooking, experience, slot);
 
         BigDecimal pricePerGuest = experience.getPriceAmount();
-        BookingPricing pricing = computePricing(privateBooking, slot, pricePerGuest,
+        BookingPricing pricing = computePricing(privateBooking, slot,
+                pricePerGuest, experience.getPrivatePrice(),
                 bands.totalGuests(), ageBandPricing.billableUnits(bands));
 
         int seatsToBook = pricing.seatsBlocked();
@@ -171,32 +175,32 @@ public class BookingService {
 
         BigDecimal originalAmount = pricing.originalAmount();
         String currency = experience.getCurrency().toUpperCase(Locale.ROOT);
-        log.info("TRAVELER_BOOKING_TIMING updateSlotMemoryMs={}", System.currentTimeMillis() - stepStart);
+        log.info("LOGGED_IN_BOOKING_TIMING updateSlotMemoryMs={}", System.currentTimeMillis() - stepStart);
 
         stepStart = System.currentTimeMillis();
         AppliedPromoCode appliedPromo = promoCodeService.applyPromoCodeForBooking(
-                travelerUserId,
+                loggedInUserId,
                 request.promoCode(),
                 null,
                 pricing.baseForPromo(),
                 currency
         );
-        log.info("TRAVELER_BOOKING_TIMING applyPromoMs={}", System.currentTimeMillis() - stepStart);
+        log.info("LOGGED_IN_BOOKING_TIMING applyPromoMs={}", System.currentTimeMillis() - stepStart);
 
         stepStart = System.currentTimeMillis();
         AppliedReferralCode appliedReferral = referralService.applyReferralCodeForBooking(
-                travelerUserId,
+                loggedInUserId,
                 request.referralCode(),
                 null
         );
-        log.info("TRAVELER_BOOKING_TIMING applyReferralMs={}", System.currentTimeMillis() - stepStart);
+        log.info("LOGGED_IN_BOOKING_TIMING applyReferralMs={}", System.currentTimeMillis() - stepStart);
 
         stepStart = System.currentTimeMillis();
         BigDecimal totalAmount = appliedPromo.finalAmount();
 
         Booking booking = new Booking();
         booking.setBookingReference(generateUniqueBookingReference());
-        booking.setTravelerUser(traveler);
+        booking.setLoggedInUser(traveler);
         booking.setBookingSource(BookingSource.LOGGED_IN_USER);
         booking.setLocalProfile(experience.getLocalProfile());
         booking.setExperience(experience);
@@ -222,31 +226,31 @@ public class BookingService {
 
         booking.setTravelerNote(optionalTrim(request.travelerNote()));
         booking.setRequestedAt(Instant.now());
-        log.info("TRAVELER_BOOKING_TIMING buildBookingObjectMs={}", System.currentTimeMillis() - stepStart);
+        log.info("LOGGED_IN_BOOKING_TIMING buildBookingObjectMs={}", System.currentTimeMillis() - stepStart);
 
         try {
             stepStart = System.currentTimeMillis();
             availabilitySlotRepository.save(slot);
-            log.info("TRAVELER_BOOKING_TIMING saveSlotMs={}", System.currentTimeMillis() - stepStart);
+            log.info("LOGGED_IN_BOOKING_TIMING saveSlotMs={}", System.currentTimeMillis() - stepStart);
 
             stepStart = System.currentTimeMillis();
             Booking savedBooking = bookingRepository.save(booking);
-            log.info("TRAVELER_BOOKING_TIMING saveBookingMs={}", System.currentTimeMillis() - stepStart);
+            log.info("LOGGED_IN_BOOKING_TIMING saveBookingMs={}", System.currentTimeMillis() - stepStart);
 
             stepStart = System.currentTimeMillis();
             eventPublisher.publishEvent(new BookingCreatedEvent(savedBooking.getId()));
-            log.info("TRAVELER_BOOKING_TIMING publishEventMs={}", System.currentTimeMillis() - stepStart);
+            log.info("LOGGED_IN_BOOKING_TIMING publishEventMs={}", System.currentTimeMillis() - stepStart);
 
             stepStart = System.currentTimeMillis();
             BookingResponse response = toResponse(savedBooking);
-            log.info("TRAVELER_BOOKING_TIMING toResponseMs={}", System.currentTimeMillis() - stepStart);
+            log.info("LOGGED_IN_BOOKING_TIMING toResponseMs={}", System.currentTimeMillis() - stepStart);
 
-            log.info("TRAVELER_BOOKING_TIMING totalMs={}", System.currentTimeMillis() - totalStart);
+            log.info("LOGGED_IN_BOOKING_TIMING totalMs={}", System.currentTimeMillis() - totalStart);
 
             return response;
 
         } catch (DataIntegrityViolationException ex) {
-            log.warn("TRAVELER_BOOKING_TIMING failedAfterMs={} reason=data_integrity_violation",
+            log.warn("LOGGED_IN_BOOKING_TIMING failedAfterMs={} reason=data_integrity_violation",
                     System.currentTimeMillis() - totalStart);
 
             throw new BadRequestException("You already have an active booking for this slot");
@@ -258,8 +262,8 @@ public class BookingService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BadRequestException("Invalid user"));
 
-        if (user.getRole() == UserRole.TRAVELER) {
-            return bookingRepository.findByTravelerUserIdOrderByRequestedAtDesc(userId)
+        if (user.getRole() == UserRole.LOGGED_IN_USER) {
+            return bookingRepository.findByLoggedInUserIdOrderByRequestedAtDesc(userId)
                     .stream()
                     .map(this::toResponse)
                     .toList();
@@ -296,35 +300,29 @@ public class BookingService {
     /**
      * Computes the pricing for a booking.
      *
-     * <p>For a private buyout the price is based on the full slot
-     * ({@code capacity x pricePerGuest}) with a 20% private-tour discount applied;
-     * promo/referral discounts then apply on top of that discounted base. For a
-     * normal booking the base is simply {@code guestsCount x pricePerGuest}.
+     * <p>Private booking (PRIVATE_ONLY or PRIVATE_ALLOWED): the host's flat {@code privatePrice}
+     * is charged as-is — no per-person calculation, no discount. Promos apply on the flat price.
+     * The whole slot is blocked (seats = capacity).
+     * <p>Shared booking: {@code guestsCount × pricePerGuest} (age-band weighted).
      */
     private BookingPricing computePricing(boolean privateBooking,
                                           AvailabilitySlot slot,
                                           BigDecimal pricePerGuest,
+                                          BigDecimal flatPrivatePrice,
                                           int seats,
                                           BigDecimal billableUnits) {
         if (privateBooking) {
-            BigDecimal originalAmount = pricePerGuest
-                    .multiply(BigDecimal.valueOf(slot.getCapacity()))
-                    .setScale(2, RoundingMode.HALF_UP);
-
-            BigDecimal privateDiscountAmount = originalAmount
-                    .multiply(PRIVATE_DISCOUNT_RATE)
-                    .setScale(2, RoundingMode.HALF_UP);
-
-            BigDecimal baseForPromo = originalAmount.subtract(privateDiscountAmount);
-
-            return new BookingPricing(originalAmount, privateDiscountAmount, baseForPromo, slot.getCapacity());
+            // Whole-slot buyout — host's flat private total, no discount, blocks all seats.
+            return new BookingPricing(flatPrivatePrice,
+                    BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP),
+                    flatPrivatePrice,
+                    slot.getCapacity());
         }
 
         // Shared booking: price by weighted billable units (age bands), seats by head count.
         BigDecimal originalAmount = pricePerGuest
                 .multiply(billableUnits)
                 .setScale(2, RoundingMode.HALF_UP);
-
         return new BookingPricing(
                 originalAmount,
                 BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP),
@@ -345,7 +343,18 @@ public class BookingService {
         return booking.getSeatsBlocked() != null ? booking.getSeatsBlocked() : booking.getGuestsCount();
     }
 
-    private void requirePrivateBookingAllowed(boolean privateBooking, AvailabilitySlot slot) {
+    private void requirePrivateBookingAllowed(boolean privateBooking, Experience experience, AvailabilitySlot slot) {
+        BookingMode mode = experience.getBookingMode();
+        if (privateBooking && experience.isListedOnExternalPlatform()) {
+            throw new BadRequestException(
+                    "Private booking is not available for experiences listed on external booking platforms");
+        }
+        if (privateBooking && mode == BookingMode.SHARED) {
+            throw new BadRequestException("This experience does not offer private bookings");
+        }
+        if (!privateBooking && mode == BookingMode.PRIVATE_ONLY) {
+            throw new BadRequestException("This experience only accepts private (whole-slot) bookings");
+        }
         if (privateBooking && slot.getBookedCount() != 0) {
             throw new BadRequestException(
                     "Private booking is not available because seats are already booked for this slot");
@@ -398,7 +407,7 @@ public class BookingService {
         return new BookingResponse(
                 booking.getId(),
                 booking.getBookingReference(),
-                booking.getTravelerUser() != null ? booking.getTravelerUser().getId() : null,
+                booking.getLoggedInUser() != null ? booking.getLoggedInUser().getId() : null,
                 booking.getGuestName(),
                 booking.getGuestEmail(),
                 booking.getGuestPhone(),
@@ -520,12 +529,12 @@ public class BookingService {
     }
 
     @Transactional
-    public BookingResponse cancelBookingByTraveler(UUID travelerUserId, UUID bookingId, CancelBookingRequest request) {
+    public BookingResponse cancelBookingByLoggedInUser(UUID loggedInUserId, UUID bookingId, CancelBookingRequest request) {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
 
-        if (booking.getTravelerUser() == null ||
-                !booking.getTravelerUser().getId().equals(travelerUserId)) {
+        if (booking.getLoggedInUser() == null ||
+                !booking.getLoggedInUser().getId().equals(loggedInUserId)) {
             throw new ResourceNotFoundException("Booking not found");
         }
 
@@ -534,8 +543,8 @@ public class BookingService {
         }
 
         releaseAvailabilityCapacity(booking);
-        handleCancellationPayment(booking, BookingCancellationActor.TRAVELER, request.reason());
-        booking.setStatus(BookingStatus.CANCELLED_BY_TRAVELER);
+        handleCancellationPayment(booking, BookingCancellationActor.LOGGED_IN_USER, request.reason());
+        booking.setStatus(BookingStatus.CANCELLED_BY_LOGGED_IN_USER);
         booking.setCancelledAt(Instant.now());
         booking.setCancellationReason(optionalTrim(request.reason()));
 
@@ -560,8 +569,18 @@ public class BookingService {
             throw new BadRequestException("Only pending payment or confirmed bookings can be cancelled");
         }
 
+        // A host cannot back out inside 24h of the start. If the booking itself was made less than 24h
+        // before start, the host can never cancel it — they should have closed the availability earlier.
+        Instant startTime = booking.getAvailabilitySlot().getStartTime();
+        if (Duration.between(Instant.now(), startTime).toHours() < HOST_CANCEL_MIN_HOURS) {
+            throw new BadRequestException(
+                    "A host can only cancel more than 24 hours before the experience starts. " +
+                    "Closer to the start time, please contact support.");
+        }
+
         releaseAvailabilityCapacity(booking);
-        handleCancellationPayment(booking, BookingCancellationActor.LOCAL, request.reason());        booking.setStatus(BookingStatus.CANCELLED_BY_LOCAL);
+        handleCancellationPayment(booking, BookingCancellationActor.LOCAL, request.reason());
+        booking.setStatus(BookingStatus.CANCELLED_BY_LOCAL);
         booking.setCancelledAt(Instant.now());
         booking.setCancellationReason(optionalTrim(request.reason()));
 
@@ -597,9 +616,9 @@ public class BookingService {
             return toResponse(booking);
         }
 
-        if (user.getRole() == UserRole.TRAVELER &&
-                booking.getTravelerUser() != null &&
-                booking.getTravelerUser().getId().equals(userId)) {
+        if (user.getRole() == UserRole.LOGGED_IN_USER &&
+                booking.getLoggedInUser() != null &&
+                booking.getLoggedInUser().getId().equals(userId)) {
             return toResponse(booking);
         }
 
@@ -682,10 +701,11 @@ public class BookingService {
 
         stepStart = System.currentTimeMillis();
         boolean privateBooking = Boolean.TRUE.equals(request.privateBooking());
-        requirePrivateBookingAllowed(privateBooking, slot);
+        requirePrivateBookingAllowed(privateBooking, experience, slot);
 
         BigDecimal pricePerGuest = experience.getPriceAmount();
-        BookingPricing pricing = computePricing(privateBooking, slot, pricePerGuest,
+        BookingPricing pricing = computePricing(privateBooking, slot,
+                pricePerGuest, experience.getPrivatePrice(),
                 bands.totalGuests(), ageBandPricing.billableUnits(bands));
 
         int seatsToBook = pricing.seatsBlocked();
@@ -723,7 +743,7 @@ public class BookingService {
 
         Booking booking = new Booking();
         booking.setBookingReference(generateUniqueBookingReference());
-        booking.setBookingSource(BookingSource.GUEST);
+        booking.setBookingSource(BookingSource.GUEST_USER);
 
         booking.setGuestName(requiredTrim(request.guestName()));
         booking.setGuestEmail(normalizedGuestEmail);
@@ -740,7 +760,7 @@ public class BookingService {
         booking.setGuestConsentIpAddress(optionalTrim(ipAddress));
         booking.setGuestConsentUserAgent(optionalTrim(userAgent));
 
-        booking.setTravelerUser(null);
+        booking.setLoggedInUser(null);
         booking.setLocalProfile(experience.getLocalProfile());
         booking.setExperience(experience);
         booking.setAvailabilitySlot(slot);
@@ -816,10 +836,11 @@ public class BookingService {
         validateSlot(experience, slot, bands.totalGuests());
 
         boolean privateBooking = Boolean.TRUE.equals(request.privateBooking());
-        requirePrivateBookingAllowed(privateBooking, slot);
+        requirePrivateBookingAllowed(privateBooking, experience, slot);
 
         BigDecimal pricePerGuest = experience.getPriceAmount();
-        BookingPricing pricing = computePricing(privateBooking, slot, pricePerGuest,
+        BookingPricing pricing = computePricing(privateBooking, slot,
+                pricePerGuest, experience.getPrivatePrice(),
                 bands.totalGuests(), ageBandPricing.billableUnits(bands));
 
         int seatsToBook = pricing.seatsBlocked();
@@ -838,7 +859,7 @@ public class BookingService {
         booking.setGuestName(requiredTrim(request.guestName()));
         booking.setGuestEmail(requiredTrim(request.guestEmail()).toLowerCase(Locale.ROOT));
         booking.setGuestPhone(optionalTrim(request.guestPhone()));
-        booking.setTravelerUser(null);
+        booking.setLoggedInUser(null);
         booking.setLocalProfile(experience.getLocalProfile());
         booking.setExperience(experience);
         booking.setAvailabilitySlot(slot);
@@ -871,7 +892,7 @@ public class BookingService {
         Booking booking = bookingRepository.findByBookingReference(normalizedReference)
                 .orElseThrow(() -> new ResourceNotFoundException("Guest booking not found"));
 
-        if (booking.getBookingSource() != BookingSource.GUEST) {
+        if (booking.getBookingSource() != BookingSource.GUEST_USER) {
             throw new ResourceNotFoundException("Guest booking not found");
         }
 
@@ -884,9 +905,9 @@ public class BookingService {
     }
 
     private void createBookingAcceptedNotification(Booking booking) {
-        if (booking.getTravelerUser() != null) {
+        if (booking.getLoggedInUser() != null) {
             notificationService.createEmailNotificationForUser(
-                    booking.getTravelerUser(),
+                    booking.getLoggedInUser(),
                     NotificationType.BOOKING_ACCEPTED,
                     "Your booking was accepted",
                     "Your booking has been accepted: " + booking.getBookingReference(),
@@ -909,9 +930,9 @@ public class BookingService {
     }
 
     private void createBookingDeclinedNotification(Booking booking) {
-        if (booking.getTravelerUser() != null) {
+        if (booking.getLoggedInUser() != null) {
             notificationService.createEmailNotificationForUser(
-                    booking.getTravelerUser(),
+                    booking.getLoggedInUser(),
                     NotificationType.BOOKING_DECLINED,
                     "Your booking was declined",
                     "Your booking has been declined: " + booking.getBookingReference(),
@@ -967,9 +988,9 @@ public class BookingService {
                 "BOOKING_CANCELLED:LOCAL:" + booking.getId()
         );
 
-        if (booking.getTravelerUser() != null) {
+        if (booking.getLoggedInUser() != null) {
             notificationService.createEmailNotificationForUser(
-                    booking.getTravelerUser(),
+                    booking.getLoggedInUser(),
                     NotificationType.BOOKING_CANCELLED,
                     "Booking cancelled",
                     "Your booking has been cancelled: " + booking.getBookingReference(),
@@ -1091,9 +1112,9 @@ public class BookingService {
 
 
     private void createBookingCompletedNotification(Booking booking) {
-        if (booking.getTravelerUser() != null) {
+        if (booking.getLoggedInUser() != null) {
             notificationService.createEmailNotificationForUser(
-                    booking.getTravelerUser(),
+                    booking.getLoggedInUser(),
                     NotificationType.BOOKING_COMPLETED,
                     "Your LocalBuddy experience is completed",
                     "Your booking has been completed: " + booking.getBookingReference()
@@ -1130,8 +1151,8 @@ public class BookingService {
     }
 
     private void validateSafetyChecklistCompleted(Booking booking) {
-        UUID travelerUserId = booking.getTravelerUser() != null
-                ? booking.getTravelerUser().getId()
+        UUID loggedInUserId = booking.getLoggedInUser() != null
+                ? booking.getLoggedInUser().getId()
                 : null;
 
         UUID localUserId = booking.getLocalProfile() != null &&
@@ -1139,9 +1160,9 @@ public class BookingService {
                 ? booking.getLocalProfile().getUser().getId()
                 : null;
 
-        if (travelerUserId != null) {
+        if (loggedInUserId != null) {
             boolean travelerCompleted = bookingSafetyChecklistRepository
-                    .existsByBookingIdAndUserIdAndCompletedTrue(booking.getId(), travelerUserId);
+                    .existsByBookingIdAndUserIdAndCompletedTrue(booking.getId(), loggedInUserId);
 
             if (!travelerCompleted) {
                 throw new BadRequestException("Traveler safety checklist must be completed before completing booking");
@@ -1198,9 +1219,9 @@ public class BookingService {
                 "BOOKING_RESCHEDULED:LOCAL:" + booking.getId()
         );
 
-        if (booking.getTravelerUser() != null) {
+        if (booking.getLoggedInUser() != null) {
             notificationService.createEmailNotificationForUser(
-                    booking.getTravelerUser(),
+                    booking.getLoggedInUser(),
                     NotificationType.BOOKING_UPDATED,
                     "Your LocalBuddy booking was rescheduled",
                     "Your booking has been rescheduled: " + booking.getBookingReference(),

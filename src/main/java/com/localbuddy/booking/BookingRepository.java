@@ -14,14 +14,14 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
 
     boolean existsByBookingReference(String bookingReference);
 
-    List<Booking> findByTravelerUserIdOrderByRequestedAtDesc(UUID travelerUserId);
+    List<Booking> findByLoggedInUserIdOrderByRequestedAtDesc(UUID loggedInUserId);
 
     List<Booking> findByLocalProfileIdOrderByRequestedAtDesc(UUID localProfileId);
 
     List<Booking> findByStatusOrderByRequestedAtDesc(BookingStatus status);
 
-    List<Booking> findByTravelerUserIdAndStatusOrderByRequestedAtDesc(
-            UUID travelerUserId,
+    List<Booking> findByLoggedInUserIdAndStatusOrderByRequestedAtDesc(
+            UUID loggedInUserId,
             BookingStatus status
     );
 
@@ -30,8 +30,8 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
             BookingStatus status
     );
 
-    boolean existsByTravelerUserIdAndAvailabilitySlotIdAndStatusIn(
-            UUID travelerUserId,
+    boolean existsByLoggedInUserIdAndAvailabilitySlotIdAndStatusIn(
+            UUID loggedInUserId,
             UUID availabilitySlotId,
             Collection<BookingStatus> statuses
     );
@@ -47,10 +47,42 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
             Collection<BookingStatus> statuses
     );
 
+    boolean existsByAvailabilitySlotIdAndStatusIn(
+            UUID availabilitySlotId,
+            Collection<BookingStatus> statuses
+    );
+
     long countByStatus(BookingStatus status);
 
     List<Booking> findTop100ByStatusAndRequestedAtBeforeOrderByRequestedAtAsc(
             BookingStatus status,
             Instant requestedAtBefore
     );
+
+    /** Bookings whose slot started before the cutoff and are still confirmed — for the auto-complete sweep. */
+    List<Booking> findTop100ByStatusAndAvailabilitySlot_StartTimeBeforeOrderByAvailabilitySlot_StartTimeAsc(
+            BookingStatus status,
+            Instant startTimeBefore
+    );
+
+    // --- Reliability counters (derived on demand; auto-correct when admins clear a flag) ---
+
+    long countByLocalProfileIdAndStatus(UUID localProfileId, BookingStatus status);
+
+    long countByLoggedInUserIdAndStatus(UUID loggedInUserId, BookingStatus status);
+
+    long countByExperienceIdAndStatus(UUID experienceId, BookingStatus status);
+
+    long countByLoggedInUserIdAndAttendanceOutcome(UUID loggedInUserId, AttendanceOutcome attendanceOutcome);
+
+    /** Host no-shows counted once per slot occurrence, even if several guests reported the same slot. */
+    @org.springframework.data.jpa.repository.Query(
+            "select count(distinct b.availabilitySlot.id) from Booking b "
+            + "where b.localProfile.id = :localProfileId and b.attendanceOutcome = :outcome")
+    long countDistinctSlotsByLocalProfileAndOutcome(UUID localProfileId, AttendanceOutcome outcome);
+
+    @org.springframework.data.jpa.repository.Query(
+            "select count(distinct b.availabilitySlot.id) from Booking b "
+            + "where b.experience.id = :experienceId and b.attendanceOutcome = :outcome")
+    long countDistinctSlotsByExperienceAndOutcome(UUID experienceId, AttendanceOutcome outcome);
 }

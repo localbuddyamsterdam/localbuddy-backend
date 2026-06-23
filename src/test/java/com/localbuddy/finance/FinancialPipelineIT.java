@@ -62,7 +62,7 @@ class FinancialPipelineIT {
 
         User hostUser = saveUser("host-" + tag + "@test.com", UserRole.LOCAL);
         LocalProfile host = saveHost(hostUser);            // NL VAT-registered
-        User traveler = saveUser("trav-" + tag + "@test.com", UserRole.TRAVELER);
+        User traveler = saveUser("trav-" + tag + "@test.com", UserRole.LOGGED_IN_USER);
         City city = saveCity(tag);
         Experience exp = saveExperience(host, city, tag);  // price 100 EUR, gross
         AvailabilitySlot slot = saveSlot(exp, host);       // ended 5 days ago (so earning is payable)
@@ -201,7 +201,7 @@ class FinancialPipelineIT {
     private Booking saveBooking(User traveler, LocalProfile host, Experience exp, AvailabilitySlot slot, String tag) {
         Booking b = new Booking();
         b.setBookingReference("LB-" + tag.toUpperCase());
-        b.setTravelerUser(traveler);
+        b.setLoggedInUser(traveler);
         b.setBookingSource(BookingSource.LOGGED_IN_USER);
         b.setLocalProfile(host);
         b.setExperience(exp);

@@ -96,8 +96,8 @@ public class PaymentService {
     }
 
     private void validatePaymentRequestUser(UUID userId, Booking booking) {
-        if (booking.getTravelerUser() != null &&
-                booking.getTravelerUser().getId().equals(userId)) {
+        if (booking.getLoggedInUser() != null &&
+                booking.getLoggedInUser().getId().equals(userId)) {
             return;
         }
 
@@ -135,7 +135,7 @@ public class PaymentService {
         Booking booking = bookingRepository.findByBookingReference(normalizedReference)
                 .orElseThrow(() -> new ResourceNotFoundException("Guest booking not found"));
 
-        if (booking.getBookingSource() != BookingSource.GUEST) {
+        if (booking.getBookingSource() != BookingSource.GUEST_USER) {
             throw new ResourceNotFoundException("Guest booking not found");
         }
 
@@ -172,7 +172,7 @@ public class PaymentService {
         Booking booking = bookingRepository.findByBookingReference(normalizedReference)
                 .orElseThrow(() -> new ResourceNotFoundException("Guest payment not found"));
 
-        if (booking.getBookingSource() != BookingSource.GUEST) {
+        if (booking.getBookingSource() != BookingSource.GUEST_USER) {
             throw new ResourceNotFoundException("Guest payment not found");
         }
 
@@ -234,7 +234,7 @@ public class PaymentService {
         Booking booking = bookingRepository.findByBookingReference(normalizedReference)
                 .orElseThrow(() -> new ResourceNotFoundException("Guest booking not found"));
 
-        if (booking.getBookingSource() != BookingSource.GUEST) {
+        if (booking.getBookingSource() != BookingSource.GUEST_USER) {
             throw new ResourceNotFoundException("Guest booking not found");
         }
 

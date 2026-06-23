@@ -68,7 +68,7 @@ public class SocialAuthService {
         User user = new User();
         user.setFullName(verified.name() != null && !verified.name().isBlank() ? verified.name().trim() : email);
         user.setEmail(email);
-        user.setRole(UserRole.TRAVELER);
+        user.setRole(UserRole.LOGGED_IN_USER);
         user.setStatus(UserStatus.ACTIVE);
         // The provider asserted this email, so treat it as verified. No password for social accounts.
         user.setEmailVerified(true);

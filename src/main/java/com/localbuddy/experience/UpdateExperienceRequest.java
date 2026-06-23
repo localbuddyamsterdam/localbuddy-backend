@@ -32,7 +32,6 @@ public record UpdateExperienceRequest(
         @Max(value = 720, message = "Duration cannot exceed 720 minutes")
         Integer durationMinutes,
 
-        @NotNull(message = "Price is required")
         @DecimalMin(value = "0.00", message = "Price cannot be negative")
         BigDecimal priceAmount,
 
@@ -75,6 +74,13 @@ public record UpdateExperienceRequest(
         BigDecimal privatePrice,
 
         /** Whether priceAmount is the gross (customer) price or the host's net; the other is computed. */
-        PriceInputMode priceInputMode
+        PriceInputMode priceInputMode,
+
+        /** Where the host also offers this experience: NONE, OWN_WEBSITE_SOCIAL, or AGGREGATOR_PLATFORM.
+         *  Private-buyout bookings are blocked only for AGGREGATOR_PLATFORM. Defaults to NONE. */
+        ExternalListingType externalListingType,
+
+        @Size(max = 500, message = "External listing details cannot exceed 500 characters")
+        String externalListingDetails
 ) {
 }

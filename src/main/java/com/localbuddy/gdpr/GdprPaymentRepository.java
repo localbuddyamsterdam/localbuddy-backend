@@ -9,5 +9,5 @@ import java.util.UUID;
 /** Read-only view over payments for GDPR export. */
 public interface GdprPaymentRepository extends JpaRepository<Payment, UUID> {
 
-    List<Payment> findByBooking_TravelerUser_IdOrderByCreatedAtDesc(UUID travelerUserId);
+    List<Payment> findByBooking_LoggedInUser_IdOrderByCreatedAtDesc(UUID loggedInUserId);
 }

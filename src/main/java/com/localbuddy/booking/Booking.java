@@ -32,7 +32,7 @@ public class Booking {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "traveler_user_id")
-    private User travelerUser;
+    private User loggedInUser;
 
     @Column(name = "guest_name", length = 150)
     private String guestName;
@@ -89,6 +89,14 @@ public class Booking {
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 40)
     private BookingStatus status = BookingStatus.REQUESTED;
+
+    /** No-show flag, set when an admin verifies a no-show report; resettable by admin. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "attendance_outcome", nullable = false, length = 30)
+    private AttendanceOutcome attendanceOutcome = AttendanceOutcome.NONE;
+
+    @Column(name = "no_show_marked_at")
+    private Instant noShowMarkedAt;
 
     @Column(name = "price_per_guest", nullable = false, precision = 10, scale = 2)
     private BigDecimal pricePerGuest;
@@ -226,7 +234,7 @@ public class Booking {
         }
 
         if (bookingSource == null) {
-            bookingSource = travelerUser == null ? BookingSource.GUEST : BookingSource.LOGGED_IN_USER;
+            bookingSource = loggedInUser == null ? BookingSource.GUEST_USER : BookingSource.LOGGED_IN_USER;
         }
 
         if (discountAmount == null) {

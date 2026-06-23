@@ -58,4 +58,55 @@ public class AvailabilitySlotController {
         UUID userId = UUID.fromString(authentication.getName());
         return ResponseEntity.ok(availabilitySlotService.getMyAvailabilitySlots(userId));
     }
+
+    @Operation(
+            summary = "Block one of my availability slots",
+            description = "Blocks a slot so no new bookings can be made. Rejected if the slot still has "
+                    + "active bookings — cancel those first (only possible more than 24h before start)."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Slot blocked"),
+            @ApiResponse(responseCode = "400", description = "Slot has active bookings"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "404", description = "Slot not found")
+    })
+    @PostMapping("/{slotId}/block")
+    public ResponseEntity<AvailabilitySlotResponse> blockMyAvailabilitySlot(
+            Authentication authentication,
+            @PathVariable UUID slotId
+    ) {
+        UUID userId = UUID.fromString(authentication.getName());
+        return ResponseEntity.ok(availabilitySlotService.blockMyAvailabilitySlot(userId, slotId));
+    }
+
+    @Operation(summary = "Unblock one of my availability slots",
+            description = "Re-opens a previously blocked slot for bookings.")
+    @PostMapping("/{slotId}/unblock")
+    public ResponseEntity<AvailabilitySlotResponse> unblockMyAvailabilitySlot(
+            Authentication authentication,
+            @PathVariable UUID slotId
+    ) {
+        UUID userId = UUID.fromString(authentication.getName());
+        return ResponseEntity.ok(availabilitySlotService.unblockMyAvailabilitySlot(userId, slotId));
+    }
+
+    @Operation(
+            summary = "Delete one of my availability slots",
+            description = "Removes a slot. Rejected if the slot still has active bookings."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Slot deleted"),
+            @ApiResponse(responseCode = "400", description = "Slot has active bookings"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "404", description = "Slot not found")
+    })
+    @DeleteMapping("/{slotId}")
+    public ResponseEntity<Void> deleteMyAvailabilitySlot(
+            Authentication authentication,
+            @PathVariable UUID slotId
+    ) {
+        UUID userId = UUID.fromString(authentication.getName());
+        availabilitySlotService.deleteMyAvailabilitySlot(userId, slotId);
+        return ResponseEntity.noContent().build();
+    }
 }

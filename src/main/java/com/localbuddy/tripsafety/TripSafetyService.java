@@ -151,7 +151,7 @@ public class TripSafetyService {
             message.append(" Message: ").append(event.getNote()).append(".");
         }
 
-        User traveler = booking.getTravelerUser();
+        User traveler = booking.getLoggedInUser();
         if (traveler != null) {
             emergencyContactRepository.findByUserId(traveler.getId()).ifPresent(contact ->
                     message.append(" Emergency contact: ").append(contact.getContactName())
@@ -166,7 +166,7 @@ public class TripSafetyService {
 
     private Booking requireTraveler(UUID userId, UUID bookingId) {
         Booking booking = requireBooking(bookingId);
-        User traveler = booking.getTravelerUser();
+        User traveler = booking.getLoggedInUser();
         if (traveler == null || !traveler.getId().equals(userId)) {
             throw new ResourceNotFoundException("Booking not found");
         }
@@ -175,8 +175,8 @@ public class TripSafetyService {
 
     private Booking requireParticipant(UUID userId, UUID bookingId) {
         Booking booking = requireBooking(bookingId);
-        boolean isTraveler = booking.getTravelerUser() != null
-                && booking.getTravelerUser().getId().equals(userId);
+        boolean isTraveler = booking.getLoggedInUser() != null
+                && booking.getLoggedInUser().getId().equals(userId);
         boolean isHost = booking.getLocalProfile() != null
                 && booking.getLocalProfile().getUser() != null
                 && booking.getLocalProfile().getUser().getId().equals(userId);

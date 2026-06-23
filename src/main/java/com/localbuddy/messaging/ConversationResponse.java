@@ -5,7 +5,7 @@ import java.util.UUID;
 
 public record ConversationResponse(
         UUID id,
-        UUID travelerUserId,
+        UUID loggedInUserId,
         UUID hostUserId,
         UUID experienceId,
         UUID bookingId,

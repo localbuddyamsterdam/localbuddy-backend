@@ -22,18 +22,18 @@ public class BookingCheckoutService {
     }
 
     public BookingCheckoutResponse createBookingAndCheckout(
-            UUID travelerUserId,
+            UUID loggedInUserId,
             CreateBookingRequest request
     ) {
         long totalStart = System.currentTimeMillis();
 
         long bookingStart = System.currentTimeMillis();
-        BookingResponse booking = bookingService.createBooking(travelerUserId, request);
+        BookingResponse booking = bookingService.createBooking(loggedInUserId, request);
         long bookingMs = System.currentTimeMillis() - bookingStart;
 
         long checkoutStart = System.currentTimeMillis();
         PaymentCheckoutResponse checkout = paymentService.createCheckout(
-                travelerUserId,
+                loggedInUserId,
                 new CreatePaymentRequest(booking.id())
         );
         long checkoutMs = System.currentTimeMillis() - checkoutStart;

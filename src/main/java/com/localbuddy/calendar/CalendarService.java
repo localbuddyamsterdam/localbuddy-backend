@@ -104,8 +104,8 @@ public class CalendarService {
     private Booking requireParticipant(UUID userId, UUID bookingId) {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
-        boolean isTraveler = booking.getTravelerUser() != null
-                && booking.getTravelerUser().getId().equals(userId);
+        boolean isTraveler = booking.getLoggedInUser() != null
+                && booking.getLoggedInUser().getId().equals(userId);
         boolean isHost = booking.getLocalProfile() != null
                 && booking.getLocalProfile().getUser() != null
                 && booking.getLocalProfile().getUser().getId().equals(userId);

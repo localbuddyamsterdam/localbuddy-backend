@@ -25,7 +25,7 @@ public class Conversation {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "traveler_user_id", nullable = false)
-    private User travelerUser;
+    private User loggedInUser;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "host_user_id", nullable = false)
