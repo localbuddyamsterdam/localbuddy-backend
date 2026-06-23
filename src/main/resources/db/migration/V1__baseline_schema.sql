@@ -1191,10 +1191,12 @@ INSERT INTO cancellation_refund_policies (
     refund_percentage, active, created_at, updated_at
 )
 VALUES
-    ('11111111-1111-1111-1111-111111111101', 'Traveler cancellation - 24+ hours before start',          'LOGGED_IN_USER', 24.00, NULL,  100.00, TRUE, NOW(), NOW()),
-    ('11111111-1111-1111-1111-111111111102', 'Traveler cancellation - less than 24 hours before start', 'LOGGED_IN_USER',  0.00, 24.00,    0.00, TRUE, NOW(), NOW()),
-    ('11111111-1111-1111-1111-111111111201', 'Local cancellation - full refund',                        'LOCAL',          0.00, NULL,  100.00, TRUE, NOW(), NOW()),
-    ('11111111-1111-1111-1111-111111111301', 'Admin cancellation - full refund',                        'ADMIN',          0.00, NULL,  100.00, TRUE, NOW(), NOW())
+    ('11111111-1111-1111-1111-111111111101', 'Traveler cancellation - 24+ hours before start',          'TRAVELER', 24.00, NULL,  100.00, TRUE, NOW(), NOW()),
+    ('11111111-1111-1111-1111-111111111102', 'Traveler cancellation - 12 to 24 hours before start',     'TRAVELER', 12.00, 24.00,  50.00, TRUE, NOW(), NOW()),
+    ('11111111-1111-1111-1111-111111111103', 'Traveler cancellation - 2 to 12 hours before start',      'TRAVELER',  2.00, 12.00,  25.00, TRUE, NOW(), NOW()),
+    ('11111111-1111-1111-1111-111111111104', 'Traveler cancellation - less than 2 hours before start',  'TRAVELER',  0.00,  2.00,   0.00, TRUE, NOW(), NOW()),
+    ('11111111-1111-1111-1111-111111111201', 'Local cancellation - full refund',                        'LOCAL',     0.00, NULL,  100.00, TRUE, NOW(), NOW()),
+    ('11111111-1111-1111-1111-111111111301', 'Admin cancellation - full refund',                        'ADMIN',     0.00, NULL,  100.00, TRUE, NOW(), NOW())
 ON CONFLICT (id) DO NOTHING;
 
 -- =====================================================================
