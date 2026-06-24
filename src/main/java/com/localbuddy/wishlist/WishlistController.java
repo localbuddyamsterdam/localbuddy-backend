@@ -2,6 +2,7 @@ package com.localbuddy.wishlist;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -27,6 +28,27 @@ public class WishlistController {
     public ResponseEntity<List<WishlistItemResponse>> getMyWishlist(Authentication authentication) {
         UUID userId = UUID.fromString(authentication.getName());
         return ResponseEntity.ok(wishlistService.getMyWishlist(userId));
+    }
+
+    @Operation(summary = "Get the ids of my wishlisted experiences",
+            description = "Lightweight list of experience ids the current user has saved — for rendering "
+                    + "filled/empty hearts across listings without a call per experience.")
+    @GetMapping("/ids")
+    public ResponseEntity<List<UUID>> getMyWishlistIds(Authentication authentication) {
+        UUID userId = UUID.fromString(authentication.getName());
+        return ResponseEntity.ok(wishlistService.getMyWishlistExperienceIds(userId));
+    }
+
+    @Operation(summary = "Add several experiences to my wishlist",
+            description = "Adds many experiences at once — used to merge a guest's locally-saved "
+                    + "favourites after they log in. Unknown / non-approved / already-saved ids are skipped.")
+    @PostMapping("/batch")
+    public ResponseEntity<List<WishlistItemResponse>> addBatch(
+            Authentication authentication,
+            @Valid @RequestBody BatchWishlistRequest request
+    ) {
+        UUID userId = UUID.fromString(authentication.getName());
+        return ResponseEntity.ok(wishlistService.addBatch(userId, request.experienceIds()));
     }
 
     @Operation(summary = "Add an experience to my wishlist")
