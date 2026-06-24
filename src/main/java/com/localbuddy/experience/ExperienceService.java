@@ -337,6 +337,7 @@ public class ExperienceService {
         applyPricing(experience, request.priceAmount(), request.priceInputMode());
         experience.setCurrency(requiredTrim(request.currency()).toUpperCase(Locale.ROOT));
         experience.setMaxGuests(request.maxGuests());
+        applyCoordinates(experience, request.latitude(), request.longitude());
         experience.setSafetyNotes(optionalTrim(request.safetyNotes()));
         experience.setShortDescription(optionalTrim(request.shortDescription()));
         experience.setTransportMode(request.transportMode());
@@ -358,6 +359,7 @@ public class ExperienceService {
         applyPricing(experience, request.priceAmount(), request.priceInputMode());
         experience.setCurrency(requiredTrim(request.currency()).toUpperCase(Locale.ROOT));
         experience.setMaxGuests(request.maxGuests());
+        applyCoordinates(experience, request.latitude(), request.longitude());
         experience.setSafetyNotes(optionalTrim(request.safetyNotes()));
         experience.setShortDescription(optionalTrim(request.shortDescription()));
         experience.setTransportMode(request.transportMode());
@@ -530,6 +532,8 @@ public class ExperienceService {
                 experience.getPriceAmount(),
                 experience.getCurrency(),
                 experience.getMaxGuests(),
+                experience.getLatitude(),
+                experience.getLongitude(),
                 experience.getBookingMode(),
                 experience.getPrivatePrice(),
                 experience.getPriceNetAmount(),
@@ -589,49 +593,86 @@ public class ExperienceService {
 
     @Transactional(readOnly = true)
     public List<ExperienceResponse> getApprovedExperiences(String citySlug, String categorySlug) {
-        String normalizedCitySlug = optionalTrim(citySlug);
-        String normalizedCategorySlug = optionalTrim(categorySlug);
-
-        if (normalizedCitySlug != null) {
-            normalizedCitySlug = normalizedCitySlug.toLowerCase(Locale.ROOT);
-        }
-
-        if (normalizedCategorySlug != null) {
-            normalizedCategorySlug = normalizedCategorySlug.toLowerCase(Locale.ROOT);
-        }
-
-        if (normalizedCitySlug != null && normalizedCategorySlug != null) {
-            return experienceRepository
-                    .findByCity_SlugAndCategory_SlugAndStatus(
-                            normalizedCitySlug,
-                            normalizedCategorySlug,
-                            ExperienceStatus.APPROVED
-                    )
-                    .stream()
-                    .map(this::toResponse)
-                    .toList();
-        }
-
-        if (normalizedCitySlug != null) {
-            return experienceRepository
-                    .findByCity_SlugAndStatus(normalizedCitySlug, ExperienceStatus.APPROVED)
-                    .stream()
-                    .map(this::toResponse)
-                    .toList();
-        }
-
-        if (normalizedCategorySlug != null) {
-            return experienceRepository
-                    .findByCategory_SlugAndStatus(normalizedCategorySlug, ExperienceStatus.APPROVED)
-                    .stream()
-                    .map(this::toResponse)
-                    .toList();
-        }
-
-        return experienceRepository.findByStatus(ExperienceStatus.APPROVED)
-                .stream()
+        return findApprovedExperiences(citySlug, categorySlug).stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    /**
+     * Approved experiences that have coordinates, as lightweight map markers. When a viewer location
+     * (lat,lng) is supplied, each marker gets a distanceKm and the list is sorted nearest-first
+     * (optionally filtered to within radiusKm).
+     */
+    @Transactional(readOnly = true)
+    public List<ExperienceMapMarker> getMapMarkers(String citySlug, String categorySlug,
+                                                   Double lat, Double lng, Double radiusKm) {
+        boolean hasOrigin = lat != null && lng != null;
+        List<ExperienceMapMarker> markers = new java.util.ArrayList<>();
+
+        for (Experience e : findApprovedExperiences(citySlug, categorySlug)) {
+            if (e.getLatitude() == null || e.getLongitude() == null) {
+                continue;
+            }
+            Double distanceKm = null;
+            if (hasOrigin) {
+                double km = haversineKm(lat, lng, e.getLatitude().doubleValue(), e.getLongitude().doubleValue());
+                distanceKm = Math.round(km * 100.0) / 100.0;
+            }
+            markers.add(new ExperienceMapMarker(e.getId(), e.getSlug(), e.getTitle(),
+                    e.getLatitude(), e.getLongitude(), e.getPriceAmount(), e.getCurrency(),
+                    e.getCity().getName(), distanceKm));
+        }
+
+        if (hasOrigin) {
+            if (radiusKm != null) {
+                markers.removeIf(m -> m.distanceKm() != null && m.distanceKm() > radiusKm);
+            }
+            markers.sort(java.util.Comparator.comparingDouble(
+                    m -> m.distanceKm() == null ? Double.MAX_VALUE : m.distanceKm()));
+        }
+        return markers;
+    }
+
+    private List<Experience> findApprovedExperiences(String citySlug, String categorySlug) {
+        String city = optionalTrim(citySlug);
+        String category = optionalTrim(categorySlug);
+        if (city != null) {
+            city = city.toLowerCase(Locale.ROOT);
+        }
+        if (category != null) {
+            category = category.toLowerCase(Locale.ROOT);
+        }
+
+        if (city != null && category != null) {
+            return experienceRepository.findByCity_SlugAndCategory_SlugAndStatus(
+                    city, category, ExperienceStatus.APPROVED);
+        }
+        if (city != null) {
+            return experienceRepository.findByCity_SlugAndStatus(city, ExperienceStatus.APPROVED);
+        }
+        if (category != null) {
+            return experienceRepository.findByCategory_SlugAndStatus(category, ExperienceStatus.APPROVED);
+        }
+        return experienceRepository.findByStatus(ExperienceStatus.APPROVED);
+    }
+
+    private void applyCoordinates(Experience experience, BigDecimal latitude, BigDecimal longitude) {
+        if ((latitude == null) != (longitude == null)) {
+            throw new BadRequestException("Latitude and longitude must be provided together");
+        }
+        experience.setLatitude(latitude);
+        experience.setLongitude(longitude);
+    }
+
+    /** Great-circle distance in km (Haversine). */
+    private static double haversineKm(double lat1, double lon1, double lat2, double lon2) {
+        double earthRadiusKm = 6371.0;
+        double dLat = Math.toRadians(lat2 - lat1);
+        double dLon = Math.toRadians(lon2 - lon1);
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     }
 
     @Transactional(readOnly = true)

@@ -24,6 +24,8 @@ public record ExperienceResponse(
         BigDecimal priceAmount,
         String currency,
         Integer maxGuests,
+        BigDecimal latitude,
+        BigDecimal longitude,
         BookingMode bookingMode,
         BigDecimal privatePrice,
         BigDecimal priceNetAmount,

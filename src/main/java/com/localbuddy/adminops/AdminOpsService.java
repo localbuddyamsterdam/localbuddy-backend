@@ -253,6 +253,8 @@ public class AdminOpsService {
                 experience.getPriceAmount(),
                 experience.getCurrency(),
                 experience.getMaxGuests(),
+                experience.getLatitude(),
+                experience.getLongitude(),
                 experience.getBookingMode(),
                 experience.getPrivatePrice(),
                 experience.getPriceNetAmount(),

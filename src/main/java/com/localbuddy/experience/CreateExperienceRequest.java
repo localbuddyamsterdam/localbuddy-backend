@@ -43,6 +43,15 @@ public record CreateExperienceRequest(
         @Max(value = 10, message = "Max guests cannot exceed 10 for MVP")
         Integer maxGuests,
 
+        /** Optional meeting-point coordinates (set together). */
+        @DecimalMin(value = "-90.0", message = "Latitude out of range")
+        @DecimalMax(value = "90.0", message = "Latitude out of range")
+        BigDecimal latitude,
+
+        @DecimalMin(value = "-180.0", message = "Longitude out of range")
+        @DecimalMax(value = "180.0", message = "Longitude out of range")
+        BigDecimal longitude,
+
         @Size(max = 2000, message = "Safety notes cannot exceed 2000 characters")
         String safetyNotes,
 

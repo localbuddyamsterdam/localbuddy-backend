@@ -80,7 +80,7 @@ Most travelers want experiences that feel genuine and personal, but they're stuc
 
 1. **Platform targets — the single biggest scoping input.** Is this **responsive web only**, web **+ native iOS/Android**, or a **PWA**? If native, **React Native / Flutter vs fully native**? The product leans mobile (Apple/Google Pay, wallet passes), but the host and admin surfaces are desktop-heavy. *We'd like your input on the best fit.*
 2. **Brand maturity** — do we apply an existing brand (logo, palette, type, tone) or do you **build the design system from scratch**? Is **dark mode** required?
-3. **Out-of-scope / backend-pending** — a **map view** of results and an **admin category-management** screen are *not currently backed by the API* (no gelocation data; categories are read-only). Treat as dropped or contingent on backend work — please don't price them as live features.
+3. **Out-of-scope / backend-pending** — the **admin category-management** screen is *not currently backed by the API* (categories are read-only). Treat as dropped or contingent on backend work — please don't price it as a live feature. *(Map view is now supported — experiences carry coordinates and there's a map-markers endpoint with optional "near me" distance.)*
 
 ## Scope at a glance
 
@@ -90,7 +90,7 @@ Most travelers want experiences that feel genuine and personal, but they're stuc
 
 ## A. Traveler app (≈70 screens)
 
-**Discovery & marketing:** home/landing with hero search + city picker + category tiles + live-deals strip; search entry/overlay; search results (paginated cards, hearts, deal badges, currency); advanced filters panel; no-results state; category landing; city landing; deals listing. _(Map view — backend-pending, see open decisions.)_
+**Discovery & marketing:** home/landing with hero search + city picker + category tiles + live-deals strip; search entry/overlay; search results (paginated cards, hearts, deal badges, currency); advanced filters panel; no-results state; category landing; city landing; deals listing; **map view of results** (experiences plotted by coordinate; optional "near me" via browser location).
 
 **Experience & host:** experience detail (gallery, descriptions, inclusions/exclusions, meeting/end point, duration, min age, safety notes, price incl. private price, host mini-profile, reviews, favourite, "message host"); photo lightbox; experience reviews list; host public profile (note: must **not** render host bank/legal/KYC fields); host reviews list.
 
@@ -178,7 +178,7 @@ Experience card · rating stars (display + input) · price/currency display (gro
 - **Localization** — EN + Dutch designs, expandable layouts, locale-aware formatting; confirm copy delivery responsibility.
 - **Transactional message templates** — email/SMS (and WhatsApp where used) for the notification set, plus in-app rows with deep links.
 - **Admin/host depth** — explicit pricing for the dense admin data-table system, moderation decision panel, the rates editors (+ audit), and the cancellation-refund policy editor.
-- **Out-of-scope confirmation** — map view and category-management flagged dropped or backend-pending.
+- **Out-of-scope confirmation** — category-management flagged dropped or backend-pending. (Map view is now backend-supported.)
 - **Prototype & testing rounds** — whether clickable prototypes/usability testing are included (recommended for guest checkout, host onboarding, and the SOS flow) and how many revision rounds.
 - **Design-QA support through build**, and a commitment to keep the Figma library in sync as the API evolves.
 

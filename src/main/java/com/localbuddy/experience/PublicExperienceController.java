@@ -40,6 +40,23 @@ public class PublicExperienceController {
     }
 
     @Operation(
+            summary = "Map markers for approved experiences",
+            description = "Lightweight markers (only experiences with coordinates) for plotting on a map. "
+                    + "Optionally pass the viewer's lat/lng (e.g. from the browser Geolocation API) to get a "
+                    + "distanceKm per marker and a nearest-first ordering, and radiusKm to restrict to nearby ones."
+    )
+    @GetMapping("/map")
+    public ResponseEntity<List<ExperienceMapMarker>> getMapMarkers(
+            @RequestParam(required = false) String citySlug,
+            @RequestParam(required = false) String categorySlug,
+            @RequestParam(required = false) Double lat,
+            @RequestParam(required = false) Double lng,
+            @RequestParam(required = false) Double radiusKm
+    ) {
+        return ResponseEntity.ok(experienceService.getMapMarkers(citySlug, categorySlug, lat, lng, radiusKm));
+    }
+
+    @Operation(
             summary = "Search approved experiences",
             description = "Public endpoint. Searches approved experiences with optional filters (city, category, date, party "
                     + "composition) and returns a paginated result."

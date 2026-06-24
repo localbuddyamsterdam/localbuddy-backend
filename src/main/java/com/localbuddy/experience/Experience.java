@@ -126,6 +126,13 @@ public class Experience {
     @Column(name = "max_guests", nullable = false)
     private Integer maxGuests;
 
+    /** Meeting-point coordinates (optional) for map view + distance sorting. */
+    @Column(name = "latitude", precision = 9, scale = 6)
+    private BigDecimal latitude;
+
+    @Column(name = "longitude", precision = 9, scale = 6)
+    private BigDecimal longitude;
+
     @Column(name = "safety_notes", columnDefinition = "TEXT")
     private String safetyNotes;
 
