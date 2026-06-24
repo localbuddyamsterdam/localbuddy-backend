@@ -41,6 +41,8 @@ Most travelers want experiences that feel genuine and personal, but they're stuc
 - **Wallet passes & calendar** — add a booking to Apple/Google Wallet and to a calendar.
 - **Trip safety** — pre-trip safety checklist, check-in/out, emergency contact, and an **SOS** that alerts support with location.
 - **Reviews** after a completed experience.
+- **Newsletter & following** — subscribe to the newsletter (double opt-in, easy unsubscribe) and follow favourite hosts to get their announcements.
+- **Gentle reminders** — automatic nudges about experiences left in the wishlist or a booking started but not paid (at a few intervals, then it stops).
 - **Privacy & consent** built in — versioned consent prompts, data export, account-deletion request.
 - **Currency display** — see prices converted to a preferred currency (display only; see note in Part 2).
 
@@ -54,6 +56,7 @@ Most travelers want experiences that feel genuine and personal, but they're stuc
 - **Earnings & payouts** — total earned, available and on-hold balances, payouts to a connected bank account (via Stripe Connect).
 - **Invoices & tax** — auto-generated documents; platform handles the commercial detail.
 - **Messaging** with guests, plus quick contact.
+- **Announcements** — broadcast updates (new dates, schedule changes) to followers and/or past guests in one click.
 - **Reliability reputation** — ratings, reviews, and a track record.
 
 ### For the admin / operations team
@@ -66,6 +69,7 @@ Most travelers want experiences that feel genuine and personal, but they're stuc
 - **Promotions & commerce** — promo codes, deals, referrals, gift cards.
 - **Rates & company config** — commission, service fees, VAT/tax, and the company's invoice/legal details.
 - **Dashboard** — platform-health metrics.
+- **Newsletter & announcements** — manage subscribers and compose newsletter broadcasts; send platform-wide announcements to all hosts.
 - **AI assist** — help hosts write listings, suggest traveler itineraries, and auto-flag inappropriate content for review.
 
 ---
@@ -100,6 +104,8 @@ Most travelers want experiences that feel genuine and personal, but they're stuc
 
 **Commerce & utility:** gift-card purchase (amount, recipient, message); my gift cards; public gift-card balance check; referral / invite-a-friend; invoices/receipts + PDF; currency switcher + converter (single-amount and whole-page rates); contact-us (with success + rate-limited states); AI itinerary planner (logged-in; with a "not available" state when AI is off).
 
+**Subscriptions & updates:** newsletter subscribe box (works logged-out) + "check your email to confirm" state; newsletter confirm + unsubscribe pages (read `?token=`); follow/unfollow host button on host/experience pages; "hosts I follow" page; newsletter status in account settings.
+
 ## B. Host console (≈36 screens)
 
 **Onboarding & profile:** multi-step onboarding wizard (profile, photo, cities/categories/languages, motivation, KYC legal name + address, banking) driven by a status state-machine; onboarding status banner (Draft → Submitted → Approved / Changes-Requested / Rejected, with messages); submit-for-review confirmation; changes-requested/rejected notice (shows reason, re-edit path); profile view/edit (with "editing an approved profile re-submits it" warning); verification status panel; tax-info form (VAT, tax country, entity type, TIN, business reg, DOB); host consent gating.
@@ -110,7 +116,7 @@ Most travelers want experiences that feel genuine and personal, but they're stuc
 
 **Money:** earnings dashboard (earned / paid-out / available / on-hold); payouts history; Stripe Connect onboarding entry + return; host invoices (commission / service-fee / payout statements + PDF).
 
-**Comms & safety:** messages (shared component); notifications + preferences; host no-show reporting (informational, within 48h) + my reports; host safety report + in-trip events view (host can **view** but not trigger check-in/SOS); account/profile + GDPR (shared).
+**Comms & safety:** messages (shared component); **announcement composer** (audience: followers / guests / both) + my-announcements list (with recipient counts); notifications + preferences; host no-show reporting (informational, within 48h) + my reports; host safety report + in-trip events view (host can **view** but not trigger check-in/SOS); account/profile + GDPR (shared).
 
 ## C. Admin console (≈39 screens)
 
@@ -126,7 +132,7 @@ Most travelers want experiences that feel genuine and personal, but they're stuc
 
 **Conversations:** conversation monitor (all threads); conversation detail + reply/take-over (admin message shows to all as `Admin (Name)`); start admin private side-chat with one customer or host.
 
-**Growth & users:** deals manager (CRUD; type, discount, scope/target, window, priority, badge); promo-codes manager (CRUD; limits, redemptions, window); gift-cards admin (list, cancel); users management (list/detail/create/set-status-with-reason); GDPR requests queue (process = anonymize / reject, with note); WhatsApp send tool (with "configured" gate); role-gated admin shell (403 handling).
+**Growth & users:** deals manager (CRUD; type, discount, scope/target, window, priority, badge); promo-codes manager (CRUD; limits, redemptions, window); gift-cards admin (list, cancel); **newsletter** (subscriber list + broadcast composer with audience targeting); **platform-announcement composer** (to all hosts) + announcement log; users management (list/detail/create/set-status-with-reason); GDPR requests queue (process = anonymize / reject, with note); WhatsApp send tool (with "configured" gate); role-gated admin shell (403 handling).
 
 ## Key user journeys (design the happy paths + edge states for these)
 

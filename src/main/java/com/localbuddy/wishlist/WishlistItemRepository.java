@@ -3,6 +3,7 @@ package com.localbuddy.wishlist;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -27,4 +28,7 @@ public interface WishlistItemRepository extends JpaRepository<WishlistItem, UUID
 
     /** How many people have saved an experience (social proof). */
     long countByExperienceId(UUID experienceId);
+
+    /** Wishlist items added within a createdAt window — for the reminder sweep. */
+    List<WishlistItem> findTop200ByCreatedAtBetweenOrderByCreatedAtAsc(Instant from, Instant to);
 }

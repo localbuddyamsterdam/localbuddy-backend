@@ -53,4 +53,20 @@ public class NotificationPreferenceService {
                 .map(NotificationPreference::isBookingReminders)
                 .orElse(true);
     }
+
+    /** Master email switch — defaults ON. Gates non-critical email (reminders, announcements). */
+    @Transactional(readOnly = true)
+    public boolean isEmailEnabled(UUID userId) {
+        return preferenceRepository.findByUserId(userId)
+                .map(NotificationPreference::isEmailEnabled)
+                .orElse(true);
+    }
+
+    /** Promotional/marketing email opt-in — defaults OFF (opt-in). */
+    @Transactional(readOnly = true)
+    public boolean isMarketingEmailsEnabled(UUID userId) {
+        return preferenceRepository.findByUserId(userId)
+                .map(NotificationPreference::isMarketingEmails)
+                .orElse(false);
+    }
 }

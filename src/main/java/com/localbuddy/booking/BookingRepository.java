@@ -30,6 +30,19 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
             BookingStatus status
     );
 
+    /** Bookings for a host across several statuses — used to resolve announcement recipients. */
+    List<Booking> findByLocalProfileIdAndStatusIn(
+            UUID localProfileId,
+            Collection<BookingStatus> statuses
+    );
+
+    /** Has this user ever engaged with this experience (any of the given statuses)? Wishlist-reminder gate. */
+    boolean existsByLoggedInUserIdAndExperienceIdAndStatusIn(
+            UUID loggedInUserId,
+            UUID experienceId,
+            Collection<BookingStatus> statuses
+    );
+
     boolean existsByLoggedInUserIdAndAvailabilitySlotIdAndStatusIn(
             UUID loggedInUserId,
             UUID availabilitySlotId,
@@ -63,6 +76,13 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
     List<Booking> findTop100ByStatusAndAvailabilitySlot_StartTimeBeforeOrderByAvailabilitySlot_StartTimeAsc(
             BookingStatus status,
             Instant startTimeBefore
+    );
+
+    /** Abandoned (EXPIRED) bookings within a cancelledAt window — for the abandoned-booking reminder sweep. */
+    List<Booking> findTop200ByStatusAndCancelledAtBetweenOrderByCancelledAtAsc(
+            BookingStatus status,
+            Instant from,
+            Instant to
     );
 
     // --- Reliability counters (derived on demand; auto-correct when admins clear a flag) ---

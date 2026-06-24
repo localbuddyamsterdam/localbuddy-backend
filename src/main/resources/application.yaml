@@ -111,6 +111,13 @@ app:
     reminder-processor-delay-ms: ${NOTIFICATION_REMINDER_PROCESSOR_DELAY_MS:900000}
     reminder-lead-hours: ${NOTIFICATION_REMINDER_LEAD_HOURS:24}
 
+  reminders:
+    # Comma-separated hours after which wishlist / abandoned-booking reminders fire (each fires once).
+    offsets-hours: ${REMINDER_OFFSETS_HOURS:2,24,48}
+    # Stop nudging items/bookings older than this many hours.
+    max-age-hours: ${REMINDER_MAX_AGE_HOURS:72}
+    processor-delay-ms: ${REMINDER_PROCESSOR_DELAY_MS:1800000}
+
   payments:
     stripe:
       secret-key: ${STRIPE_SECRET_KEY:}

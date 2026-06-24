@@ -158,7 +158,10 @@ Conversations are participant-based and typed. In **every** `MessageResponse`, u
 - `NoShowReportStatus`: `REQUESTED`, `APPROVED`, `REJECTED`
 - `NotificationChannel`: `EMAIL`, `SMS`, `WHATSAPP`, `IN_APP`
 - `NotificationStatus`: `PENDING`, `PROCESSING`, `SENT`, `FAILED`, `SKIPPED`
-- `NotificationType`: `BOOKING_CREATED`, `BOOKING_ACCEPTED`, `BOOKING_DECLINED`, `BOOKING_CANCELLED`, `BOOKING_COMPLETED`, `BOOKING_UPDATED`, `BOOKING_CONFIRMED`, `BOOKING_REMINDER`, `GUEST_BOOKING_CREATED`, `NEW_MESSAGE`, `INVOICE_ISSUED`, `WAITLIST_SPOT_AVAILABLE`, `SLOT_UNDERBOOKED_HOST_NOTICE`, `SLOT_CANCELLED_MINIMUM_NOT_MET`, `LOCAL_PROFILE_SUBMITTED`, `LOCAL_PROFILE_APPROVED`, `LOCAL_PROFILE_CHANGES_REQUESTED`, `LOCAL_PROFILE_REJECTED`, `SAFETY_REPORT_CREATED`, `SAFETY_REPORT_RESOLVED`, `SYSTEM_ALERT`
+- `NotificationType`: `BOOKING_CREATED`, `BOOKING_ACCEPTED`, `BOOKING_DECLINED`, `BOOKING_CANCELLED`, `BOOKING_COMPLETED`, `BOOKING_UPDATED`, `BOOKING_CONFIRMED`, `BOOKING_REMINDER`, `GUEST_BOOKING_CREATED`, `NEW_MESSAGE`, `INVOICE_ISSUED`, `WAITLIST_SPOT_AVAILABLE`, `SLOT_UNDERBOOKED_HOST_NOTICE`, `SLOT_CANCELLED_MINIMUM_NOT_MET`, `LOCAL_PROFILE_SUBMITTED`, `LOCAL_PROFILE_APPROVED`, `LOCAL_PROFILE_CHANGES_REQUESTED`, `LOCAL_PROFILE_REJECTED`, `SAFETY_REPORT_CREATED`, `SAFETY_REPORT_RESOLVED`, `SYSTEM_ALERT`, `NEWSLETTER_CONFIRM`, `NEWSLETTER`, `HOST_ANNOUNCEMENT`, `PLATFORM_ANNOUNCEMENT`, `WISHLIST_REMINDER`, `BOOKING_ABANDONED_REMINDER`
+- `NewsletterAudience`: `TRAVELER`, `HOST`, `ALL`
+- `NewsletterSubscriptionStatus`: `PENDING`, `CONFIRMED`, `UNSUBSCRIBED`
+- `AnnouncementAudience`: `MY_FOLLOWERS`, `MY_GUESTS`, `BOTH`, `ALL_HOSTS`
 
 **Promotions**
 - `PromoDiscountType`: `PERCENTAGE`, `FIXED_AMOUNT`
@@ -607,6 +610,35 @@ Refund tiers by `(cancelledBy, hoursBeforeStart)`. `UpsertCancellationRefundPoli
 
 ### `/api` — HealthController (Public)
 `GET /api/health` — `{ status: "UP", service, timestamp }`.
+
+## 4.10 Newsletter, Announcements & Reminders
+
+> New enums: `NewsletterAudience` (`TRAVELER`/`HOST`/`ALL`), `NewsletterSubscriptionStatus` (`PENDING`/`CONFIRMED`/`UNSUBSCRIBED`), `AnnouncementAudience` (`MY_FOLLOWERS`/`MY_GUESTS`/`BOTH`/`ALL_HOSTS`). New `NotificationType` values: `NEWSLETTER_CONFIRM`, `NEWSLETTER`, `HOST_ANNOUNCEMENT`, `PLATFORM_ANNOUNCEMENT`, `WISHLIST_REMINDER`, `BOOKING_ABANDONED_REMINDER` — these surface in the existing notification feed / emails; no new delivery endpoints.
+
+### Newsletter — `/api/public/newsletter` (Public, rate-limited) + `/api/newsletter` (Authenticated) + `/api/admin/newsletter` (ADMIN)
+Email-keyed subscriptions with **double opt-in** and **one-click tokenized unsubscribe**. `NewsletterSubscriptionResponse`: `id`, `email`, `audience`, `status`, `confirmedAt`, `createdAt`.
+- `POST /api/public/newsletter/subscribe` — **Auth:** Public — anonymous subscribe (`SubscribeNewsletterRequest`: `email` req, `audience` opt (default ALL), `source` opt). Sends a confirmation email; status `PENDING` until confirmed.
+- `POST /api/public/newsletter/confirm?token=` — **Auth:** Public — confirm the subscription (double opt-in). → `CONFIRMED`.
+- `POST /api/public/newsletter/unsubscribe?token=` — **Auth:** Public — one-click unsubscribe → **204**.
+- `POST /api/newsletter/subscribe` — **Auth:** Authenticated — subscribe the current user (segmented by role; auto-confirmed if their email is verified).
+- `GET /api/newsletter/me` — **Auth:** Authenticated — my subscription (or **204** if none).
+- `GET /api/admin/newsletter/subscriptions` — **Auth:** ADMIN — list all subscriptions.
+- `POST /api/admin/newsletter/broadcast` — **Auth:** ADMIN — send to CONFIRMED subscribers in an audience (`NewsletterBroadcastRequest`: `audience` req, `subject` req, `body` req). Returns `{ recipients: <n> }`. Body gets an unsubscribe link appended automatically.
+
+**Frontend note:** a "subscribe" box must work logged-out (public endpoint). After subscribing, show "check your email to confirm." Build `/newsletter/confirm` and `/newsletter/unsubscribe` pages that read `?token=` and call the matching public endpoint.
+
+### Announcements & Follow
+**`AnnouncementResponse`**: `id`, `localProfileId` (null for platform), `audience`, `subject`, `body`, `recipientCount`, `createdAt`. Delivered to recipients as in-app + email (email respects the recipient's email preference); guests who booked get email.
+- `POST /api/host/announcements` — **Auth:** Authenticated (approved host) — post an announcement (`CreateAnnouncementRequest`: `audience` `MY_FOLLOWERS`/`MY_GUESTS`/`BOTH`, `subject` req ≤200, `body` req ≤5000) → **201**.
+- `GET /api/host/announcements` — **Auth:** Authenticated (host) — my announcements.
+- `POST /api/admin/announcements/platform` — **Auth:** ADMIN — announce to all hosts (`PlatformAnnouncementRequest`: `subject`, `body`) → **201**.
+- `GET /api/admin/announcements` — **Auth:** ADMIN — all announcements.
+- `POST /api/follows/{localProfileId}` — **Auth:** Authenticated — follow a host → **204** (idempotent).
+- `DELETE /api/follows/{localProfileId}` — **Auth:** Authenticated — unfollow → **204**.
+- `GET /api/follows/me` — **Auth:** Authenticated — hosts I follow (`FollowedHostResponse`: `localProfileId`, `displayName`, `followedAt`).
+
+### Reminders (no endpoints — scheduled)
+Wishlist-not-booked and abandoned-booking (EXPIRED, unpaid) reminders fire automatically at configurable offsets (default **2h / 24h / 48h**, `app.reminders.offsets-hours`), once per stage, as `WISHLIST_REMINDER` / `BOOKING_ABANDONED_REMINDER` notifications (in-app + email). The abandoned-booking nudge links back to the experience to re-book. Nothing for the frontend to call — these appear in the notification feed / inbox.
 
 ---
 
