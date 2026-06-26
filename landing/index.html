@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>LocalBuddy — Book experiences with the locals who live here</title>
+<meta name="description" content="Book authentic local experiences with verified buddies in Amsterdam. Go solo, share with a group, or book a private slot.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.47.0/dist/tabler-icons.min.css">
+<style>
+:root{--white:#fff;--f1:#F5F5F7;--f2:#FAFAFA;--line:#D2D2D7;--ink:#1D1D1F;--ink2:#6E6E73;--ink3:#86868B;--black:#0A0A0A;--ob2:#A1A1A6;--terra:#C4602A;--teal:#1F7A8C;--amber:#C09120;--blue:#0066CC;--bluec:#0A84FF;--green:#1A8F4C}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Helvetica Neue',sans-serif;color:var(--ink);background:var(--white);line-height:1.5;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+a{color:inherit;text-decoration:none}
+i.ti{font-style:normal;line-height:1}
+.ct{max-width:1240px;margin:0 auto;padding:0 clamp(18px,5vw,48px)}
+.sec{padding:clamp(48px,9vw,96px) 0}
+.fill{background:var(--f1)}
+.ey{font-size:13px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--ink3)}
+h2.h{font-size:clamp(27px,4.6vw,40px);font-weight:700;letter-spacing:-.022em;line-height:1.08;margin:9px 0 0}
+.sub{font-size:clamp(15px,1.6vw,19px);color:var(--ink2);margin-top:11px;max-width:620px;line-height:1.45}
+.shead{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;margin-bottom:32px;flex-wrap:wrap}
+.see{color:var(--terra);font-size:13px;font-weight:500;display:inline-flex;align-items:center;gap:3px;white-space:nowrap}
+.see:hover{text-decoration:underline}
+nav{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.8);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-bottom:1px solid var(--line)}
+.navrow{display:flex;align-items:center;gap:16px;height:56px}
+.wm{font-size:18px;font-weight:600;letter-spacing:-.01em}.wm b{color:var(--ink3);font-weight:600}
+.citypill{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);border-radius:20px;padding:6px 12px;font-size:13px;color:var(--ink2)}
+.nlinks{display:flex;gap:20px;font-size:13.5px;color:var(--ink2)}
+.nlinks a:hover{color:var(--ink)}
+.nright{margin-left:auto;display:flex;align-items:center;gap:14px}
+.nsearch{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:8px;padding:8px 13px;font-size:13px;color:var(--ink3);cursor:pointer}
+.becomehost{font-size:13.5px;color:var(--ink2)}.becomehost:hover{color:var(--ink)}
+.signin{background:var(--terra);color:#fff;border-radius:20px;padding:8px 17px;font-size:13.5px;font-weight:500}
+.burger{display:none;font-size:24px;background:none;border:0;color:var(--ink);cursor:pointer;margin-left:auto}
+.hero{background:var(--black);color:#fff;padding:clamp(58px,11vw,120px) 0}
+.hero .ey{color:var(--ink3)}
+.hero h1{font-size:clamp(34px,6.2vw,62px);font-weight:700;letter-spacing:-.028em;line-height:1.04;margin:14px 0 0;max-width:900px}
+.hero p{color:var(--ob2);font-size:clamp(16px,2.1vw,21px);margin:18px 0 32px;max-width:600px;line-height:1.4}
+.search{background:#fff;border-radius:14px;max-width:680px;display:flex;align-items:stretch;box-shadow:0 12px 50px rgba(0,0,0,.35);overflow:hidden}
+.field{flex:1 1 0;padding:12px 18px;border-right:1px solid var(--line);min-width:0}
+.field .fl{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.02em}
+.field .fv{font-size:14px;color:var(--ink3);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.searchbtn{margin:8px;border:0;background:var(--terra);color:#fff;border-radius:10px;padding:0 22px;font-family:inherit;font-size:15px;font-weight:600;display:inline-flex;align-items:center;gap:8px;cursor:pointer;flex:0 0 auto;justify-content:center}
+.searchbtn:hover{background:#A3501F}
+.chips{display:flex;flex-wrap:wrap;gap:10px;margin-top:24px}
+.chip{border:1px solid #424245;color:#fff;background:transparent;border-radius:20px;padding:8px 15px;font-size:13.5px;font-family:inherit;cursor:pointer;transition:.2s}
+.chip:hover{border-color:#fff;background:rgba(255,255,255,.07)}
+.rail{display:flex;gap:14px;overflow-x:auto;padding:4px 0 10px}
+.cat{flex:0 0 auto;width:128px;height:110px;background:var(--f1);border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:11px;color:var(--ink);transition:.2s;cursor:pointer;border:1px solid transparent}
+.fill .cat{background:#fff;border-color:var(--line)}
+.cat:hover{transform:translateY(-3px)}
+.cat i{font-size:25px;color:var(--teal)}.cat span{font-size:13px;font-weight:500;color:var(--ink2)}
+.grid{display:grid;gap:24px;grid-template-columns:repeat(auto-fill,minmax(264px,1fr))}
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden;transition:.2s;display:flex;flex-direction:column}
+.card:hover{transform:translateY(-4px);box-shadow:0 4px 24px rgba(0,0,0,.07)}
+.ph{position:relative;aspect-ratio:4/3;background:var(--f1);overflow:hidden}
+.ph img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transition:transform .4s ease}
+.card:hover .ph img{transform:scale(1.04)}
+.modechip{position:absolute;top:10px;left:10px;background:rgba(10,10,10,.82);backdrop-filter:blur(6px);color:#fff;font-size:12px;font-weight:500;border-radius:20px;padding:5px 11px;display:inline-flex;align-items:center;gap:5px;z-index:2}
+.heart{position:absolute;top:10px;right:10px;width:32px;height:32px;border-radius:50%;background:#fff;border:0;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--ink);font-size:17px;z-index:2;box-shadow:0 1px 4px rgba(0,0,0,.14)}
+.heart.on{color:#fff;background:var(--ink)}
+.cbody{padding:15px 16px 0;flex:1;display:flex;flex-direction:column}
+.ctitle{font-size:17px;font-weight:600;letter-spacing:-.012em;line-height:1.25}
+.host{display:flex;align-items:center;gap:7px;margin-top:10px;font-size:13px;color:var(--ink2);flex-wrap:wrap}
+.av{width:21px;height:21px;border-radius:50%;background:var(--f1);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:var(--ink2)}
+.vchk{color:var(--ink2);font-size:14px}
+.rt{display:inline-flex;align-items:center;gap:3px;color:var(--amber);font-weight:600;margin-left:2px}.rt i{font-size:13px;color:var(--amber)}.rt .cnt{color:var(--ink3);font-weight:400}
+.meta{display:flex;gap:14px;margin-top:10px;font-size:12.5px;color:var(--ink2)}
+.meta span{display:inline-flex;align-items:center;gap:4px}
+.cfoot{display:flex;align-items:center;justify-content:space-between;margin-top:14px;padding:13px 0 15px;border-top:1px solid var(--line)}
+.price{font-size:18px;font-weight:700;letter-spacing:-.01em}.price small{font-size:12px;font-weight:400;color:var(--ink3)}
+.freebadge{display:inline-flex;align-items:center;gap:5px;color:var(--green);font-weight:600;font-size:13px;border:1px solid var(--green);border-radius:20px;padding:4px 12px;background:#fff}
+.book{color:var(--terra);font-size:14px;font-weight:600;display:inline-flex;align-items:center;gap:3px;cursor:pointer}
+.bgrid{display:grid;gap:22px;grid-template-columns:repeat(auto-fill,minmax(232px,1fr))}
+.buddy{background:#fff;border:1px solid var(--line);border-radius:14px;padding:24px 20px;text-align:center;transition:.2s}
+.buddy:hover{transform:translateY(-4px);box-shadow:0 4px 24px rgba(0,0,0,.07)}
+.bav{width:68px;height:68px;border-radius:50%;margin:0 auto 13px;overflow:hidden;background:var(--f1);border:1px solid var(--line)}
+.bav img{width:100%;height:100%;object-fit:cover}
+.buddy .bn{font-size:16px;font-weight:600;display:inline-flex;align-items:center;gap:5px}
+.buddy .sp{font-size:13px;color:var(--ink2);margin-top:3px}
+.buddy .st{font-size:12.5px;color:var(--ink3);margin:13px 0;padding:12px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);display:flex;gap:6px;align-items:center;justify-content:center}
+.buddy .qt{font-size:14px;line-height:1.45}
+.buddy .ve{color:var(--terra);font-size:13px;font-weight:500;margin-top:14px;display:inline-block}
+.modes{display:grid;gap:22px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+.mode{background:#fff;border:1px solid var(--line);border-radius:14px;padding:28px 24px;position:relative}
+.mode.pop{border:2px solid var(--terra)}
+.popbadge{position:absolute;top:-11px;left:24px;background:#FAF0EA;color:var(--terra);font-size:11px;font-weight:600;letter-spacing:.04em;border-radius:20px;padding:4px 12px}
+.mode .mi{font-size:27px}
+.mode h3{font-size:20px;font-weight:600;letter-spacing:-.012em;margin:14px 0 7px}
+.mode p{font-size:14px;color:var(--ink2);line-height:1.45}
+.mode .mp{margin-top:16px;font-size:13px;color:var(--ink3)}.mode .mp b{color:var(--ink);font-weight:700;font-size:16px}
+.steps{display:grid;gap:28px;grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
+.step .sn{font-size:13px;font-weight:600;color:var(--terra)}
+.step .si{font-size:27px;margin:11px 0 13px;color:var(--teal)}
+.step h3{font-size:20px;font-weight:700;letter-spacing:-.015em}
+.step p{font-size:14px;color:var(--ink2);margin-top:7px;line-height:1.45}
+.trust{display:grid;gap:44px;grid-template-columns:1fr 1fr;align-items:start}
+.bigscore{font-size:clamp(56px,10vw,84px);font-weight:700;letter-spacing:-.03em;line-height:1}
+.stars{font-size:18px;margin:8px 0;display:flex;gap:3px;color:var(--amber)}
+.tsig{margin-top:26px;border-top:1px solid var(--line)}
+.tsig .row{display:flex;gap:12px;padding:16px 0;border-bottom:1px solid var(--line);align-items:flex-start}
+.tsig .row>i{font-size:21px;margin-top:1px;color:var(--teal)}
+.tsig b{font-size:14px;font-weight:600;display:block}.tsig span{font-size:13px;color:var(--ink3)}
+.rev{background:var(--f1);border-radius:14px;padding:22px;margin-bottom:16px}
+.rev .rs{font-size:14px;letter-spacing:2px;color:var(--amber)}
+.rev .rq{font-size:15px;line-height:1.5;margin:9px 0 12px}
+.rev .ra{font-size:12.5px;color:var(--ink3)}
+.cities{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
+.city{position:relative;aspect-ratio:3/4;border-radius:14px;overflow:hidden;display:flex;align-items:flex-end;padding:16px;color:#fff;background:#5c5c62}
+.city img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.city.soon img{filter:grayscale(1);opacity:.7}
+.city::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 42%,rgba(10,10,10,.62))}
+.city .cn{position:relative;z-index:2;font-size:16px;font-weight:600}
+.city .tag{position:absolute;top:13px;left:13px;z-index:2;font-size:11px;font-weight:600;border-radius:20px;padding:4px 10px;display:inline-flex;align-items:center;gap:5px}
+.city .tag.live{background:#fff;color:var(--green)}
+.city .tag.cs{background:rgba(255,255,255,.2);color:#fff;backdrop-filter:blur(4px)}
+.hostband{background:var(--black);color:#fff;border-radius:24px;padding:clamp(44px,8vw,96px) clamp(24px,6vw,64px);text-align:center}
+.hostband h2{font-size:clamp(27px,4.4vw,40px);font-weight:700;letter-spacing:-.022em;max-width:700px;margin:0 auto}
+.hostband p{color:var(--ob2);font-size:clamp(15px,2vw,18px);margin:15px auto 28px;max-width:520px;line-height:1.45}
+.hostbtn{background:#fff;color:var(--black);border-radius:24px;padding:15px 30px;font-size:15px;font-weight:600;display:inline-flex;align-items:center;gap:8px}
+footer{border-top:1px solid var(--line);padding:60px 0 30px}
+.fcols{display:grid;gap:30px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:40px}
+footer h4{font-size:13px;font-weight:600;margin-bottom:14px}
+footer ul{list-style:none}footer li{padding:5px 0;font-size:13px;color:var(--ink2)}
+footer li a:hover{color:var(--ink)}
+.news h4{margin-bottom:7px}.news p{font-size:13px;color:var(--ink2);margin-bottom:13px}
+.newsform{display:flex;gap:8px;max-width:330px}
+.newsform input{flex:1;border:1px solid var(--line);border-radius:8px;padding:10px 13px;font-family:inherit;font-size:13px;outline:none}
+.newsform input:focus{border-color:var(--ink)}
+.newsform button{background:var(--ink);color:#fff;border:0;border-radius:8px;padding:10px 18px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer}
+.fbot{border-top:1px solid var(--line);padding-top:22px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--ink3)}
+.fbot .l,.fbot .r{display:flex;gap:16px;flex-wrap:wrap;align-items:center}
+.rv{opacity:0;transform:translateY(18px);transition:opacity .6s ease,transform .6s ease}
+.rv.in{opacity:1;transform:none}
+:focus-visible{outline:2px solid var(--bluec);outline-offset:2px}
+@media(max-width:900px){
+  .nlinks,.citypill,.nsearch,.becomehost,.signin{display:none}
+  nav.open .nlinks{display:flex;position:absolute;top:56px;left:0;right:0;background:#fff;border-bottom:1px solid var(--line);flex-direction:column;gap:0;padding:8px 0}
+  nav.open .nlinks a{padding:12px clamp(18px,5vw,48px)}
+  .burger{display:block}
+  .trust{grid-template-columns:1fr;gap:28px}
+}
+@media(max-width:600px){
+  .search{flex-direction:column;max-width:440px}
+  .field{border-right:0;border-bottom:1px solid var(--line);padding:13px 18px}
+  .searchbtn{margin:9px;padding:14px;width:auto}
+}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}.rv{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+<nav id="nav">
+  <div class="ct navrow">
+    <span class="wm">Local<b>Buddy</b></span>
+    <span class="citypill"><i class="ti ti-map-pin"></i>Amsterdam<i class="ti ti-chevron-down" style="font-size:14px"></i></span>
+    <span class="nlinks"><a href="#trending">Categories</a><a href="#buddies">Buddies</a><a href="#free">Free</a></span>
+    <span class="nright">
+      <span class="nsearch"><i class="ti ti-search"></i>Search experiences</span>
+      <a href="#host" class="becomehost">Become a host</a>
+      <a href="#" class="signin">Sign in</a>
+    </span>
+    <button class="burger" id="burger" aria-label="Menu"><i class="ti ti-menu-2"></i></button>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="ct">
+    <div class="ey">Amsterdam</div>
+    <h1>Book experiences with the locals who live here.</h1>
+    <p>Verified buddies, real prices. Go solo, share with a group, or book a slot all to yourself.</p>
+    <div class="search">
+      <div class="field"><div class="fl">What</div><div class="fv">Canal cycling, food, art…</div></div>
+      <div class="field"><div class="fl">When</div><div class="fv">Add dates</div></div>
+      <div class="field" style="border-right:0"><div class="fl">Who</div><div class="fv">Solo · Group · Private</div></div>
+      <button class="searchbtn"><i class="ti ti-search"></i>Search</button>
+    </div>
+    <div class="chips"><button class="chip">Food &amp; drink</button><button class="chip">On the water</button><button class="chip">Art &amp; design</button><button class="chip">Nightlife</button><button class="chip">Free to join</button></div>
+  </div>
+</header>
+
+<section class="sec">
+  <div class="ct">
+    <div class="shead rv"><div><div class="ey">Browse</div><h2 class="h">Find your kind of Amsterdam</h2><p class="sub">New categories appear as buddies add experiences across the city.</p></div><a href="#" class="see">All categories <i class="ti ti-chevron-right"></i></a></div>
+    <div class="rail rv">
+      <div class="cat"><i class="ti ti-tools-kitchen-2"></i><span>Food &amp; drink</span></div>
+      <div class="cat"><i class="ti ti-sailboat"></i><span>On the water</span></div>
+      <div class="cat"><i class="ti ti-palette"></i><span>Art &amp; design</span></div>
+      <div class="cat"><i class="ti ti-walk"></i><span>Walking tours</span></div>
+      <div class="cat"><i class="ti ti-camera"></i><span>Photography</span></div>
+      <div class="cat"><i class="ti ti-music"></i><span>Nightlife</span></div>
+      <div class="cat"><i class="ti ti-building-arch"></i><span>History</span></div>
+      <div class="cat"><i class="ti ti-leaf"></i><span>Markets</span></div>
+      <div class="cat"><i class="ti ti-dots"></i><span>All categories</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="sec fill" id="trending">
+  <div class="ct">
+    <div class="shead rv"><div><div class="ey">Trending now</div><h2 class="h">Booked most this week</h2></div><a href="#" class="see">See all experiences <i class="ti ti-chevron-right"></i></a></div>
+    <div class="grid">
+      <article class="card rv"><div class="ph"><img loading="lazy" alt="Hidden Canals by Bike" src="https://images.unsplash.com/photo-1534351590666-13e3e96b5017?auto=format&amp;fit=crop&amp;w=800&amp;q=70" onerror="this.onerror=null;this.src='https://picsum.photos/seed/lb1/800/600'"><span class="modechip"><i class="ti ti-users"></i>Group · Private available</span><button class="heart" aria-label="Save"><i class="ti ti-heart"></i></button></div><div class="cbody"><div class="ctitle">Hidden Canals by Bike</div><div class="host"><span class="av">L</span>Lars<i class="ti ti-circle-check vchk"></i><span class="rt"><i class="ti ti-star"></i>4.9<span class="cnt">(312)</span></span></div><div class="meta"><span><i class="ti ti-clock"></i>3 h</span><span><i class="ti ti-users"></i>Up to 8</span></div><div class="cfoot"><span class="price">€45 <small>/ person</small></span><span class="book">Book <i class="ti ti-chevron-right"></i></span></div></div></article>
+      <article class="card rv"><div class="ph"><img loading="lazy" alt="Jordaan Food and Cheese Walk" src="https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&amp;fit=crop&amp;w=800&amp;q=70" onerror="this.onerror=null;this.src='https://picsum.photos/seed/lb2/800/600'"><span class="modechip"><i class="ti ti-users"></i>Group</span><button class="heart" aria-label="Save"><i class="ti ti-heart"></i></button></div><div class="cbody"><div class="ctitle">Jordaan Food &amp; Cheese Walk</div><div class="host"><span class="av">E</span>Eva<i class="ti ti-circle-check vchk"></i><span class="rt"><i class="ti ti-star"></i>4.8<span class="cnt">(204)</span></span></div><div class="meta"><span><i class="ti ti-clock"></i>2.5 h</span><span><i class="ti ti-users"></i>Up to 10</span></div><div class="cfoot"><span class="price">€39 <small>/ person</small></span><span class="book">Book <i class="ti ti-chevron-right"></i></span></div></div></article>
+      <article class="card rv"><div class="ph"><img loading="lazy" alt="Cheese and Jenever Pairing" src="https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?auto=format&amp;fit=crop&amp;w=800&amp;q=70" onerror="this.onerror=null;this.src='https://picsum.photos/seed/lb3/800/600'"><span class="modechip"><i class="ti ti-lock"></i>Private buyout</span><button class="heart" aria-label="Save"><i class="ti ti-heart"></i></button></div><div class="cbody"><div class="ctitle">Cheese &amp; Jenever Pairing</div><div class="host"><span class="av">F</span>Femke<i class="ti ti-circle-check vchk"></i><span class="rt"><i class="ti ti-star"></i>5.0<span class="cnt">(96)</span></span></div><div class="meta"><span><i class="ti ti-clock"></i>2 h</span><span><i class="ti ti-users"></i>Up to 6</span></div><div class="cfoot"><span class="price">€52 <small>/ person</small></span><span class="book">Book <i class="ti ti-chevron-right"></i></span></div></div></article>
+      <article class="card rv"><div class="ph"><img loading="lazy" alt="Sunset Boat with a Local" src="https://images.unsplash.com/photo-1527631746610-bca00a040d60?auto=format&amp;fit=crop&amp;w=800&amp;q=70" onerror="this.onerror=null;this.src='https://picsum.photos/seed/lb4/800/600'"><span class="modechip"><i class="ti ti-users"></i>Group · Private available</span><button class="heart" aria-label="Save"><i class="ti ti-heart"></i></button></div><div class="cbody"><div class="ctitle">Sunset Boat with a Local</div><div class="host"><span class="av">D</span>Daan<i class="ti ti-circle-check vchk"></i><span class="rt"><i class="ti ti-star"></i>4.9<span class="cnt">(118)</span></span></div><div class="meta"><span><i class="ti ti-clock"></i>2 h</span><span><i class="ti ti-users"></i>Up to 12</span></div><div class="cfoot"><span class="price">€68 <small>/ person</small></span><span class="book">Book <i class="ti ti-chevron-right"></i></span></div></div></article>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="free">
+  <div class="ct">
+    <div class="shead rv"><div><div class="ey" style="color:var(--green)">No ticket needed</div><h2 class="h">Free to join</h2><p class="sub">Tip-based and community experiences hosted by locals. Reserve your spot in seconds.</p></div><a href="#" class="see">See all free <i class="ti ti-chevron-right"></i></a></div>
+    <div class="grid">
+      <article class="card rv"><div class="ph"><img loading="lazy" alt="Free Old Town History Walk" src="https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&amp;fit=crop&amp;w=800&amp;q=70" onerror="this.onerror=null;this.src='https://picsum.photos/seed/lb5/800/600'"><button class="heart" aria-label="Save"><i class="ti ti-heart"></i></button></div><div class="cbody"><div class="ctitle">Free Old Town History Walk</div><div class="host"><span class="av">T</span>Thomas<i class="ti ti-circle-check vchk"></i><span class="rt"><i class="ti ti-star"></i>4.8<span class="cnt">(533)</span></span></div><div class="meta"><span><i class="ti ti-clock"></i>1.5 h</span><span><i class="ti ti-users"></i>Up to 15</span></div><div class="cfoot"><span class="freebadge"><i class="ti ti-shield-check"></i>Free</span><span class="book">Reserve <i class="ti ti-chevron-right"></i></span></div></div></article>
+      <article class="card rv"><div class="ph"><img loading="lazy" alt="Sunday Canal Stroll" src="https://images.unsplash.com/photo-1512470876302-972faa2aa9a4?auto=format&amp;fit=crop&amp;w=800&amp;q=70" onerror="this.onerror=null;this.src='https://picsum.photos/seed/lb6/800/600'"><button class="heart" aria-label="Save"><i class="ti ti-heart"></i></button></div><div class="cbody"><div class="ctitle">Sunday Canal Stroll &amp; Stories</div><div class="host"><span class="av">F</span>Femke<i class="ti ti-circle-check vchk"></i><span class="rt"><i class="ti ti-star"></i>4.9<span class="cnt">(187)</span></span></div><div class="meta"><span><i class="ti ti-clock"></i>2 h</span><span><i class="ti ti-users"></i>Up to 12</span></div><div class="cfoot"><span class="freebadge"><i class="ti ti-shield-check"></i>Free</span><span class="book">Reserve <i class="ti ti-chevron-right"></i></span></div></div></article>
+      <article class="card rv"><div class="ph"><img loading="lazy" alt="De Pijp Morning Market Wander" src="https://images.unsplash.com/photo-1488459716781-31db52582fe9?auto=format&amp;fit=crop&amp;w=800&amp;q=70" onerror="this.onerror=null;this.src='https://picsum.photos/seed/lb7/800/600'"><button class="heart" aria-label="Save"><i class="ti ti-heart"></i></button></div><div class="cbody"><div class="ctitle">De Pijp Morning-Market Wander</div><div class="host"><span class="av">L</span>Lotte<i class="ti ti-circle-check vchk"></i><span class="rt"><i class="ti ti-star"></i>4.9<span class="cnt">(140)</span></span></div><div class="meta"><span><i class="ti ti-clock"></i>2 h</span><span><i class="ti ti-users"></i>Up to 10</span></div><div class="cfoot"><span class="freebadge"><i class="ti ti-shield-check"></i>Free</span><span class="book">Reserve <i class="ti ti-chevron-right"></i></span></div></div></article>
+      <article class="card rv"><div class="ph"><img loading="lazy" alt="Vondelpark Run with a Local" src="https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?auto=format&amp;fit=crop&amp;w=800&amp;q=70" onerror="this.onerror=null;this.src='https://picsum.photos/seed/lb8/800/600'"><button class="heart" aria-label="Save"><i class="ti ti-heart"></i></button></div><div class="cbody"><div class="ctitle">Vondelpark Run with a Local</div><div class="host"><span class="av">B</span>Bram<i class="ti ti-circle-check vchk"></i><span class="rt"><i class="ti ti-star"></i>4.7<span class="cnt">(52)</span></span></div><div class="meta"><span><i class="ti ti-clock"></i>1 h</span><span><i class="ti ti-users"></i>Up to 8</span></div><div class="cfoot"><span class="freebadge"><i class="ti ti-shield-check"></i>Free</span><span class="book">Reserve <i class="ti ti-chevron-right"></i></span></div></div></article>
+    </div>
+  </div>
+</section>
+
+<section class="sec fill" id="buddies">
+  <div class="ct">
+    <div class="shead rv"><div><div class="ey">Your locals</div><h2 class="h">Meet the buddies</h2></div><a href="#" class="see">Browse all buddies <i class="ti ti-chevron-right"></i></a></div>
+    <div class="bgrid">
+      <div class="buddy rv"><div class="bav"><img loading="lazy" alt="Sanne" src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&amp;fit=crop&amp;w=200&amp;q=70" onerror="this.onerror=null;this.src='https://picsum.photos/seed/bu1/200/200'"></div><div class="bn">Sanne <i class="ti ti-circle-check vchk"></i></div><div class="sp">Canal history &amp; hidden courtyards</div><div class="st"><i class="ti ti-star"></i>4.9 · 18 experiences</div><div class="qt">"I've lived on the Prinsengracht for 12 years — let me show you my Amsterdam."</div><a href="#" class="ve">View experiences ›</a></div>
+      <div class="buddy rv"><div class="bav"><img loading="lazy" alt="Daan" src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&amp;fit=crop&amp;w=200&amp;q=70" onerror="this.onerror=null;this.src='https://picsum.photos/seed/bu2/200/200'"></div><div class="bn">Daan <i class="ti ti-circle-check vchk"></i></div><div class="sp">Beer &amp; brown cafés</div><div class="st"><i class="ti ti-star"></i>4.8 · 24 experiences</div><div class="qt">"The best stories are told over a jenever in a 300-year-old bar."</div><a href="#" class="ve">View experiences ›</a></div>
+      <div class="buddy rv"><div class="bav"><img loading="lazy" alt="Femke" src="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&amp;fit=crop&amp;w=200&amp;q=70" onerror="this.onerror=null;this.src='https://picsum.photos/seed/bu3/200/200'"></div><div class="bn">Femke <i class="ti ti-circle-check vchk"></i></div><div class="sp">Cheese &amp; spirits</div><div class="st"><i class="ti ti-star"></i>5.0 · 11 experiences</div><div class="qt">"Taste the Netherlands the way locals actually do."</div><a href="#" class="ve">View experiences ›</a></div>
+      <div class="buddy rv"><div class="bav"><img loading="lazy" alt="Lotte" src="https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&amp;fit=crop&amp;w=200&amp;q=70" onerror="this.onerror=null;this.src='https://picsum.photos/seed/bu4/200/200'"></div><div class="bn">Lotte <i class="ti ti-circle-check vchk"></i></div><div class="sp">Markets &amp; local life</div><div class="st"><i class="ti ti-star"></i>4.9 · 30 experiences</div><div class="qt">"Backstreets and market stalls, never the postcard route."</div><a href="#" class="ve">View experiences ›</a></div>
+    </div>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="ct">
+    <div class="shead rv"><div><div class="ey">How you book</div><h2 class="h">Book it your way</h2><p class="sub">One experience, three ways to share it.</p></div></div>
+    <div class="modes">
+      <div class="mode rv"><i class="ti ti-user mi"></i><h3>Solo</h3><p>Just you and your buddy.</p><div class="mp">from <b>€35</b> · 1 guest</div></div>
+      <div class="mode pop rv"><span class="popbadge">POPULAR</span><i class="ti ti-users mi"></i><h3>Group (shared)</h3><p>Share the experience and the cost with others.</p><div class="mp">from <b>€22</b> / person · split pricing</div></div>
+      <div class="mode rv"><i class="ti ti-lock mi"></i><h3>Private buyout</h3><p>Book the whole slot. No strangers.</p><div class="mp">from <b>€180</b> / slot · whole slot</div></div>
+    </div>
+  </div>
+</section>
+
+<section class="sec fill">
+  <div class="ct">
+    <div class="shead rv"><div><div class="ey">Getting started</div><h2 class="h">Three steps to a real local day</h2></div></div>
+    <div class="steps">
+      <div class="step rv"><div class="sn">01</div><i class="ti ti-search si"></i><h3>Choose an experience</h3><p>Browse trending, free, or private — book in seconds.</p></div>
+      <div class="step rv"><div class="sn">02</div><i class="ti ti-map-pin si"></i><h3>Meet your local</h3><p>Get the spot and a message from your buddy.</p></div>
+      <div class="step rv"><div class="sn">03</div><i class="ti ti-mood-smile si"></i><h3>Enjoy</h3><p>Pay nothing on the day — it's all prepaid and secure.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="ct">
+    <div class="shead rv"><div><h2 class="h">Booked with confidence</h2></div></div>
+    <div class="trust">
+      <div class="rv">
+        <div class="bigscore">4.9</div>
+        <div class="stars"><i class="ti ti-star"></i><i class="ti ti-star"></i><i class="ti ti-star"></i><i class="ti ti-star"></i><i class="ti ti-star"></i></div>
+        <div style="font-size:13px;color:var(--ink3)">From 12,400 verified bookings in Amsterdam</div>
+        <div class="tsig">
+          <div class="row"><i class="ti ti-circle-check"></i><div><b>Verified hosts</b><span>ID &amp; background checked before they host.</span></div></div>
+          <div class="row"><i class="ti ti-lock"></i><div><b>Secure prepaid</b><span>Encrypted payments, instant refunds.</span></div></div>
+          <div class="row"><i class="ti ti-message-2-check"></i><div><b>Real reviews</b><span>Only left after a real booking.</span></div></div>
+        </div>
+      </div>
+      <div class="rv">
+        <div class="rev"><div class="rs">★★★★★</div><div class="rq">"Lars showed us courtyards we'd have walked straight past. Booked the whole slot for our family — worth every euro."</div><div class="ra">Sophie · Private buyout with Lars · May 2026</div></div>
+        <div class="rev"><div class="rs">★★★★★</div><div class="rq">"Joined a group walk solo and left with new friends and a cheese addiction. Eva is the best."</div><div class="ra">Anna · Group walk with Eva · April 2026</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sec fill">
+  <div class="ct">
+    <div class="shead rv"><div><div class="ey">Where we live</div><h2 class="h">Amsterdam now. Europe next.</h2></div></div>
+    <div class="cities rv">
+      <div class="city"><img loading="lazy" alt="Amsterdam" src="https://images.unsplash.com/photo-1576924542622-772281b13aa8?auto=format&amp;fit=crop&amp;w=500&amp;q=70" onerror="this.onerror=null;this.src='https://picsum.photos/seed/ci1/500/700'"><span class="tag live"><i class="ti ti-point"></i>Live now</span><span class="cn">Amsterdam</span></div>
+      <div class="city soon"><img loading="lazy" alt="Berlin" src="https://images.unsplash.com/photo-1560969184-10fe8719e047?auto=format&amp;fit=crop&amp;w=500&amp;q=70" onerror="this.onerror=null;this.src='https://picsum.photos/seed/ci2/500/700'"><span class="tag cs">Coming soon</span><span class="cn">Berlin</span></div>
+      <div class="city soon"><img loading="lazy" alt="Lisbon" src="https://images.unsplash.com/photo-1585208798174-6cedd86e019a?auto=format&amp;fit=crop&amp;w=500&amp;q=70" onerror="this.onerror=null;this.src='https://picsum.photos/seed/ci3/500/700'"><span class="tag cs">Coming soon</span><span class="cn">Lisbon</span></div>
+      <div class="city soon"><img loading="lazy" alt="Barcelona" src="https://images.unsplash.com/photo-1583422409516-2895a77efded?auto=format&amp;fit=crop&amp;w=500&amp;q=70" onerror="this.onerror=null;this.src='https://picsum.photos/seed/ci4/500/700'"><span class="tag cs">Coming soon</span><span class="cn">Barcelona</span></div>
+      <div class="city soon"><img loading="lazy" alt="Copenhagen" src="https://images.unsplash.com/photo-1513622470522-26c3c8a854bc?auto=format&amp;fit=crop&amp;w=500&amp;q=70" onerror="this.onerror=null;this.src='https://picsum.photos/seed/ci5/500/700'"><span class="tag cs">Coming soon</span><span class="cn">Copenhagen</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="host">
+  <div class="ct">
+    <div class="hostband rv">
+      <h2>Know your city? Get paid to share it.</h2>
+      <p>Host travelers on your own schedule. You set the price, the slots, and the story.</p>
+      <a href="#" class="hostbtn">Start hosting <i class="ti ti-arrow-right"></i></a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="ct">
+    <div class="fcols">
+      <div><h4>Explore</h4><ul><li><a href="#">Trending</a></li><li><a href="#">Free to join</a></li><li><a href="#">Categories</a></li><li><a href="#">All experiences</a></li></ul></div>
+      <div><h4>Company</h4><ul><li><a href="#">About</a></li><li><a href="#">Careers</a></li><li><a href="#">Press</a></li><li><a href="#">Blog</a></li></ul></div>
+      <div><h4>Support</h4><ul><li><a href="#">Help centre</a></li><li><a href="#">Cancellation</a></li><li><a href="#">Contact</a></li><li><a href="#">Safety</a></li></ul></div>
+      <div><h4>Hosting</h4><ul><li><a href="#">Become a host</a></li><li><a href="#">Host resources</a></li><li><a href="#">Community</a></li></ul></div>
+      <div class="news"><h4>Stay in the loop</h4><p>Get new Amsterdam experiences in your inbox.</p><div class="newsform"><input placeholder="Your email" aria-label="Email"><button>Subscribe</button></div></div>
+    </div>
+    <div class="fbot">
+      <div class="l"><span>© 2026 LocalBuddy B.V.</span><span>Netherlands · EUR €</span><span>English ⌄</span></div>
+      <div class="r"><a href="#">Terms</a><a href="#">Privacy</a><a href="#">Cookies</a><i class="ti ti-brand-instagram"></i><i class="ti ti-brand-twitter"></i></div>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function(){
+  var burger=document.getElementById('burger'),nav=document.getElementById('nav');
+  if(burger)burger.addEventListener('click',function(){nav.classList.toggle('open');});
+  nav.querySelectorAll('.nlinks a').forEach(function(a){a.addEventListener('click',function(){nav.classList.remove('open');});});
+  document.querySelectorAll('.heart').forEach(function(b){b.addEventListener('click',function(){b.classList.toggle('on');});});
+  var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}});},{threshold:.12});
+  document.querySelectorAll('.rv').forEach(function(el){io.observe(el);});
+})();
+</script>
+</body>
+</html>

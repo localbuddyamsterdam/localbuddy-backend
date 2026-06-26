@@ -21,6 +21,7 @@ import com.localbuddy.user.User;
 import com.localbuddy.user.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +35,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 /**
@@ -51,6 +53,7 @@ public class AttendanceService {
     private static final Logger log = LoggerFactory.getLogger(AttendanceService.class);
 
     private final AttendanceCheckInRepository checkInRepository;
+    private final AttendanceCheckInWriter checkInWriter;
     private final AvailabilitySlotRepository slotRepository;
     private final BookingRepository bookingRepository;
     private final LocalProfileRepository localProfileRepository;
@@ -60,6 +63,7 @@ public class AttendanceService {
     private final CheckInProperties props;
 
     public AttendanceService(AttendanceCheckInRepository checkInRepository,
+                             AttendanceCheckInWriter checkInWriter,
                              AvailabilitySlotRepository slotRepository,
                              BookingRepository bookingRepository,
                              LocalProfileRepository localProfileRepository,
@@ -68,6 +72,7 @@ public class AttendanceService {
                              MediaStorageProvider storageProvider,
                              CheckInProperties props) {
         this.checkInRepository = checkInRepository;
+        this.checkInWriter = checkInWriter;
         this.slotRepository = slotRepository;
         this.bookingRepository = bookingRepository;
         this.localProfileRepository = localProfileRepository;
@@ -152,7 +157,8 @@ public class AttendanceService {
         checkIn.setRole(CheckInRole.GUEST);
         checkIn.setCheckedInAt(Instant.now());
         applyGeo(checkIn, geo, result);
-        checkInRepository.save(checkIn);
+        checkIn = saveHandlingConcurrentInsert(checkIn,
+                () -> checkInRepository.findByBookingIdAndRole(booking.getId(), CheckInRole.GUEST));
 
         return new CheckInResponse(
                 CheckInRole.GUEST,
@@ -200,7 +206,8 @@ public class AttendanceService {
             checkIn.setPhotoStorageKey(stored.storageKey());
         }
 
-        checkInRepository.save(checkIn);
+        checkIn = saveHandlingConcurrentInsert(checkIn,
+                () -> checkInRepository.findByAvailabilitySlotIdAndRole(slotId, CheckInRole.HOST));
         notifyGuestsHostArrived(slot);
 
         String warning;
@@ -337,6 +344,27 @@ public class AttendanceService {
         checkIn.setAccuracyMeters(geo.accuracyMeters());
         checkIn.setDistanceMeters(result.distanceMeters());
         checkIn.setWithinGeofence(result.withinGeofence());
+    }
+
+    /**
+     * Persists a check-in while tolerating a concurrent double-submit (e.g. an impatient double-tap).
+     *
+     * <p>An already-persisted row is just updated — no INSERT, so it can't trip the V23 partial unique
+     * indexes. A brand-new row is inserted in its own transaction ({@link AttendanceCheckInWriter}); if a
+     * parallel request inserted the same booking/slot row first, the unique index rejects ours with a
+     * {@link DataIntegrityViolationException}. Because that insert ran in a separate transaction, ours
+     * stays healthy, so we recover idempotently by re-reading the winning row.
+     */
+    private AttendanceCheckIn saveHandlingConcurrentInsert(
+            AttendanceCheckIn checkIn, Supplier<Optional<AttendanceCheckIn>> reread) {
+        if (checkIn.getId() != null) {
+            return checkInRepository.save(checkIn);
+        }
+        try {
+            return checkInWriter.insertNew(checkIn);
+        } catch (DataIntegrityViolationException race) {
+            return reread.get().orElseThrow(() -> race);
+        }
     }
 
     private void notifyGuestsHostArrived(AvailabilitySlot slot) {

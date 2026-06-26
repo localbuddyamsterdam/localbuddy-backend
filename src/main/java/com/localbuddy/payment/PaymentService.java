@@ -10,7 +10,9 @@ import com.localbuddy.payout.HostLedgerService;
 import com.localbuddy.pricing.PricingEngine;
 import com.localbuddy.promo.PromoCodeService;
 import com.localbuddy.referral.ReferralService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.stripe.model.Event;
@@ -41,10 +43,20 @@ public class PaymentService {
     private final InvoiceService invoiceService;
     private final BookingConfirmationNotifier bookingConfirmationNotifier;
     private final GiftCardService giftCardService;
+    private final BigDecimal stripeMinimumCharge;
+
+    // Self-reference (lazy, to break the construction cycle). createCheckout is deliberately NOT
+    // @Transactional — it must not hold a DB transaction open across the Stripe network call — so
+    // invoking its @Transactional siblings on `this` would bypass their @Transactional (Spring
+    // self-invocation). Routing through `self` runs them in a real transaction, so the lazy
+    // booking proxy used by finalizePaidBooking can initialise.
+    @Autowired
+    @Lazy
+    private PaymentService self;
 
     public PaymentService(PaymentRepository paymentRepository,
                           BookingRepository bookingRepository,
-                          @Value("${app.platform.commission-percentage:20}") BigDecimal commissionPercentage, PaymentCheckoutProvider paymentCheckoutProvider, PaymentWebhookEventRepository paymentWebhookEventRepository, PromoCodeService promoCodeService, ReferralService referralService, CancellationRefundPolicyService cancellationRefundPolicyService, PaymentTransactionService paymentTransactionService, BookingExpiryService bookingExpiryService, PricingEngine pricingEngine, HostLedgerService hostLedgerService, InvoiceService invoiceService, BookingConfirmationNotifier bookingConfirmationNotifier, GiftCardService giftCardService) {
+                          @Value("${app.platform.commission-percentage:20}") BigDecimal commissionPercentage, PaymentCheckoutProvider paymentCheckoutProvider, PaymentWebhookEventRepository paymentWebhookEventRepository, PromoCodeService promoCodeService, ReferralService referralService, CancellationRefundPolicyService cancellationRefundPolicyService, PaymentTransactionService paymentTransactionService, BookingExpiryService bookingExpiryService, PricingEngine pricingEngine, HostLedgerService hostLedgerService, InvoiceService invoiceService, BookingConfirmationNotifier bookingConfirmationNotifier, GiftCardService giftCardService, @Value("${app.payments.stripe.minimum-charge:0.50}") BigDecimal stripeMinimumCharge) {
         this.paymentRepository = paymentRepository;
         this.bookingRepository = bookingRepository;
         this.commissionPercentage = commissionPercentage;
@@ -60,6 +72,7 @@ public class PaymentService {
         this.invoiceService = invoiceService;
         this.bookingConfirmationNotifier = bookingConfirmationNotifier;
         this.giftCardService = giftCardService;
+        this.stripeMinimumCharge = stripeMinimumCharge;
     }
 
     @Transactional
@@ -219,8 +232,8 @@ public class PaymentService {
             return toCheckoutResponse(payment);
         }
 
-        if (isFullyCoveredByGiftCard(payment)) {
-            return completeGiftCardOnlyCheckout(payment.getId());
+        if (shouldCompleteWithoutStripeCharge(payment)) {
+            return self.completeWithoutStripeCharge(payment.getId());
         }
 
         try {
@@ -233,7 +246,7 @@ public class PaymentService {
 
             return toCheckoutResponse(savedPayment);
         } catch (RuntimeException ex) {
-            releaseGiftCardOnFailure(payment.getId());
+            self.releaseGiftCardOnFailure(payment.getId());
             throw ex;
         }
     }
@@ -276,7 +289,7 @@ public class PaymentService {
             payment = paymentRepository.save(payment);
         }
 
-        if (isFullyCoveredByGiftCard(payment)) {
+        if (shouldCompleteWithoutStripeCharge(payment)) {
             payment.setPaymentStatus(PaymentStatus.PAID);
             payment.setPaidAt(Instant.now());
             paymentRepository.save(payment);
@@ -301,14 +314,27 @@ public class PaymentService {
     }
 
 
-    private boolean isFullyCoveredByGiftCard(Payment payment) {
+    /**
+     * True when the booking needs no Stripe charge: a gift card covers the full amount, or it
+     * covers all but a remainder below Stripe's minimum charge. Stripe rejects charges under its
+     * per-currency floor (≈€0.50), so rather than block an otherwise-paid booking, the platform
+     * absorbs that sub-minimum remainder. Only applies when a gift card was actually reserved.
+     */
+    private boolean shouldCompleteWithoutStripeCharge(Payment payment) {
         BigDecimal gift = payment.getGiftCardAmount() != null ? payment.getGiftCardAmount() : BigDecimal.ZERO;
-        return gift.compareTo(payment.getAmount()) >= 0;
+        if (gift.signum() <= 0) {
+            return false;
+        }
+        BigDecimal cashRemainder = payment.getAmount().subtract(gift);
+        return cashRemainder.compareTo(stripeMinimumCharge) < 0;
     }
 
-    /** Completes a booking paid entirely by a gift card — no Stripe checkout needed. */
+    /**
+     * Completes a booking with no Stripe charge — the gift card covers the whole amount, or all but
+     * a sub-minimum remainder the platform absorbs (see {@link #shouldCompleteWithoutStripeCharge}).
+     */
     @Transactional
-    public PaymentCheckoutResponse completeGiftCardOnlyCheckout(UUID paymentId) {
+    public PaymentCheckoutResponse completeWithoutStripeCharge(UUID paymentId) {
         Payment payment = paymentRepository.findById(paymentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Payment not found"));
         Booking booking = payment.getBooking();

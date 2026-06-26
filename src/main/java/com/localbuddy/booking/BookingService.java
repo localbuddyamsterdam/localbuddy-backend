@@ -12,6 +12,7 @@ import com.localbuddy.experience.ExperienceRepository;
 import com.localbuddy.experience.ExperienceStatus;
 import com.localbuddy.localprofile.LocalProfile;
 import com.localbuddy.localprofile.LocalProfileRepository;
+import com.localbuddy.messaging.ConversationRepository;
 import com.localbuddy.notification.NotificationService;
 import com.localbuddy.notification.NotificationType;
 import com.localbuddy.payment.PaymentService;
@@ -69,12 +70,13 @@ public class BookingService {
     private final WaitlistService waitlistService;
     private final AgeBandPricing ageBandPricing;
     private final BookingConfirmationNotifier bookingConfirmationNotifier;
+    private final ConversationRepository conversationRepository;
 
     public BookingService(BookingRepository bookingRepository,
                           UserRepository userRepository,
                           ExperienceRepository experienceRepository,
                           AvailabilitySlotRepository availabilitySlotRepository,
-                          LocalProfileRepository localProfileRepository, NotificationService notificationService, ConsentService consentService, PromoCodeService promoCodeService, ReferralService referralService, BookingSafetyChecklistRepository bookingSafetyChecklistRepository, PaymentService paymentService, TrustSafetyService trustSafetyService, ApplicationEventPublisher eventPublisher, BookingReferenceGenerator bookingReferenceGenerator, WaitlistService waitlistService, AgeBandPricing ageBandPricing, BookingConfirmationNotifier bookingConfirmationNotifier) {
+                          LocalProfileRepository localProfileRepository, NotificationService notificationService, ConsentService consentService, PromoCodeService promoCodeService, ReferralService referralService, BookingSafetyChecklistRepository bookingSafetyChecklistRepository, PaymentService paymentService, TrustSafetyService trustSafetyService, ApplicationEventPublisher eventPublisher, BookingReferenceGenerator bookingReferenceGenerator, WaitlistService waitlistService, AgeBandPricing ageBandPricing, BookingConfirmationNotifier bookingConfirmationNotifier, ConversationRepository conversationRepository) {
         this.bookingRepository = bookingRepository;
         this.userRepository = userRepository;
         this.experienceRepository = experienceRepository;
@@ -92,6 +94,7 @@ public class BookingService {
         this.waitlistService = waitlistService;
         this.ageBandPricing = ageBandPricing;
         this.bookingConfirmationNotifier = bookingConfirmationNotifier;
+        this.conversationRepository = conversationRepository;
     }
 
     @Transactional
@@ -613,7 +616,16 @@ public class BookingService {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
 
-        if (user.getRole() == UserRole.ADMIN || user.getRole() == UserRole.SUPPORT) {
+        if (user.getRole() == UserRole.ADMIN) {
+            return toResponse(booking);
+        }
+
+        // SUPPORT is not an all-access role. An agent may only read a booking they have actually
+        // been assigned to, i.e. one tied to a conversation they participate in. Without this scope
+        // a provisioned SUPPORT account could enumerate bookingIds and read every customer's PII and
+        // financial data (IDOR / GDPR confidentiality issue).
+        if (user.getRole() == UserRole.SUPPORT &&
+                conversationRepository.existsBookingConversationParticipant(bookingId, userId)) {
             return toResponse(booking);
         }
 

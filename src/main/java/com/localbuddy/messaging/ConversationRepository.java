@@ -36,4 +36,18 @@ public interface ConversationRepository extends JpaRepository<Conversation, UUID
     /** All conversations, most recent activity first (admin monitoring). */
     @Query("select c from Conversation c order by coalesce(c.lastMessageAt, c.createdAt) desc")
     List<Conversation> findAllByActivity();
+
+    /**
+     * Whether the user participates in any conversation tied to the given booking.
+     * Used to scope SUPPORT booking access to the cases they have actually been assigned to,
+     * rather than granting them an unscoped read of every booking.
+     */
+    @Query("""
+            select (count(c) > 0) from Conversation c
+            where c.booking.id = :bookingId
+              and exists (select 1 from ConversationParticipant p
+                          where p.conversation = c and p.user.id = :userId)
+            """)
+    boolean existsBookingConversationParticipant(@Param("bookingId") UUID bookingId,
+                                                 @Param("userId") UUID userId);
 }
