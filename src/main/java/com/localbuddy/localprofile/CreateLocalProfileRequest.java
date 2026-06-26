@@ -4,6 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.Size;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -77,6 +78,25 @@ public record CreateLocalProfileRequest(
         String accountName,
 
         @Size(max = 32, message = "Swift code cannot exceed 32 characters")
-        String swiftCode
+        String swiftCode,
+
+        Boolean vatRegistered,
+
+        @Size(max = 40, message = "VAT number cannot exceed 40 characters")
+        String vatNumber,
+
+        @Size(max = 2, message = "Tax country must be a 2-letter ISO code")
+        String taxCountry,
+
+        @Size(max = 20, message = "Legal entity type cannot exceed 20 characters")
+        String legalEntityType,
+
+        @Size(max = 60, message = "Tax identification number cannot exceed 60 characters")
+        String taxIdentificationNumber,
+
+        @Size(max = 60, message = "Business registration number cannot exceed 60 characters")
+        String businessRegistrationNumber,
+
+        LocalDate dateOfBirth
 ) {
 }

@@ -5,6 +5,8 @@ import com.localbuddy.booking.BookingRepository;
 import com.localbuddy.booking.BookingStatus;
 import com.localbuddy.common.exception.BadRequestException;
 import com.localbuddy.common.exception.ResourceNotFoundException;
+import com.localbuddy.giftcard.GiftCardApplication;
+import com.localbuddy.giftcard.GiftCardService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,19 +22,22 @@ public class PaymentTransactionService {
     private final PaymentRepository paymentRepository;
     private final BookingRepository bookingRepository;
     private final com.localbuddy.pricing.PricingEngine pricingEngine;
+    private final GiftCardService giftCardService;
 
     public PaymentTransactionService(
             PaymentRepository paymentRepository,
             BookingRepository bookingRepository,
-            com.localbuddy.pricing.PricingEngine pricingEngine
+            com.localbuddy.pricing.PricingEngine pricingEngine,
+            GiftCardService giftCardService
     ) {
         this.paymentRepository = paymentRepository;
         this.bookingRepository = bookingRepository;
         this.pricingEngine = pricingEngine;
+        this.giftCardService = giftCardService;
     }
 
     @Transactional
-    public Payment preparePaymentForCheckout(UUID userId, UUID bookingId) {
+    public Payment preparePaymentForCheckout(UUID userId, UUID bookingId, String giftCardCode) {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
 
@@ -40,6 +45,16 @@ public class PaymentTransactionService {
         validateBookingReadyForCheckout(booking);
 
         Payment payment = getOrCreatePendingPaymentForBooking(booking);
+
+        // Apply a gift card atomically with the payment (same transaction) before checkout.
+        if (giftCardCode != null && !giftCardCode.trim().isEmpty()
+                && payment.getGiftCardId() == null
+                && payment.getPaymentStatus() == PaymentStatus.PENDING) {
+            GiftCardApplication application = giftCardService.reserveForCheckout(giftCardCode, payment.getAmount());
+            payment.setGiftCardId(application.giftCardId());
+            payment.setGiftCardAmount(application.amount());
+            payment = paymentRepository.save(payment);
+        }
 
         // Initialize lazy values needed later outside the transaction
         payment.getId();

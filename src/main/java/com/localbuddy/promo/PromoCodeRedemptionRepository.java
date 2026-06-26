@@ -13,4 +13,6 @@ public interface PromoCodeRedemptionRepository extends JpaRepository<PromoCodeRe
     long countByPromoCodeIdAndGuestEmailIgnoreCase(UUID promoCodeId, String guestEmail);
 
     boolean existsByBookingId(UUID bookingId);
+
+    boolean existsByBookingIdAndPromoCodeId(UUID bookingId, UUID promoCodeId);
 }

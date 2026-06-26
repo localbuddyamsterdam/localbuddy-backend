@@ -168,6 +168,14 @@ public class AdminOpsService {
                 profile.getAccountName(),
                 profile.getSwiftCode(),
 
+                profile.isVatRegistered(),
+                profile.getVatNumber(),
+                profile.getTaxCountry(),
+                profile.getLegalEntityType(),
+                profile.getTaxIdentificationNumber(),
+                profile.getBusinessRegistrationNumber(),
+                profile.getDateOfBirth(),
+
                 profile.getVerificationProvider(),
                 profile.getVerificationReferenceId(),
                 profile.getVerificationStartedAt(),

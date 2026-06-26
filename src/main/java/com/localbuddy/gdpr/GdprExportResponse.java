@@ -15,7 +15,8 @@ public record GdprExportResponse(
         NotificationPreferenceResponse notificationPreferences,
         List<ExportBooking> bookings,
         List<ExportPayment> payments,
-        List<ExportReview> reviews
+        List<ExportReview> reviews,
+        List<ExportCheckIn> checkIns
 ) {
     public record ExportAccount(
             UUID id,
@@ -67,6 +68,15 @@ public record GdprExportResponse(
             String status,
             String experienceTitle,
             Instant createdAt
+    ) {
+    }
+
+    public record ExportCheckIn(
+            String bookingReference,
+            String experienceTitle,
+            Instant checkedInAt,
+            Double distanceMeters,
+            boolean withinGeofence
     ) {
     }
 }

@@ -94,10 +94,16 @@ For a **logged-in** user, render filled/empty hearts across listings by calling 
 - Guest customer: `POST /api/public/guest-no-show/report` with `{ bookingReference, guestEmail, reason? }`.
 - Admin approves/rejects (`/api/admin/no-show/...`); **host-no-show approval triggers a full refund**. Show the "report a no-show / claim refund" option only within 48h of start.
 
-### 2.9 Admin messaging takeover — render `senderLabel` verbatim
+### 2.9 Geo check-in & host arrival (around start time)
+Tied to the experience's meeting-point coordinate (the `latitude`/`longitude` on the experience). See §4.4 "Geo check-in & attendance" for full DTOs.
+- **Guest check-in is optional but hard-gated.** Only enable the button inside the time window (15 min before → 15 min after start). On tap, request precise geolocation and `POST` lat/lng/accuracy. A **400** comes back with a ready-to-show message when they're too early/late, too far, too imprecise, or the host never set a meeting point — surface it as-is. Logged-in → `/api/bookings/{id}/check-in`; guests → `/api/public/check-in` with reference + email.
+- **Host check-in is soft** (`/api/host/slots/{slotId}/check-in`, multipart, optional live photo). It always records; if outside the fence the response carries a `warning` + `distanceMeters` — show the warning, don't block. Host check-in fires a **`HOST_ARRIVED`** notification to confirmed guests.
+- **Host attendance roster** (`GET /api/host/slots/{slotId}/attendance`) shows who's checked in nearby + each booking's `guestShowStatus`; the host marks `SHOWED`/`NO_SHOW` per booking (one mark per booking, party size irrelevant) via `/api/host/bookings/{id}/attendance`. This is operational ("whom to call first"), **not** the admin refund verdict.
+
+### 2.10 Admin messaging takeover — render `senderLabel` verbatim
 Conversations are participant-based and typed. In **every** `MessageResponse`, use the pre-formatted **`senderLabel`**: for admin-sent messages it's `"Admin (Sarah Chen)"`, otherwise the sender's plain name. **Do not build your own label** from `senderName`/`senderRole`. Admins can monitor all threads, reply/take over transparently (their messages appear to all participants as `Admin (Name)`), and open private side conversations with a single customer or host (`ConversationType` `ADMIN_CUSTOMER` / `ADMIN_HOST`).
 
-### 2.10 Other gotchas
+### 2.11 Other gotchas
 - **Waitlist:** being `NOTIFIED` when a seat frees up is **not a reservation** — it's first-come-first-served. Message accordingly.
 - **Reviews** require the booking to be **COMPLETED**; one review per direction per booking; direction is set server-side.
 - **Trip safety SOS** (`POST /api/trip-safety/bookings/{id}/sos`) emails support with location — wire it to an obvious in-trip button. Check-in/out/SOS are traveler-only.
@@ -135,7 +141,9 @@ Conversations are participant-based and typed. In **every** `MessageResponse`, u
 - `BookingStatus`: `REQUESTED`, `ACCEPTED`, `PENDING_PAYMENT`, `CONFIRMED`, `DECLINED`, `CANCELLED_BY_LOGGED_IN_USER`, `CANCELLED_BY_LOCAL`, `CANCELLED_BY_ADMIN`, `CANCELLED_MINIMUM_NOT_MET`, `COMPLETED`, `EXPIRED`
 - `BookingSource`: `LOGGED_IN_USER`, `GUEST_USER`, `ADMIN`
 - `BookingCancellationActor`: `LOGGED_IN_USER`, `LOCAL`, `ADMIN`
-- `AttendanceOutcome`: `NONE`, `HOST_NO_SHOW`, `CUSTOMER_NO_SHOW`
+- `AttendanceOutcome`: `NONE`, `HOST_NO_SHOW`, `CUSTOMER_NO_SHOW` (admin-verified no-show verdict — distinct from `GuestShowStatus`)
+- `GuestShowStatus`: `PENDING`, `SHOWED`, `NO_SHOW` (host's in-person mark per booking; operational, not an admin verdict)
+- `CheckInRole`: `HOST`, `GUEST` (geo check-in actor)
 - `WaitlistStatus`: `WAITING`, `NOTIFIED`, `CONVERTED`, `CANCELLED`
 
 **Payments / payouts / invoices**
@@ -158,7 +166,7 @@ Conversations are participant-based and typed. In **every** `MessageResponse`, u
 - `NoShowReportStatus`: `REQUESTED`, `APPROVED`, `REJECTED`
 - `NotificationChannel`: `EMAIL`, `SMS`, `WHATSAPP`, `IN_APP`
 - `NotificationStatus`: `PENDING`, `PROCESSING`, `SENT`, `FAILED`, `SKIPPED`
-- `NotificationType`: `BOOKING_CREATED`, `BOOKING_ACCEPTED`, `BOOKING_DECLINED`, `BOOKING_CANCELLED`, `BOOKING_COMPLETED`, `BOOKING_UPDATED`, `BOOKING_CONFIRMED`, `BOOKING_REMINDER`, `GUEST_BOOKING_CREATED`, `NEW_MESSAGE`, `INVOICE_ISSUED`, `WAITLIST_SPOT_AVAILABLE`, `SLOT_UNDERBOOKED_HOST_NOTICE`, `SLOT_CANCELLED_MINIMUM_NOT_MET`, `LOCAL_PROFILE_SUBMITTED`, `LOCAL_PROFILE_APPROVED`, `LOCAL_PROFILE_CHANGES_REQUESTED`, `LOCAL_PROFILE_REJECTED`, `SAFETY_REPORT_CREATED`, `SAFETY_REPORT_RESOLVED`, `SYSTEM_ALERT`, `NEWSLETTER_CONFIRM`, `NEWSLETTER`, `HOST_ANNOUNCEMENT`, `PLATFORM_ANNOUNCEMENT`, `WISHLIST_REMINDER`, `BOOKING_ABANDONED_REMINDER`
+- `NotificationType`: `BOOKING_CREATED`, `BOOKING_ACCEPTED`, `BOOKING_DECLINED`, `BOOKING_CANCELLED`, `BOOKING_COMPLETED`, `BOOKING_UPDATED`, `BOOKING_CONFIRMED`, `BOOKING_REMINDER`, `GUEST_BOOKING_CREATED`, `NEW_MESSAGE`, `INVOICE_ISSUED`, `WAITLIST_SPOT_AVAILABLE`, `SLOT_UNDERBOOKED_HOST_NOTICE`, `SLOT_CANCELLED_MINIMUM_NOT_MET`, `LOCAL_PROFILE_SUBMITTED`, `LOCAL_PROFILE_APPROVED`, `LOCAL_PROFILE_CHANGES_REQUESTED`, `LOCAL_PROFILE_REJECTED`, `SAFETY_REPORT_CREATED`, `SAFETY_REPORT_RESOLVED`, `SYSTEM_ALERT`, `NEWSLETTER_CONFIRM`, `NEWSLETTER`, `HOST_ANNOUNCEMENT`, `PLATFORM_ANNOUNCEMENT`, `WISHLIST_REMINDER`, `BOOKING_ABANDONED_REMINDER`, `HOST_ARRIVED`
 - `NewsletterAudience`: `TRAVELER`, `HOST`, `ALL`
 - `NewsletterSubscriptionStatus`: `PENDING`, `CONFIRMED`, `UNSUBSCRIBED`
 - `AnnouncementAudience`: `MY_FOLLOWERS`, `MY_GUESTS`, `BOTH`, `ALL_HOSTS`
@@ -376,6 +384,24 @@ Booking/cancellation rules in §2.6/§2.7.
 ### `/api/bookings/{bookingId}/safety-checklist` — BookingSafetyChecklistController (Authenticated; participant)
 `GET` — My checklist for the booking (`BookingSafetyChecklistResponse`: 4 acknowledgement booleans + `completed`, `completedAt`, `roleContext`, …).
 `POST .../complete` — Complete it. Request (`CompleteBookingSafetyChecklistRequest`): all four ack fields are `@AssertTrue` (**must be true**) — `publicMeetingAcknowledged`, `communicationGuidelinesAcknowledged`, `personalSafetyAcknowledged`, `reportingGuidelinesAcknowledged`. (IP/User-Agent captured.)
+
+### Geo check-in & attendance — Booking/Public/Host controllers
+
+> Check-in proves presence near the experience's meeting point (its `latitude`/`longitude`) around start time. **Window:** opens 15 min before start, closes 15 min after (both configurable). **Geofence:** 300 m, configurable, GPS-error-adjusted (`distance − min(accuracy, 500 m) ≤ radius`). All coordinates from the browser Geolocation API; server stamps `checkedInAt`. Distances in **metres**. Operational signal only — **not** auto-refund proof.
+>
+> **Guests are hard-gated** — a check-in only succeeds inside the geofence, in-window, with a usable accuracy reading, and only if a meeting point is set; otherwise **400** with a human-readable message (too early / too late / too imprecise / "you're about N m away" / no meeting point). **Hosts are soft** — never rejected for distance; the check-in records and the response carries a `warning` + `distanceMeters` when they're outside the fence.
+
+`CheckInResponse`: `role` (`HOST`/`GUEST`), `checkedInAt`, `withinGeofence`, `distanceMeters` (null if no meeting point), `geofenceRadiusMeters`, `warning` (host only; null when inside), `photoUrl` (host only).
+
+**`POST /api/bookings/{bookingId}/check-in`** — Authenticated traveler checks into their own booking. `CheckInRequest`: `latitude` req (−90..90), `longitude` req (−180..180), `accuracyMeters` opt but **required to pass the guest gate** (≥0; rejected if > 500 m). Booking must be `CONFIRMED`. → `CheckInResponse` (success only).
+
+**`POST /api/public/check-in`** — Public, rate-limited. Anonymous guest via `GuestCheckInRequest`: `bookingReference` req (≤40), `guestEmail` req (valid, ≤255), `latitude`/`longitude`/`accuracyMeters` as above. Resolves a `GUEST_USER` booking by reference + email (404 otherwise). Same hard gate. → `CheckInResponse`.
+
+**`POST /api/host/slots/{slotId}/check-in`** — Authenticated host (ownership enforced; else 404). **`multipart/form-data`**: `latitude` req, `longitude` req, `accuracyMeters` opt, `photo` opt (optional live arrival picture, reuses blob storage). Soft check-in. On success notifies every `CONFIRMED` booking's guest **`HOST_ARRIVED`** (in-app + email for logged-in, email for guests; deduped per booking). → `CheckInResponse` (with `warning`/`distanceMeters`/`photoUrl`).
+
+**`GET /api/host/slots/{slotId}/attendance`** — Authenticated host. The arrival roster. `SlotAttendanceResponse`: `slotId`, `experienceTitle`, `startTime`, `meetingPointSet`, `geofenceRadiusMeters`, `hostCheckedIn`, `hostCheckedInAt`, `hostWithinGeofence`, `hostDistanceMeters`, `hostPhotoUrl`, `bookings[]`. Each `BookingAttendanceRow`: `bookingId`, `bookingReference`, `guestDisplayName`, `guestPhone`, `partySize`, `guestShowStatus` (`GuestShowStatus`), `guestCheckedIn`, `guestCheckedInAt`, `guestDistanceMeters`, `guestWithinGeofence`. Use it to know who's checked in nearby (whom to call) before marking show/no-show.
+
+**`POST /api/host/bookings/{bookingId}/attendance`** — Authenticated host marks one booking's guest(s) as shown/not. `MarkAttendanceRequest`: `status` = `SHOWED` or `NO_SHOW` (`PENDING` rejected). One mark per booking regardless of party size. Booking must be `CONFIRMED`/`COMPLETED`. → updated `BookingAttendanceRow`. (This is the host's operational mark — separate from the admin-verified `AttendanceOutcome` no-show verdict.)
 
 ## 4.5 Payments, Payouts & Invoices
 

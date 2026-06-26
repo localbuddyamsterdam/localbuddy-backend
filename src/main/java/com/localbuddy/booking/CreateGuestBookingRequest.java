@@ -2,6 +2,7 @@ package com.localbuddy.booking;
 
 import jakarta.validation.constraints.*;
 
+import java.util.List;
 import java.util.UUID;
 
 public record CreateGuestBookingRequest(
@@ -46,6 +47,9 @@ public record CreateGuestBookingRequest(
 
         @Size(max = 80, message = "Promo code cannot exceed 80 characters")
         String promoCode,
+
+        /** Additional stacked promo/voucher codes; all applied codes must be combinable. */
+        List<String> promoCodes,
 
         @Size(max = 80, message = "Referral code cannot exceed 80 characters")
         String referralCode,

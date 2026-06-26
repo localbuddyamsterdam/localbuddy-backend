@@ -41,8 +41,13 @@ public class PricingCalculator {
             experienceVat = round(experienceGross.subtract(experienceNet));
         }
 
-        // Step 2 — commission (base = experience gross) + its VAT treatment.
-        BigDecimal commission = round(experienceGross.multiply(commissionRate));
+        // The host's commission/payout base. Defaults to the customer gross (the host bears
+        // any discount); a higher value means the platform absorbs part/all of the discount.
+        BigDecimal hostGross = in.hostExperienceGross() != null ? round(in.hostExperienceGross()) : experienceGross;
+        BigDecimal platformBorneDiscount = round(hostGross.subtract(experienceGross)).max(BigDecimal.ZERO);
+
+        // Step 2 — commission (base = host gross) + its VAT treatment.
+        BigDecimal commission = round(hostGross.multiply(commissionRate));
         BigDecimal commissionVat;
         CommissionVatTreatment treatment;
         switch (in.hostVatStatus()) {
@@ -69,10 +74,10 @@ public class PricingCalculator {
         BigDecimal serviceFee = round(experienceGross.multiply(serviceFeeRate));
         BigDecimal serviceFeeVat = round(serviceFee.multiply(feeVatRate));
 
-        // Step 4 — settlement.
+        // Step 4 — settlement. The platform's margin absorbs any platform-borne discount.
         BigDecimal customerTotal = round(experienceGross.add(serviceFee).add(serviceFeeVat));
-        BigDecimal hostPayoutCash = round(experienceGross.subtract(commission).subtract(commissionVat));
-        BigDecimal platformKeeps = round(commission.add(serviceFee));
+        BigDecimal hostPayoutCash = round(hostGross.subtract(commission).subtract(commissionVat));
+        BigDecimal platformKeeps = round(commission.add(serviceFee).subtract(platformBorneDiscount));
         BigDecimal platformRemitsVat = round(commissionVat.add(serviceFeeVat));
 
         return new PricingBreakdown(

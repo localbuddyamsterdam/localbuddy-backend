@@ -1,5 +1,6 @@
 package com.localbuddy;
 
+import com.localbuddy.attendance.CheckInProperties;
 import com.localbuddy.notification.email.AzureCommunicationProperties;
 import com.localbuddy.notification.email.EmailProperties;
 import com.localbuddy.payment.StripeProperties;
@@ -14,7 +15,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         StripeProperties.class,
         EmailProperties.class,
         AzureCommunicationProperties.class,
-        RateLimitProperties.class
+        RateLimitProperties.class,
+        CheckInProperties.class
 })
 @SpringBootApplication
 public class LocalbuddyBackendApplication {

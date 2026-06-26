@@ -35,12 +35,19 @@ public class AdminPayoutController {
     }
 
     @Operation(summary = "Mark a payout paid",
-            description = "Marks a pending payout as paid (for manual/offline disbursement). Admin only.")
+            description = "Marks a pending or failed payout as paid (for manual/offline disbursement) and settles its reserved earnings exactly once. Admin only.")
     @PostMapping("/{payoutId}/mark-paid")
     public ResponseEntity<PayoutResponse> markPayoutPaid(
             @PathVariable UUID payoutId,
             @RequestParam(required = false) String notes
     ) {
         return ResponseEntity.ok(hostPayoutService.markPayoutPaid(payoutId, notes));
+    }
+
+    @Operation(summary = "Retry a failed payout",
+            description = "Re-attempts a failed Stripe payout using the earnings still reserved on it. Admin only.")
+    @PostMapping("/{payoutId}/retry")
+    public ResponseEntity<PayoutResponse> retryPayout(@PathVariable UUID payoutId) {
+        return ResponseEntity.ok(hostPayoutService.retryPayout(payoutId));
     }
 }

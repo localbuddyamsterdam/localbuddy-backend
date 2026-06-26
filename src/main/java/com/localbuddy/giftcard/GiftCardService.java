@@ -3,6 +3,8 @@ package com.localbuddy.giftcard;
 import com.localbuddy.booking.Booking;
 import com.localbuddy.common.exception.BadRequestException;
 import com.localbuddy.common.exception.ResourceNotFoundException;
+import com.localbuddy.payment.PaymentCheckoutProvider;
+import com.localbuddy.payment.PaymentCheckoutResult;
 import com.localbuddy.user.User;
 import com.localbuddy.user.UserRepository;
 import org.springframework.beans.factory.annotation.Value;
@@ -28,22 +30,25 @@ public class GiftCardService {
     private final GiftCardRedemptionRepository redemptionRepository;
     private final GiftCardBookingRepository bookingRepository;
     private final UserRepository userRepository;
+    private final PaymentCheckoutProvider paymentCheckoutProvider;
     private final int validityDays;
 
     public GiftCardService(GiftCardRepository giftCardRepository,
                            GiftCardRedemptionRepository redemptionRepository,
                            GiftCardBookingRepository bookingRepository,
                            UserRepository userRepository,
+                           PaymentCheckoutProvider paymentCheckoutProvider,
                            @Value("${app.giftcard.validity-days:365}") int validityDays) {
         this.giftCardRepository = giftCardRepository;
         this.redemptionRepository = redemptionRepository;
         this.bookingRepository = bookingRepository;
         this.userRepository = userRepository;
+        this.paymentCheckoutProvider = paymentCheckoutProvider;
         this.validityDays = validityDays;
     }
 
     @Transactional
-    public GiftCardResponse purchase(UUID purchaserUserId, PurchaseGiftCardRequest request) {
+    public GiftCardPurchaseResponse purchase(UUID purchaserUserId, PurchaseGiftCardRequest request) {
         BigDecimal amount = request.amount().setScale(2, RoundingMode.HALF_UP);
         if (amount.signum() <= 0) {
             throw new BadRequestException("Gift card amount must be positive");
@@ -54,11 +59,13 @@ public class GiftCardService {
         card.setInitialAmount(amount);
         card.setBalance(amount);
         card.setCurrency(normalizeCurrency(request.currency()));
-        card.setStatus(GiftCardStatus.ACTIVE);
+        // Not spendable until the purchase payment succeeds (activated by the Stripe webhook).
+        card.setStatus(GiftCardStatus.PENDING_PAYMENT);
         card.setRecipientEmail(trimToNull(request.recipientEmail()));
         card.setRecipientName(trimToNull(request.recipientName()));
         card.setMessage(trimToNull(request.message()));
-        card.setExpiresAt(Instant.now().plus(validityDays, ChronoUnit.DAYS));
+        // Purchased gift cards are stored value and never expire (it is the customer's money).
+        card.setExpiresAt(null);
 
         if (purchaserUserId != null) {
             User purchaser = userRepository.findById(purchaserUserId)
@@ -67,7 +74,25 @@ public class GiftCardService {
             card.setPurchaserEmail(purchaser.getEmail());
         }
 
-        return GiftCardResponse.from(giftCardRepository.save(card));
+        GiftCard saved = giftCardRepository.save(card);
+
+        PaymentCheckoutResult checkout = paymentCheckoutProvider.createGiftCardCheckout(
+                saved.getId(), amount, saved.getCurrency(), saved.getCode());
+
+        return new GiftCardPurchaseResponse(
+                saved.getId(), saved.getCode(), saved.getInitialAmount(),
+                saved.getCurrency(), saved.getStatus(), checkout.checkoutUrl());
+    }
+
+    /** Activates a purchased gift card once its Stripe payment completes (idempotent). */
+    @Transactional
+    public void activatePurchasedCard(UUID giftCardId) {
+        GiftCard card = giftCardRepository.findByIdForUpdate(giftCardId)
+                .orElseThrow(() -> new ResourceNotFoundException("Gift card not found"));
+        if (card.getStatus() == GiftCardStatus.PENDING_PAYMENT) {
+            card.setStatus(GiftCardStatus.ACTIVE);
+            giftCardRepository.save(card);
+        }
     }
 
     @Transactional
@@ -79,7 +104,11 @@ public class GiftCardService {
 
     @Transactional
     public GiftCardBalanceResponse redeem(UUID userId, RedeemGiftCardRequest request) {
-        GiftCard card = requireCard(request.code());
+        // Resolve the code, then re-load under a row lock so concurrent redemptions
+        // of the same card serialise and cannot double-spend the balance.
+        UUID cardId = requireCard(request.code()).getId();
+        GiftCard card = giftCardRepository.findByIdForUpdate(cardId)
+                .orElseThrow(() -> new ResourceNotFoundException("Gift card not found"));
         expireIfNeeded(card);
 
         if (card.getStatus() != GiftCardStatus.ACTIVE) {
@@ -114,6 +143,70 @@ public class GiftCardService {
         redemptionRepository.save(redemption);
 
         return GiftCardBalanceResponse.from(card);
+    }
+
+    /**
+     * Reserves gift-card balance for a booking checkout: locks the card, validates it, and
+     * decrements by min(balance, amountDue). Returns which card and how much it covered, so the
+     * remainder can be charged to Stripe. Released via {@link #returnToCard} on failure/refund.
+     */
+    @Transactional
+    public GiftCardApplication reserveForCheckout(String code, BigDecimal amountDue) {
+        UUID cardId = requireCard(code).getId();
+        GiftCard card = giftCardRepository.findByIdForUpdate(cardId)
+                .orElseThrow(() -> new ResourceNotFoundException("Gift card not found"));
+        expireIfNeeded(card);
+
+        if (card.getStatus() != GiftCardStatus.ACTIVE) {
+            throw new BadRequestException("Gift card is not active (status: " + card.getStatus() + ")");
+        }
+
+        BigDecimal due = amountDue.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal applied = card.getBalance().min(due).setScale(2, RoundingMode.HALF_UP);
+        if (applied.signum() <= 0) {
+            throw new BadRequestException("Gift card has no balance to apply");
+        }
+
+        card.setBalance(card.getBalance().subtract(applied));
+        if (card.getBalance().signum() == 0) {
+            card.setStatus(GiftCardStatus.DEPLETED);
+        }
+        giftCardRepository.save(card);
+
+        return new GiftCardApplication(card.getId(), applied);
+    }
+
+    /** Returns funds to a card — releasing an unused reservation or refunding a cancelled booking. */
+    @Transactional
+    public void returnToCard(UUID cardId, BigDecimal amount) {
+        if (cardId == null || amount == null || amount.signum() <= 0) {
+            return;
+        }
+        GiftCard card = giftCardRepository.findByIdForUpdate(cardId)
+                .orElseThrow(() -> new ResourceNotFoundException("Gift card not found"));
+        card.setBalance(card.getBalance().add(amount.setScale(2, RoundingMode.HALF_UP)));
+        if (card.getStatus() == GiftCardStatus.DEPLETED && card.getBalance().signum() > 0) {
+            card.setStatus(GiftCardStatus.ACTIVE);
+        }
+        giftCardRepository.save(card);
+    }
+
+    /** Records a confirmed gift-card redemption against a booking (after the payment succeeds). */
+    @Transactional
+    public void recordBookingRedemption(UUID cardId, UUID bookingId, UUID userId, BigDecimal amount) {
+        if (cardId == null || amount == null || amount.signum() <= 0) {
+            return;
+        }
+        GiftCardRedemption redemption = new GiftCardRedemption();
+        giftCardRepository.findById(cardId).ifPresent(redemption::setGiftCard);
+        redemption.setAmount(amount.setScale(2, RoundingMode.HALF_UP));
+        if (userId != null) {
+            userRepository.findById(userId).ifPresent(redemption::setRedeemedByUser);
+        }
+        if (bookingId != null) {
+            bookingRepository.findById(bookingId).ifPresent(redemption::setBooking);
+        }
+        redemptionRepository.save(redemption);
     }
 
     @Transactional(readOnly = true)

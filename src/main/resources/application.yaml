@@ -133,6 +133,20 @@ app:
     underbooked-processor-delay-ms: ${BOOKING_UNDERBOOKED_PROCESSOR_DELAY_MS:300000}
     auto-complete-after-hours: ${BOOKING_AUTO_COMPLETE_AFTER_HOURS:48}
     auto-complete-processor-delay-ms: ${BOOKING_AUTO_COMPLETE_PROCESSOR_DELAY_MS:300000}
+
+  checkin:
+    # How early before the slot start a check-in is allowed (minutes).
+    before-minutes: ${CHECKIN_BEFORE_MINUTES:15}
+    # How late after the slot start a check-in is still allowed (minutes).
+    after-minutes: ${CHECKIN_AFTER_MINUTES:15}
+    # Geofence radius from the experience meeting point (metres).
+    geofence-radius-meters: ${CHECKIN_GEOFENCE_RADIUS_METERS:300}
+    # Worst device accuracy we still trust; beyond this a guest check-in is rejected (metres).
+    max-accuracy-meters: ${CHECKIN_MAX_ACCURACY_METERS:500}
+    # Delete check-in rows older than this (days); operational data, not refund proof.
+    retention-days: ${CHECKIN_RETENTION_DAYS:90}
+    retention-processor-delay-ms: ${CHECKIN_RETENTION_PROCESSOR_DELAY_MS:86400000}
+
   email:
     provider: ${EMAIL_PROVIDER:console}
     from-address: ${EMAIL_FROM_ADDRESS:no-reply@localbuddy.dev}

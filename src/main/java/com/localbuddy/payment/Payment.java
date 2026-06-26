@@ -121,6 +121,14 @@ public class Payment {
     @Column(name = "refunded_amount", precision = 10, scale = 2)
     private BigDecimal refundedAmount;
 
+    /** Gift card applied to this payment as a payment method, and the amount it covered.
+     *  The Stripe charge is {@code amount - giftCardAmount}. */
+    @Column(name = "gift_card_id")
+    private UUID giftCardId;
+
+    @Column(name = "gift_card_amount", nullable = false, precision = 10, scale = 2)
+    private BigDecimal giftCardAmount = BigDecimal.ZERO;
+
 
     @Column(name = "paid_at")
     private Instant paidAt;
@@ -170,6 +178,10 @@ public class Payment {
 
         if (localPayoutAmount == null) {
             localPayoutAmount = BigDecimal.ZERO;
+        }
+
+        if (giftCardAmount == null) {
+            giftCardAmount = BigDecimal.ZERO;
         }
     }
 

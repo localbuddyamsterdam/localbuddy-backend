@@ -16,6 +16,7 @@ import com.localbuddy.notification.NotificationService;
 import com.localbuddy.notification.NotificationType;
 import com.localbuddy.payment.PaymentService;
 import com.localbuddy.promo.AppliedPromoCode;
+import com.localbuddy.promo.AppliedPromoCodes;
 import com.localbuddy.promo.PromoCodeService;
 import com.localbuddy.referral.AppliedReferralCode;
 import com.localbuddy.referral.ReferralService;
@@ -35,6 +36,7 @@ import java.math.RoundingMode;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -178,9 +180,9 @@ public class BookingService {
         log.info("LOGGED_IN_BOOKING_TIMING updateSlotMemoryMs={}", System.currentTimeMillis() - stepStart);
 
         stepStart = System.currentTimeMillis();
-        AppliedPromoCode appliedPromo = promoCodeService.applyPromoCodeForBooking(
+        AppliedPromoCodes appliedPromos = promoCodeService.applyPromoCodesForBooking(
                 loggedInUserId,
-                request.promoCode(),
+                mergePromoCodes(request.promoCode(), request.promoCodes()),
                 null,
                 pricing.baseForPromo(),
                 currency
@@ -196,7 +198,7 @@ public class BookingService {
         log.info("LOGGED_IN_BOOKING_TIMING applyReferralMs={}", System.currentTimeMillis() - stepStart);
 
         stepStart = System.currentTimeMillis();
-        BigDecimal totalAmount = appliedPromo.finalAmount();
+        BigDecimal totalAmount = appliedPromos.finalAmount();
 
         Booking booking = new Booking();
         booking.setBookingReference(generateUniqueBookingReference());
@@ -214,12 +216,11 @@ public class BookingService {
         booking.setPricePerGuest(pricePerGuest);
         booking.setOriginalAmount(originalAmount);
         booking.setPrivateDiscountAmount(pricing.privateDiscountAmount());
-        booking.setDiscountAmount(appliedPromo.discountAmount());
+        booking.setDiscountAmount(appliedPromos.totalDiscount());
         booking.setTotalAmount(totalAmount);
         booking.setCurrency(currency);
 
-        booking.setPromoCode(appliedPromo.promoCode());
-        booking.setPromoCodeText(optionalUpper(request.promoCode()));
+        applyPromoCodesToBooking(booking, appliedPromos);
 
         booking.setReferralCode(appliedReferral.referralCode());
         booking.setReferralCodeText(optionalUpper(request.referralCode()));
@@ -721,9 +722,9 @@ public class BookingService {
         log.info("GUEST_BOOKING_TIMING updateSlotMemoryMs={}", System.currentTimeMillis() - stepStart);
 
         stepStart = System.currentTimeMillis();
-        AppliedPromoCode appliedPromo = promoCodeService.applyPromoCodeForBooking(
+        AppliedPromoCodes appliedPromos = promoCodeService.applyPromoCodesForBooking(
                 null,
-                request.promoCode(),
+                mergePromoCodes(request.promoCode(), request.promoCodes()),
                 normalizedGuestEmail,
                 pricing.baseForPromo(),
                 currency
@@ -739,7 +740,7 @@ public class BookingService {
         log.info("GUEST_BOOKING_TIMING applyReferralMs={}", System.currentTimeMillis() - stepStart);
 
         stepStart = System.currentTimeMillis();
-        BigDecimal totalAmount = appliedPromo.finalAmount();
+        BigDecimal totalAmount = appliedPromos.finalAmount();
 
         Booking booking = new Booking();
         booking.setBookingReference(generateUniqueBookingReference());
@@ -773,12 +774,11 @@ public class BookingService {
         booking.setPricePerGuest(pricePerGuest);
         booking.setOriginalAmount(originalAmount);
         booking.setPrivateDiscountAmount(pricing.privateDiscountAmount());
-        booking.setDiscountAmount(appliedPromo.discountAmount());
+        booking.setDiscountAmount(appliedPromos.totalDiscount());
         booking.setTotalAmount(totalAmount);
         booking.setCurrency(currency);
 
-        booking.setPromoCode(appliedPromo.promoCode());
-        booking.setPromoCodeText(optionalUpper(request.promoCode()));
+        applyPromoCodesToBooking(booking, appliedPromos);
 
         booking.setReferralCode(appliedReferral.referralCode());
         booking.setReferralCodeText(optionalUpper(request.referralCode()));
@@ -1206,6 +1206,36 @@ public class BookingService {
             return null;
         }
         return value.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private List<String> mergePromoCodes(String single, List<String> multiple) {
+        List<String> all = new ArrayList<>();
+        if (single != null && !single.trim().isEmpty()) {
+            all.add(single);
+        }
+        if (multiple != null) {
+            all.addAll(multiple);
+        }
+        return all;
+    }
+
+    /** Records the applied (stacked) codes on the booking: a primary code for display + a child row per code. */
+    private void applyPromoCodesToBooking(Booking booking, AppliedPromoCodes appliedPromos) {
+        if (appliedPromos.codes().isEmpty()) {
+            return;
+        }
+        var primary = appliedPromos.codes().get(0).promoCode();
+        booking.setPromoCode(primary);
+        booking.setPromoCodeText(primary.getCode());
+
+        for (AppliedPromoCode applied : appliedPromos.codes()) {
+            BookingPromoCode bookingPromoCode = new BookingPromoCode();
+            bookingPromoCode.setBooking(booking);
+            bookingPromoCode.setPromoCode(applied.promoCode());
+            bookingPromoCode.setCodeText(applied.promoCode().getCode());
+            bookingPromoCode.setDiscountAmount(applied.discountAmount());
+            booking.getAppliedPromoCodes().add(bookingPromoCode);
+        }
     }
 
     private void createBookingRescheduledNotification(Booking booking) {

@@ -20,6 +20,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 
 @Service
@@ -189,6 +190,16 @@ public class LocalProfileService {
         profile.setAccountNumber(optionalTrim(request.accountNumber()));
         profile.setAccountName(optionalTrim(request.accountName()));
         profile.setSwiftCode(optionalTrim(request.swiftCode()));
+
+        if (request.vatRegistered() != null) {
+            profile.setVatRegistered(request.vatRegistered());
+        }
+        profile.setVatNumber(optionalTrim(request.vatNumber()));
+        profile.setTaxCountry(optionalUpper(request.taxCountry()));
+        profile.setLegalEntityType(optionalTrim(request.legalEntityType()));
+        profile.setTaxIdentificationNumber(optionalTrim(request.taxIdentificationNumber()));
+        profile.setBusinessRegistrationNumber(optionalTrim(request.businessRegistrationNumber()));
+        profile.setDateOfBirth(request.dateOfBirth());
     }
 
     private void applyUpdateRequest(LocalProfile profile, UpdateLocalProfileRequest request) {
@@ -272,6 +283,11 @@ public class LocalProfileService {
         return value.trim();
     }
 
+    private String optionalUpper(String value) {
+        String trimmed = optionalTrim(value);
+        return trimmed == null ? null : trimmed.toUpperCase(Locale.ROOT);
+    }
+
     private List<String> cleanList(List<String> values) {
         if (values == null) {
             return List.of();
@@ -322,6 +338,14 @@ public class LocalProfileService {
                 profile.getAccountNumber(),
                 profile.getAccountName(),
                 profile.getSwiftCode(),
+
+                profile.isVatRegistered(),
+                profile.getVatNumber(),
+                profile.getTaxCountry(),
+                profile.getLegalEntityType(),
+                profile.getTaxIdentificationNumber(),
+                profile.getBusinessRegistrationNumber(),
+                profile.getDateOfBirth(),
 
                 profile.getVerificationProvider(),
                 profile.getVerificationReferenceId(),

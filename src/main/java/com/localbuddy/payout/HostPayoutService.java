@@ -118,20 +118,34 @@ public class HostPayoutService {
                 ledgerService.settlePayout(saved.getId());
                 invoiceService.generatePayoutStatement(saved);
             } catch (Exception ex) {
+                // Keep the entries reserved on this FAILED payout so they can never be
+                // paid twice. An admin then either marks it paid (offline) or retries it.
                 saved.setStatus(PayoutStatus.FAILED);
                 saved.setFailureReason(ex.getMessage());
                 saved = payoutRepository.save(saved);
-                ledgerService.detachPayout(saved.getId());
             }
         }
 
         return toResponse(saved);
     }
 
+    /**
+     * Records an offline / out-of-band disbursement as paid and settles the payout's
+     * still-attached ledger entries. Guarded so the same earnings can never be settled
+     * (and therefore paid) twice.
+     */
     @Transactional
     public PayoutResponse markPayoutPaid(UUID payoutId, String notes) {
         Payout payout = payoutRepository.findById(payoutId)
                 .orElseThrow(() -> new ResourceNotFoundException("Payout not found"));
+
+        if (payout.getStatus() == PayoutStatus.PAID) {
+            throw new BadRequestException("Payout is already marked paid");
+        }
+        if (payout.getStatus() != PayoutStatus.PENDING && payout.getStatus() != PayoutStatus.FAILED) {
+            throw new BadRequestException("Only pending or failed payouts can be marked paid");
+        }
+
         payout.setStatus(PayoutStatus.PAID);
         payout.setPaidAt(Instant.now());
         if (notes != null && !notes.trim().isEmpty()) {
@@ -141,6 +155,41 @@ public class HostPayoutService {
         ledgerService.settlePayout(payoutId);
         invoiceService.generatePayoutStatement(payout);
         return response;
+    }
+
+    /** Re-attempts a failed Stripe payout using the entries still reserved on it. */
+    @Transactional
+    public PayoutResponse retryPayout(UUID payoutId) {
+        Payout payout = payoutRepository.findById(payoutId)
+                .orElseThrow(() -> new ResourceNotFoundException("Payout not found"));
+
+        if (payout.getStatus() != PayoutStatus.FAILED) {
+            throw new BadRequestException("Only failed payouts can be retried");
+        }
+
+        LocalProfile host = payout.getLocalProfile();
+        if (!connectPayoutProvider.isConfigured()
+                || !host.isPayoutsEnabled()
+                || host.getStripeConnectAccountId() == null) {
+            throw new BadRequestException(
+                    "This host is not set up for Stripe payouts; mark the payout paid offline instead");
+        }
+
+        try {
+            String transferId = connectPayoutProvider.transfer(
+                    host.getStripeConnectAccountId(), payout.getAmount(), payout.getCurrency());
+            payout.setProviderTransferId(transferId);
+            payout.setStatus(PayoutStatus.PAID);
+            payout.setPaidAt(Instant.now());
+            payout.setFailureReason(null);
+            Payout saved = payoutRepository.save(payout);
+            ledgerService.settlePayout(saved.getId());
+            invoiceService.generatePayoutStatement(saved);
+            return toResponse(saved);
+        } catch (Exception ex) {
+            payout.setFailureReason(ex.getMessage());
+            return toResponse(payoutRepository.save(payout));
+        }
     }
 
     private LocalProfile requireHostProfile(UUID hostUserId) {

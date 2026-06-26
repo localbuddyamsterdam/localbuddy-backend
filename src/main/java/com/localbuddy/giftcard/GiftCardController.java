@@ -22,9 +22,10 @@ public class GiftCardController {
         this.giftCardService = giftCardService;
     }
 
-    @Operation(summary = "Purchase a gift card")
+    @Operation(summary = "Purchase a gift card",
+            description = "Creates a pending gift card and returns a Stripe checkout URL; the card activates once payment completes.")
     @PostMapping("/purchase")
-    public ResponseEntity<GiftCardResponse> purchase(
+    public ResponseEntity<GiftCardPurchaseResponse> purchase(
             Authentication authentication,
             @Valid @RequestBody PurchaseGiftCardRequest request
     ) {

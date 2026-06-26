@@ -5,6 +5,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
+import java.util.List;
 import java.util.UUID;
 
 public record CreateBookingRequest(
@@ -37,6 +38,9 @@ public record CreateBookingRequest(
 
         @Size(max = 80, message = "Promo code cannot exceed 80 characters")
         String promoCode,
+
+        /** Additional stacked promo/voucher codes; all applied codes must be combinable. */
+        List<String> promoCodes,
 
         @Size(max = 80, message = "Referral code cannot exceed 80 characters")
         String referralCode,

@@ -1,5 +1,6 @@
 package com.localbuddy.gdpr;
 
+import com.localbuddy.attendance.AttendanceCheckInRepository;
 import com.localbuddy.common.exception.BadRequestException;
 import com.localbuddy.common.exception.ResourceNotFoundException;
 import com.localbuddy.consent.UserConsentRepository;
@@ -24,6 +25,7 @@ public class GdprService {
     private final GdprPaymentRepository paymentRepository;
     private final GdprReviewRepository reviewRepository;
     private final DataDeletionRequestRepository deletionRequestRepository;
+    private final AttendanceCheckInRepository checkInRepository;
 
     public GdprService(UserRepository userRepository,
                        UserConsentRepository consentRepository,
@@ -31,7 +33,8 @@ public class GdprService {
                        GdprBookingRepository bookingRepository,
                        GdprPaymentRepository paymentRepository,
                        GdprReviewRepository reviewRepository,
-                       DataDeletionRequestRepository deletionRequestRepository) {
+                       DataDeletionRequestRepository deletionRequestRepository,
+                       AttendanceCheckInRepository checkInRepository) {
         this.userRepository = userRepository;
         this.consentRepository = consentRepository;
         this.preferenceService = preferenceService;
@@ -39,6 +42,7 @@ public class GdprService {
         this.paymentRepository = paymentRepository;
         this.reviewRepository = reviewRepository;
         this.deletionRequestRepository = deletionRequestRepository;
+        this.checkInRepository = checkInRepository;
     }
 
     @Transactional(readOnly = true)
@@ -101,6 +105,17 @@ public class GdprService {
                                 r.getCreatedAt()))
                         .toList();
 
+        List<GdprExportResponse.ExportCheckIn> checkIns =
+                checkInRepository.findByUserId(userId).stream()
+                        .map(c -> new GdprExportResponse.ExportCheckIn(
+                                c.getBooking() != null ? c.getBooking().getBookingReference() : null,
+                                c.getBooking() != null && c.getBooking().getExperience() != null
+                                        ? c.getBooking().getExperience().getTitle() : null,
+                                c.getCheckedInAt(),
+                                c.getDistanceMeters(),
+                                c.isWithinGeofence()))
+                        .toList();
+
         return new GdprExportResponse(
                 Instant.now(),
                 account,
@@ -108,7 +123,8 @@ public class GdprService {
                 preferenceService.getMyPreferences(userId),
                 bookings,
                 payments,
-                reviews
+                reviews,
+                checkIns
         );
     }
 

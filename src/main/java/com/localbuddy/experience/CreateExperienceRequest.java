@@ -8,6 +8,7 @@ import java.util.UUID;
 
 public record CreateExperienceRequest(
 
+        @NotNull(message = "Category is required")
         UUID categoryId,
 
         Set<UUID> categoryIds,

@@ -13,6 +13,9 @@ public record CreateGuestPaymentRequest(
         @NotBlank(message = "Guest email is required")
         @Email(message = "Guest email must be valid")
         @Size(max = 255, message = "Guest email cannot exceed 255 characters")
-        String guestEmail
+        String guestEmail,
+
+        /** Optional gift card to apply as a payment method; covers up to its balance, Stripe charges the rest. */
+        String giftCardCode
 ) {
 }

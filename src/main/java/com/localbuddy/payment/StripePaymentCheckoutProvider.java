@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
+import java.util.UUID;
 
 @Component
 public class StripePaymentCheckoutProvider implements PaymentCheckoutProvider {
@@ -42,7 +43,11 @@ public class StripePaymentCheckoutProvider implements PaymentCheckoutProvider {
 
         try {
 
-            long amountInCents = payment.getAmount()
+            // Charge the customer only the portion not covered by an applied gift card.
+            java.math.BigDecimal chargeAmount = payment.getAmount()
+                    .subtract(payment.getGiftCardAmount() != null
+                            ? payment.getGiftCardAmount() : java.math.BigDecimal.ZERO);
+            long amountInCents = chargeAmount
                     .movePointRight(2)
                     .longValueExact();
 
@@ -90,6 +95,59 @@ public class StripePaymentCheckoutProvider implements PaymentCheckoutProvider {
 
         } catch (Exception ex) {
             throw new BadRequestException("Unable to create Stripe checkout session: " + ex.getMessage());
+        }
+    }
+
+    @Override
+    public PaymentCheckoutResult createGiftCardCheckout(UUID giftCardId, BigDecimal amount, String currency, String reference) {
+        if (stripeProperties.secretKey() == null || stripeProperties.secretKey().trim().isEmpty()) {
+            throw new BadRequestException("Stripe secret key is not configured");
+        }
+
+        try {
+            long amountInCents = amount.movePointRight(2).longValueExact();
+
+            String successUrl = stripeProperties.successUrl()
+                    + "?giftCardId=" + giftCardId
+                    + "&session_id={CHECKOUT_SESSION_ID}";
+            String cancelUrl = stripeProperties.cancelUrl() + "?giftCardId=" + giftCardId;
+
+            SessionCreateParams params = SessionCreateParams.builder()
+                    .setMode(SessionCreateParams.Mode.PAYMENT)
+                    .setSuccessUrl(successUrl)
+                    .setCancelUrl(cancelUrl)
+                    .setExpiresAt(Instant.now().getEpochSecond() + SESSION_EXPIRATION_SECONDS)
+                    .setClientReferenceId(giftCardId.toString())
+                    .putMetadata("giftCardId", giftCardId.toString())
+                    .addLineItem(
+                            SessionCreateParams.LineItem.builder()
+                                    .setQuantity(1L)
+                                    .setPriceData(
+                                            SessionCreateParams.LineItem.PriceData.builder()
+                                                    .setCurrency(currency.toLowerCase())
+                                                    .setUnitAmount(amountInCents)
+                                                    .setProductData(
+                                                            SessionCreateParams.LineItem.PriceData.ProductData.builder()
+                                                                    .setName("LocalBuddy gift card " + reference)
+                                                                    .build()
+                                                    )
+                                                    .build()
+                                    )
+                                    .build()
+                    )
+                    .build();
+
+            Session session = stripeClient.checkout().sessions().create(params);
+
+            return new PaymentCheckoutResult(
+                    session.getUrl(),
+                    session.getId(),
+                    session.getPaymentIntent(),
+                    PaymentMethodType.UNKNOWN
+            );
+
+        } catch (Exception ex) {
+            throw new BadRequestException("Unable to create Stripe gift card checkout session: " + ex.getMessage());
         }
     }
 

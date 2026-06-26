@@ -7,6 +7,7 @@ import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.UUID;
 
 public record CreatePromoCodeRequest(
 
@@ -36,6 +37,22 @@ public record CreatePromoCodeRequest(
         Instant startsAt,
         Instant expiresAt,
 
-        Boolean active
+        Boolean active,
+
+        /** Who bears the discount cost. Defaults to HOST (legacy behaviour) when omitted. */
+        DiscountBearer discountBearer,
+
+        /** Required when discountBearer is SPLIT: the platform's share of the discount (0–100). */
+        BigDecimal platformSharePercentage,
+
+        /** Optional voucher targeting: restrict redemption to this registered user. */
+        UUID issuedToUserId,
+
+        /** Optional voucher targeting: restrict redemption to this guest email. */
+        @Size(max = 255, message = "Issued-to email cannot exceed 255 characters")
+        String issuedToEmail,
+
+        /** Whether this code may be stacked with other combinable codes on one booking. Defaults to false. */
+        Boolean combinable
 ) {
 }

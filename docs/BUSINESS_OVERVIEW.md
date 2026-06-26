@@ -40,6 +40,7 @@ Most travelers want experiences that feel genuine and personal, but they're stuc
 - **Notifications & reminders** (in-app), with email/SMS preferences.
 - **Wallet passes & calendar** — add a booking to Apple/Google Wallet and to a calendar.
 - **Trip safety** — pre-trip safety checklist, check-in/out, emergency contact, and an **SOS** that alerts support with location.
+- **Arrival check-in** — around start time, tap to check in at the meeting point (geofenced, optional) so the host knows you're on your way; get notified when **your host has arrived**.
 - **Reviews** after a completed experience.
 - **Newsletter & following** — subscribe to the newsletter (double opt-in, easy unsubscribe) and follow favourite hosts to get their announcements.
 - **Gentle reminders** — automatic nudges about experiences left in the wishlist or a booking started but not paid (at a few intervals, then it stops).
@@ -57,6 +58,7 @@ Most travelers want experiences that feel genuine and personal, but they're stuc
 - **Invoices & tax** — auto-generated documents; platform handles the commercial detail.
 - **Messaging** with guests, plus quick contact.
 - **Announcements** — broadcast updates (new dates, schedule changes) to followers and/or past guests in one click.
+- **Arrival check-in & attendance** — check in at the meeting point (optionally with a live photo), which alerts guests you've arrived; see a live roster of who has checked in nearby (whom to call first), and mark each booking **showed / no-show** in person.
 - **Reliability reputation** — ratings, reviews, and a track record.
 
 ### For the admin / operations team
@@ -96,7 +98,7 @@ Most travelers want experiences that feel genuine and personal, but they're stuc
 
 **Booking & checkout:** availability/slot picker (capacity, "private available" flag, "join waitlist" when full); booking configurator (guest-count + **age-band steppers with a combined max of 10**, min-age gate, **private-buyout toggle** showing flat price + "blocks the whole slot", traveler note, promo/referral/gift-card fields, price summary with discount lines); promo/referral applied-or-invalid inline states; gift-card redeem + balance; **forced login/signup interstitial** (when a logged-out user hits a login-only action); **guest checkout** (name/email/phone + **required terms & versioned consent**); order review/confirm (final price + **cancellation-policy summary**); Stripe redirect interstitial; payment return/processing (poll status); payment success/ticket-issued; payment failed/retry; rate-limited ("try again shortly"); booking confirmation with reference.
 
-**My account & bookings:** my bookings (status tabs across the full lifecycle incl. **awaiting host acceptance** and **payment expired**); booking detail (status, slot, guests/bands, price + discount + refund state, private indicator, contact); add-to-wallet panel (incl. "not configured" fallback); add-to-calendar panel (Google/Outlook/ICS); cancel-booking modal (reason + **refund preview: 100% if ≥24h, else 0%**); host-reschedule notice; **booking safety checklist** (4 mandatory acknowledgements); in-trip safety panel (check-in/out/**SOS**, traveler-only); emergency contact form (with empty state); leave-a-review (gated to **host-marked-completed** bookings); my reviews; reviews about me; **no-show refund-claim** report (within 48h); my no-show reports; file-a-safety-report.
+**My account & bookings:** my bookings (status tabs across the full lifecycle incl. **awaiting host acceptance** and **payment expired**); booking detail (status, slot, guests/bands, price + discount + refund state, private indicator, contact); add-to-wallet panel (incl. "not configured" fallback); add-to-calendar panel (Google/Outlook/ICS); cancel-booking modal (reason + **refund preview: 100% if ≥24h, else 0%**); host-reschedule notice; **booking safety checklist** (4 mandatory acknowledgements); in-trip safety panel (check-in/out/**SOS**, traveler-only); **arrival check-in** (geolocated, time-windowed; only enabled near start, with clear "too far / too early / too late" states + a "host has arrived" banner); emergency contact form (with empty state); leave-a-review (gated to **host-marked-completed** bookings); my reviews; reviews about me; **no-show refund-claim** report (within 48h); my no-show reports; file-a-safety-report.
 
 **Lists, social, messaging:** wishlist page (cards with experience-status badge; empty state); **wishlist post-login merge confirmation** (see journey 4); waitlist join modal (logged-in + guest variant with name/email/phone); my waitlist (status, "notified ≠ reserved" messaging, leave); messages list (unread badges); message thread (bubbles rendering the sender label **verbatim**, including `Admin (Name)` for admin messages); start-conversation entry; WhatsApp click-to-chat handoff (with "configured" fallback).
 
@@ -116,7 +118,7 @@ Most travelers want experiences that feel genuine and personal, but they're stuc
 
 **Money:** earnings dashboard (earned / paid-out / available / on-hold); payouts history; Stripe Connect onboarding entry + return; host invoices (commission / service-fee / payout statements + PDF).
 
-**Comms & safety:** messages (shared component); **announcement composer** (audience: followers / guests / both) + my-announcements list (with recipient counts); notifications + preferences; host no-show reporting (informational, within 48h) + my reports; host safety report + in-trip events view (host can **view** but not trigger check-in/SOS); account/profile + GDPR (shared).
+**Comms & safety:** messages (shared component); **announcement composer** (audience: followers / guests / both) + my-announcements list (with recipient counts); notifications + preferences; host no-show reporting (informational, within 48h) + my reports; host safety report + in-trip events view (host can **view** but not trigger check-in/SOS); **arrival check-in** (geolocated, optional live photo; never blocked — shows a distance warning if far) + **attendance roster** for the slot (who's checked in nearby, with show/no-show marking per booking); account/profile + GDPR (shared).
 
 ## C. Admin console (≈39 screens)
 
@@ -146,6 +148,7 @@ Most travelers want experiences that feel genuine and personal, but they're stuc
 8. **Completed trip → review** (host marks completed → traveler review prompt appears → host reviews back, **only for non-guest bookings**; one review per direction).
 9. **In-trip safety / SOS** (pre-trip checklist → check-in → SOS with location → support alerted → admin resolves → check-out).
 10. **No-show refund claim → admin review** (within 48h, customer reports host no-show as a claim → admin approves → full refund; guest does it via reference + email; host→customer reports are informational only).
+11. **Meeting up on the day** (near start: guest taps arrival check-in, gated to within ~300 m and the ±15 min window, with clear far/early/late states → host checks in, optionally with a live photo → guests get a "host has arrived" alert → host reads the roster of who's nearby and marks each booking showed / no-show in person).
 11. **Host onboards → approved → lists → booked → paid** (profile + KYC + banking → submit → admin approves → create experience → submit → approve → set availability → accept booking → mark completed → earnings accrue → Connect onboarding → admin payout → invoice).
 12. **Host handles a problem booking** (cancel-underbooked, reschedule, or cancel — blocked within 24h of start).
 13. **Admin reviews a host application** (request changes → host resubmits → approve).

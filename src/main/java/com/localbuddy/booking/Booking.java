@@ -13,6 +13,8 @@ import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -98,6 +100,14 @@ public class Booking {
     @Column(name = "no_show_marked_at")
     private Instant noShowMarkedAt;
 
+    /** The host's in-person show/no-show mark for this booking (operational, not an admin verdict). */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "guest_show_status", nullable = false, length = 20)
+    private GuestShowStatus guestShowStatus = GuestShowStatus.PENDING;
+
+    @Column(name = "guest_show_marked_at")
+    private Instant guestShowMarkedAt;
+
     @Column(name = "price_per_guest", nullable = false, precision = 10, scale = 2)
     private BigDecimal pricePerGuest;
 
@@ -174,6 +184,9 @@ public class Booking {
 
     @Column(name = "referral_code_text", length = 80)
     private String referralCodeText;
+
+    @OneToMany(mappedBy = "booking", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<BookingPromoCode> appliedPromoCodes = new ArrayList<>();
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

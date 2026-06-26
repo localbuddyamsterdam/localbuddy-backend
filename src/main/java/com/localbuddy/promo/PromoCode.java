@@ -61,6 +61,30 @@ public class PromoCode {
     @Column(name = "active", nullable = false)
     private boolean active = true;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "discount_bearer", nullable = false, length = 20)
+    private DiscountBearer discountBearer = DiscountBearer.HOST;
+
+    /** For SPLIT: percentage (0–100) of the discount the platform absorbs; the host bears the rest. */
+    @Column(name = "platform_share_percentage", precision = 5, scale = 2)
+    private BigDecimal platformSharePercentage;
+
+    /** Optional targeting: only this registered user may redeem the voucher. */
+    @Column(name = "issued_to_user_id")
+    private UUID issuedToUserId;
+
+    /** Optional targeting: only this (guest) email may redeem the voucher. */
+    @Column(name = "issued_to_email", length = 255)
+    private String issuedToEmail;
+
+    /**
+     * Whether this code may be stacked with other codes on one booking. Multiple codes
+     * can be applied together only when every applied code is combinable. Default false
+     * (exclusive — cannot be combined).
+     */
+    @Column(name = "combinable", nullable = false)
+    private boolean combinable = false;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

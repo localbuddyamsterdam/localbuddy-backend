@@ -5,6 +5,7 @@ import com.localbuddy.experience.ExperienceCategoryResponse;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -45,6 +46,14 @@ public record LocalProfileResponse(
         String accountNumber,
         String accountName,
         String swiftCode,
+
+        boolean vatRegistered,
+        String vatNumber,
+        String taxCountry,
+        String legalEntityType,
+        String taxIdentificationNumber,
+        String businessRegistrationNumber,
+        LocalDate dateOfBirth,
 
         String verificationProvider,
         String verificationReferenceId,

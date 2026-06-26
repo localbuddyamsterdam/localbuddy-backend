@@ -34,7 +34,7 @@ public class BookingCheckoutService {
         long checkoutStart = System.currentTimeMillis();
         PaymentCheckoutResponse checkout = paymentService.createCheckout(
                 loggedInUserId,
-                new CreatePaymentRequest(booking.id())
+                new CreatePaymentRequest(booking.id(), null)
         );
         long checkoutMs = System.currentTimeMillis() - checkoutStart;
 

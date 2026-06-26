@@ -3,6 +3,8 @@ package com.localbuddy.payment;
 import com.localbuddy.booking.*;
 import com.localbuddy.common.exception.BadRequestException;
 import com.localbuddy.common.exception.ResourceNotFoundException;
+import com.localbuddy.giftcard.GiftCardApplication;
+import com.localbuddy.giftcard.GiftCardService;
 import com.localbuddy.invoice.InvoiceService;
 import com.localbuddy.payout.HostLedgerService;
 import com.localbuddy.pricing.PricingEngine;
@@ -38,10 +40,11 @@ public class PaymentService {
     private final HostLedgerService hostLedgerService;
     private final InvoiceService invoiceService;
     private final BookingConfirmationNotifier bookingConfirmationNotifier;
+    private final GiftCardService giftCardService;
 
     public PaymentService(PaymentRepository paymentRepository,
                           BookingRepository bookingRepository,
-                          @Value("${app.platform.commission-percentage:20}") BigDecimal commissionPercentage, PaymentCheckoutProvider paymentCheckoutProvider, PaymentWebhookEventRepository paymentWebhookEventRepository, PromoCodeService promoCodeService, ReferralService referralService, CancellationRefundPolicyService cancellationRefundPolicyService, PaymentTransactionService paymentTransactionService, BookingExpiryService bookingExpiryService, PricingEngine pricingEngine, HostLedgerService hostLedgerService, InvoiceService invoiceService, BookingConfirmationNotifier bookingConfirmationNotifier) {
+                          @Value("${app.platform.commission-percentage:20}") BigDecimal commissionPercentage, PaymentCheckoutProvider paymentCheckoutProvider, PaymentWebhookEventRepository paymentWebhookEventRepository, PromoCodeService promoCodeService, ReferralService referralService, CancellationRefundPolicyService cancellationRefundPolicyService, PaymentTransactionService paymentTransactionService, BookingExpiryService bookingExpiryService, PricingEngine pricingEngine, HostLedgerService hostLedgerService, InvoiceService invoiceService, BookingConfirmationNotifier bookingConfirmationNotifier, GiftCardService giftCardService) {
         this.paymentRepository = paymentRepository;
         this.bookingRepository = bookingRepository;
         this.commissionPercentage = commissionPercentage;
@@ -56,6 +59,7 @@ public class PaymentService {
         this.hostLedgerService = hostLedgerService;
         this.invoiceService = invoiceService;
         this.bookingConfirmationNotifier = bookingConfirmationNotifier;
+        this.giftCardService = giftCardService;
     }
 
     @Transactional
@@ -205,7 +209,8 @@ public class PaymentService {
     public PaymentCheckoutResponse createCheckout(UUID userId, CreatePaymentRequest request) {
         Payment payment = paymentTransactionService.preparePaymentForCheckout(
                 userId,
-                request.bookingId()
+                request.bookingId(),
+                request.giftCardCode()
         );
 
         if (payment.getPaymentStatus() == PaymentStatus.PROCESSING &&
@@ -214,14 +219,23 @@ public class PaymentService {
             return toCheckoutResponse(payment);
         }
 
-        PaymentCheckoutResult checkoutResult = paymentCheckoutProvider.createCheckout(payment);
+        if (isFullyCoveredByGiftCard(payment)) {
+            return completeGiftCardOnlyCheckout(payment.getId());
+        }
 
-        Payment savedPayment = paymentTransactionService.attachCheckoutResult(
-                payment.getId(),
-                checkoutResult
-        );
+        try {
+            PaymentCheckoutResult checkoutResult = paymentCheckoutProvider.createCheckout(payment);
 
-        return toCheckoutResponse(savedPayment);
+            Payment savedPayment = paymentTransactionService.attachCheckoutResult(
+                    payment.getId(),
+                    checkoutResult
+            );
+
+            return toCheckoutResponse(savedPayment);
+        } catch (RuntimeException ex) {
+            releaseGiftCardOnFailure(payment.getId());
+            throw ex;
+        }
     }
 
 
@@ -253,6 +267,23 @@ public class PaymentService {
             return toCheckoutResponse(payment);
         }
 
+        if (request.giftCardCode() != null && !request.giftCardCode().trim().isEmpty()
+                && payment.getGiftCardId() == null && payment.getPaymentStatus() == PaymentStatus.PENDING) {
+            GiftCardApplication application =
+                    giftCardService.reserveForCheckout(request.giftCardCode(), payment.getAmount());
+            payment.setGiftCardId(application.giftCardId());
+            payment.setGiftCardAmount(application.amount());
+            payment = paymentRepository.save(payment);
+        }
+
+        if (isFullyCoveredByGiftCard(payment)) {
+            payment.setPaymentStatus(PaymentStatus.PAID);
+            payment.setPaidAt(Instant.now());
+            paymentRepository.save(payment);
+            finalizePaidBooking(payment, booking);
+            return toCheckoutResponse(payment);
+        }
+
         PaymentCheckoutResult checkoutResult = paymentCheckoutProvider.createCheckout(payment);
 
         payment.setPaymentStatus(PaymentStatus.PROCESSING);
@@ -269,6 +300,64 @@ public class PaymentService {
         return toCheckoutResponse(savedPayment);
     }
 
+
+    private boolean isFullyCoveredByGiftCard(Payment payment) {
+        BigDecimal gift = payment.getGiftCardAmount() != null ? payment.getGiftCardAmount() : BigDecimal.ZERO;
+        return gift.compareTo(payment.getAmount()) >= 0;
+    }
+
+    /** Completes a booking paid entirely by a gift card — no Stripe checkout needed. */
+    @Transactional
+    public PaymentCheckoutResponse completeGiftCardOnlyCheckout(UUID paymentId) {
+        Payment payment = paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Payment not found"));
+        Booking booking = payment.getBooking();
+
+        payment.setPaymentStatus(PaymentStatus.PAID);
+        payment.setPaidAt(Instant.now());
+        paymentRepository.save(payment);
+
+        finalizePaidBooking(payment, booking);
+
+        return toCheckoutResponse(payment);
+    }
+
+    /** Shared post-payment finalisation: redeem codes, confirm, record host earning + gift redemption, invoice. */
+    private void finalizePaidBooking(Payment payment, Booking booking) {
+        promoCodeService.redeemPromoCodeForPaidBooking(booking);
+        referralService.redeemReferralCodeForPaidBooking(booking);
+        confirmBookingAfterPayment(booking);
+        hostLedgerService.recordEarning(booking, payment);
+        if (payment.getGiftCardId() != null) {
+            giftCardService.recordBookingRedemption(
+                    payment.getGiftCardId(),
+                    booking.getId(),
+                    booking.getLoggedInUser() != null ? booking.getLoggedInUser().getId() : null,
+                    payment.getGiftCardAmount());
+        }
+        invoiceService.generateForConfirmedPayment(booking, payment);
+    }
+
+    private void releaseGiftCardIfAny(Payment payment) {
+        if (payment.getGiftCardId() != null
+                && payment.getGiftCardAmount() != null
+                && payment.getGiftCardAmount().signum() > 0) {
+            giftCardService.returnToCard(payment.getGiftCardId(), payment.getGiftCardAmount());
+            payment.setGiftCardId(null);
+            payment.setGiftCardAmount(BigDecimal.ZERO);
+        }
+    }
+
+    @Transactional
+    public void releaseGiftCardOnFailure(UUID paymentId) {
+        paymentRepository.findById(paymentId).ifPresent(payment -> {
+            if (payment.getPaymentStatus() == PaymentStatus.PENDING
+                    || payment.getPaymentStatus() == PaymentStatus.PROCESSING) {
+                releaseGiftCardIfAny(payment);
+                paymentRepository.save(payment);
+            }
+        });
+    }
 
     private PaymentCheckoutResponse toCheckoutResponse(Payment payment) {
         return new PaymentCheckoutResponse(
@@ -371,7 +460,13 @@ public class PaymentService {
         try {
             if ("checkout.session.completed".equals(eventType)) {
                 Session session = extractCheckoutSession(event);
-                markPaymentPaidFromStripeSession(session);
+                String purchasedGiftCardId = session.getMetadata() != null
+                        ? session.getMetadata().get("giftCardId") : null;
+                if (purchasedGiftCardId != null && !purchasedGiftCardId.isBlank()) {
+                    giftCardService.activatePurchasedCard(UUID.fromString(purchasedGiftCardId));
+                } else {
+                    markPaymentPaidFromStripeSession(session);
+                }
             } else if ("checkout.session.expired".equals(eventType) ||
                     "checkout.session.async_payment_failed".equals(eventType)) {
                 Session session = extractCheckoutSession(event);
@@ -527,12 +622,7 @@ public class PaymentService {
             return;
         }
 
-        promoCodeService.redeemPromoCodeForPaidBooking(booking);
-        referralService.redeemReferralCodeForPaidBooking(booking);
-
-        confirmBookingAfterPayment(booking);
-        hostLedgerService.recordEarning(booking, payment);
-        invoiceService.generateForConfirmedPayment(booking, payment);
+        finalizePaidBooking(payment, booking);
     }
 
     @Transactional
@@ -567,16 +657,43 @@ public class PaymentService {
             return;
         }
 
-        hostLedgerService.reverseForPayment(payment.getId(), reason);
-
         RefundCalculationResult refundCalculation =
                 cancellationRefundPolicyService.calculateRefund(booking, cancelledBy);
 
         BigDecimal refundAmount = refundCalculation.refundAmount();
 
+        // Claw back the host's earning only in proportion to the refund the customer
+        // actually receives. A 0% refund (e.g. a late cancellation) leaves the host's
+        // earning fully intact; a 50% refund reverses half, and so on.
+        BigDecimal refundFraction = refundCalculation.refundPercentage()
+                .divide(BigDecimal.valueOf(100), 6, RoundingMode.HALF_UP);
+        hostLedgerService.reverseForPayment(payment.getId(), refundFraction, reason);
+
         payment.setRefundReason(optionalTrim(reason));
 
         if (refundAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            paymentRepository.save(payment);
+            return;
+        }
+
+        // Split the refund: the gift-card share returns to the card (gift cards are redeemable,
+        // never cashed out); only the cash share is refunded via Stripe.
+        BigDecimal giftCardAmount = payment.getGiftCardAmount() != null ? payment.getGiftCardAmount() : BigDecimal.ZERO;
+        BigDecimal giftRefund = giftCardAmount.multiply(refundFraction)
+                .setScale(2, RoundingMode.HALF_UP)
+                .min(giftCardAmount);
+        if (giftRefund.signum() > 0) {
+            giftCardService.returnToCard(payment.getGiftCardId(), giftRefund);
+        }
+        BigDecimal cashRefund = refundAmount.subtract(giftRefund).max(BigDecimal.ZERO)
+                .setScale(2, RoundingMode.HALF_UP);
+
+        if (cashRefund.compareTo(BigDecimal.ZERO) <= 0) {
+            // Fully covered by the gift-card return; no Stripe refund needed.
+            payment.setRefundedAmount(refundAmount);
+            payment.setRefundedAt(Instant.now());
+            payment.setPaymentStatus(refundAmount.compareTo(payment.getAmount()) >= 0
+                    ? PaymentStatus.REFUNDED : PaymentStatus.PARTIALLY_REFUNDED);
             paymentRepository.save(payment);
             return;
         }
@@ -586,10 +703,10 @@ public class PaymentService {
 
         try {
             PaymentRefundResult refundResult =
-                    paymentCheckoutProvider.refundPayment(payment, refundAmount, reason);
+                    paymentCheckoutProvider.refundPayment(payment, cashRefund, reason);
 
             payment.setProviderRefundId(refundResult.providerRefundId());
-            payment.setRefundedAmount(refundResult.refundedAmount());
+            payment.setRefundedAmount(refundResult.refundedAmount().add(giftRefund));
             payment.setPaymentStatus(refundResult.paymentStatus());
 
             if (refundResult.paymentStatus() == PaymentStatus.REFUNDED ||
@@ -630,6 +747,7 @@ public class PaymentService {
             payment.setPaymentStatus(PaymentStatus.FAILED);
             payment.setFailedAt(Instant.now());
             payment.setFailureReason("Stripe checkout session expired or payment failed");
+            releaseGiftCardIfAny(payment);
             paymentRepository.save(payment);
         }
 

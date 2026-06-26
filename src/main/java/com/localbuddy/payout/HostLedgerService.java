@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -69,9 +70,25 @@ public class HostLedgerService {
         }
     }
 
-    /** Reverses a host's earning when a paid booking is refunded (clawback if already paid out). */
+    /** Fully reverses a host's earning (used for full refunds). */
     @Transactional
     public void reverseForPayment(UUID paymentId, String reason) {
+        reverseForPayment(paymentId, BigDecimal.ONE, reason);
+    }
+
+    /**
+     * Reverses a host's earning in proportion to the refund actually given to the
+     * customer (clawback if already paid out). {@code refundFraction} is the share
+     * of the booking refunded: 0 means the customer got nothing back, so the host
+     * keeps their full earning and nothing is reversed; 1 means a full reversal.
+     */
+    @Transactional
+    public void reverseForPayment(UUID paymentId, BigDecimal refundFraction, String reason) {
+        BigDecimal fraction = clampFraction(refundFraction);
+        if (fraction.signum() <= 0) {
+            return; // 0% refund — the host keeps their full earning.
+        }
+
         List<HostLedgerEntry> entries = ledgerRepository.findByPaymentId(paymentId);
 
         HostLedgerEntry earning = entries.stream()
@@ -85,10 +102,23 @@ public class HostLedgerService {
             return;
         }
 
+        BigDecimal clawback = earning.getAmount().multiply(fraction).setScale(2, RoundingMode.HALF_UP);
+        if (clawback.signum() <= 0) {
+            return;
+        }
+        boolean full = clawback.compareTo(earning.getAmount()) >= 0;
+
         if (earning.getStatus() == LedgerEntryStatus.PENDING
                 || earning.getStatus() == LedgerEntryStatus.AVAILABLE) {
-            earning.setStatus(LedgerEntryStatus.REVERSED);
-            earning.setDescription(append(earning.getDescription(), "Reversed: " + safe(reason)));
+            if (full) {
+                earning.setStatus(LedgerEntryStatus.REVERSED);
+                earning.setDescription(append(earning.getDescription(), "Reversed: " + safe(reason)));
+            } else {
+                // Not yet paid out — reduce the earning by the refunded share.
+                earning.setAmount(earning.getAmount().subtract(clawback).setScale(2, RoundingMode.HALF_UP));
+                earning.setDescription(append(earning.getDescription(),
+                        "Partially reversed " + clawback + ": " + safe(reason)));
+            }
             ledgerRepository.save(earning);
             return;
         }
@@ -99,12 +129,20 @@ public class HostLedgerService {
         reversal.setPaymentId(paymentId);
         reversal.setBookingId(earning.getBookingId());
         reversal.setEntryType(LedgerEntryType.REVERSAL);
-        reversal.setAmount(earning.getAmount().negate());
+        reversal.setAmount(clawback.negate());
         reversal.setCurrency(earning.getCurrency());
         reversal.setStatus(LedgerEntryStatus.AVAILABLE);
         reversal.setAvailableAt(Instant.now());
-        reversal.setDescription("Clawback for refunded booking: " + safe(reason));
+        reversal.setDescription((full ? "Clawback" : "Partial clawback " + clawback)
+                + " for refunded booking: " + safe(reason));
         ledgerRepository.save(reversal);
+    }
+
+    private static BigDecimal clampFraction(BigDecimal value) {
+        if (value == null || value.signum() < 0) {
+            return BigDecimal.ZERO;
+        }
+        return value.compareTo(BigDecimal.ONE) > 0 ? BigDecimal.ONE : value;
     }
 
     /** Moves earnings out of the hold window once their available_at has passed. */
