@@ -1,12 +1,10 @@
 name: Deploy to Azure Web App
 
-# Manual trigger by default so it never auto-runs (and fails) on feature pushes
-# before Azure is configured. Once your App Service + secret are set up, you can
-# add a push trigger (e.g. on push to main) below.
+# Deploys on every push to the working branch, and can also be run manually.
 on:
+  push:
+    branches: [ "feature/private-tour-buyout" ]
   workflow_dispatch:
-  # push:
-  #   branches: [ "main" ]
 
 env:
   AZURE_WEBAPP_NAME: localbuddy-backend            # <-- change to your Azure App Service name
