@@ -679,3 +679,107 @@ Wishlist-not-booked and abandoned-booking (EXPIRED, unpaid) reminders fire autom
 - **Two safety-report systems** (`/api/safety/reports` vs `/api/trust-safety/reports`) with slightly different enums; pick per feature.
 - Regenerate your typed client from `/v3/api-docs` after each backend deploy — that's the guarantee that nothing new is missed.
 
+---
+
+## 6. UI handover — landing & experience pages (visual prototype)
+
+> **Status: front-end design prototype, not wired to the API.** Two self-contained pages in `landing/` show the intended look, layout, components and responsive behaviour. All data shown is placeholder/demo. Use these as the implementation reference; bind real data via the API sections above. A zipped copy is at `localbuddy-landing.zip` (repo root).
+
+### 6.0 Files & how to run
+- `landing/index.html` — home / marketplace landing page.
+- `landing/experience.html` — experience-detail page (example: *Hidden Canals by Bike*).
+- Pure HTML + CSS + vanilla JS, **all inlined** (no build step, no framework). Each file is standalone and links to the other relatively — keep them in the same folder.
+- Open directly (double-click) or serve: `python3 -m http.server 8000 -d landing` → http://localhost:8000/index.html.
+- **External runtime deps:** Google Fonts (Inter) + Unsplash photos (each `<img>` has an `onerror` fallback to picsum, so nothing renders broken). Icons are **inline SVG** (see §6.3) — no icon CDN.
+
+### 6.1 Design system
+Five-colour system, flat (no gradients), depth via soft shadows.
+
+| Token | Value | Use |
+|---|---|---|
+| `--paper` | `#FFFFFF` | page background |
+| `--cream` | `#F5F5F7` | alt section fill |
+| `--ink` / `--ink2` / `--ink3` | `#111114` / `#6E6E73` / `#86868B` | text / secondary / tertiary |
+| `--navy` | `#0C1320` | dark sections (host band, footer, "Three steps", trust band, map panel) + "on-yellow" text |
+| `--terra` / `--terra2` | `#D62F2A` / `#C0241F` | **red accent** — buttons, links, prices, active states, hover |
+| `--yellow` | `#FFDE5D` | header background + sparse accents (verified pill, trust medallions, hero kicker text, one highlight) |
+| subheader | `#0B0C10` | black secondary nav bar |
+| `--line` | `#E6E6E9` | hairlines/borders |
+| stars (`--amber`) | `#17171A` | rating stars are near-black, not gold |
+
+- **Type:** Inter only (weights 400–800); `--serif` is aliased to Inter (no serif anywhere). Section headings are **navy** (`.h2`, `.sec-h`, `.pg-h`).
+- **Radius:** `--r:18px` general; **home-page experience cards and city tiles are sharp (radius 0)** by request. Most other elements rounded.
+- **Shadows:** `--shadow-sm/md/lg` for elevation; no gradient fills (hero/city image scrims are flat `rgba` overlays).
+
+### 6.2 Global chrome (both pages)
+- **Header (`#nav`)** — yellow `#FFDE5D`, sticky `top:0`, height 64px. Logo "LocalBuddy" (navy, red dot), nav links + Sign-in (navy) hidden ≤900px behind a hamburger → slide-down `.mmenu`. *Everything on the yellow bar is navy.*
+- **Black subheader (`.subnav`)** — non-sticky bar under the header: a yellow 📍 **Amsterdam** city marker + scrollable quick links (*All experiences · Food · Hidden Gems · Café Hopping · Nightlife · Local Markets · Gift cards · How it works · Help centre · Contact*). Horizontally scrolls on mobile. **Wire the city to GET /api/cities and the categories to GET /api/categories — do not hardcode.**
+- **Footer** — dark navy, brand + link columns + socials.
+- **Icons (`.ic`)** — see §6.3.
+
+### 6.3 Icons
+No icon font/CDN. Each page embeds one hidden `<svg><defs>…<symbol id="…">` **sprite** (~48 Tabler-style stroke icons, 24×24, `currentColor`). Usage: `<svg class="ic"><use href="#clock"></use></svg>`, sized at `1em`, colour via `currentColor`. Filled variants (star, verified rosette, map-pin) bake `fill`. If you port to a component framework, swap for your own icon set — the class hooks (`.ic`) and colours are inherited.
+
+### 6.4 Home page (`index.html`) — sections, top → bottom
+1. **Hero** — full-bleed Amsterdam photo + flat dark scrim; **dark-glass kicker pill with yellow text**; headline *"Meet the locals. See the city <span red>they</span> love."*; lead; **search bar** (rounded-rect) with fields **WHERE** (city) · **WHEN** (dates) · **WHO** (Shared or Private) + red search button; trust row.
+2. **Categories rail** — the 8 real categories (Food, Photo Walk, Hidden Gems, Local Markets, Cafe Hopping, Student Life, Nightlife, Custom). Heading "Find your kind of Amsterdam".
+3. **Trending** — experience cards. **Mobile = swipe carousel** (cards left-aligned under the heading, next card peeks, translucent-glass **directional arrows**: first→right only, middle→both, last→left only, + position dots + one-time "Swipe" hint). Cards are sharp rectangles.
+4. **Meet the locals** — host grid (term is "locals", never "buddies").
+5. **Modes** — *"One experience, two ways to book it"*: **Shared** (per person, 1–10 guests) and **Private buyout** (flat whole-slot). **No "Solo".**
+6. **Three steps to a real local day** — dark-navy section, white cards.
+7. **Trust** — header "Booked with confidence" + "Real locals. Real reviews. Real safety." on white; the **3 trust signals are a full-width edge-to-edge dark band** (yellow labels + yellow medallions w/ navy icons + white descriptions); testimonials below on white.
+8. **Cities** — "Amsterdam now. Europe next." — Amsterdam live + unnamed "Coming soon" tiles (don't name unannounced cities).
+9. **Host band** (dark CTA) → **Footer**.
+
+> The previous **"Free to join" section was deleted** — there is no free/tip product (see §6.6).
+
+### 6.5 Experience page (`experience.html`)
+- **Gallery** — **desktop:** 4-tile collage (tall photo left, two squares, darkened landscape bottom-right = "Show all 18 photos"). **Mobile:** swipe through **all 18** photos with a persistent **"n / 18" counter** + glass directional arrows. Both open a **lightbox** (role=dialog, 18-thumb strip, ‹/›, Esc, arrow keys). Photo count is illustrative — bind to the experience's real photo list.
+- **Title block** — title, Share/Save; meta line `★ ratingAvg · N reviews · ` **yellow "Verified local" pill** ` · area`; quick-fact pills (duration, max guests, an inclusion, host languages, meeting area).
+- **Host stripe / "Meet your host"** — "ID-verified, admin-approved", `ratingAvg (totalReviews)`, spoken languages, city. *No response-rate / "responds within 1h" / per-host experience-count — those aren't real fields.*
+- **About** (description) · **Good to know** (minimumAge, transportMode, maxGuests, safetyNotes) · **What's included** (inclusions ✓ / exclusions ✕).
+- **Reviews** — full-width: aggregate `ratingAvg` + distribution bars + cards (rating + comment + first name + date; **no booking-mode tag** — reviews carry none, and the public payload has **no author name/avatar**, so a real build needs a separate lookup).
+- **Map** — dark-navy panel: white "MEETING POINT", **yellow free-text area** ("Jordaan, Amsterdam West"), white note ("exact point after you book"). Use `meetingArea` + optional lat/lng; there is no structured street address.
+- **More experiences with this host** — rail.
+- **Booking widget** — tabs **Shared** (`€price / person` × guests 1–10) / **Private** (`€privatePrice / slot`, flat, guest counter hidden); date + guest stepper; line items + **Subtotal** with note *"A service fee is added at checkout"* (no hard-coded fee — see §6.6); Reserve; trust (secure prepaid · **full refund 24h before** · reviews-after-trip). **Hide the Private tab when the experience is AGGREGATOR_PLATFORM or while a shared seat exists** (per §3/§4.4).
+- **Mobile sticky reserve bar** — price + Reserve; **auto-hides when the footer scrolls into view** (IntersectionObserver).
+
+### 6.6 Backend accuracy — DO NOT re-invent
+Earlier drafts of these pages invented features; the current pages were corrected against the backend. Keep them honest:
+- **Booking = SHARED / PRIVATE_ALLOWED / PRIVATE_ONLY only — there is no "Solo".** A guest sends a boolean `privateBooking` + guest count (1–10). Shared = per-person; Private buyout = flat whole-slot price (not per-person), blocks full capacity; Private hidden for AGGREGATOR_PLATFORM and once any shared seat is booked.
+- **No free / tip / pay-what-you-want experiences.** Every experience has a price and routes through Stripe.
+- **Cancellation = 100% refund if ≥24h before start, else 0%** (reason required). Never "48h" (that's the unrelated no-show window).
+- **Service fee is real but admin-configurable (default 2.5%) with no public quote endpoint** — do not display a hard-coded "5%"/"€3"; show "added at checkout" or fetch the real breakdown.
+- **Hosts are "locals"/"hosts", never "buddies"** (buddy = brand only). Verification copy = "ID-verified, admin-approved" (KYC + approval), **not** "background checked". No response-rate / response-time fields.
+- **Ratings live on the host** (`ratingAvg` 0–5, `totalReviews`), not on the experience. Reviews are gated to COMPLETED bookings; public payload = `reviewerUserId + createdAt + rating + comment + direction` (no name/avatar, no mode tag).
+- **Categories are DB-seeded + admin-editable** (current: Food, Photo Walk, Hidden Gems, Local Markets, Cafe Hopping, Student Life, Nightlife, Custom) — load from the API.
+- **Real experience fields:** title, description, shortDescription, durationMinutes, maxGuests, inclusions, exclusions, reasonsToBook, free-text meetingArea (+ endLocation), lat/lng, minimumAge, safetyNotes, transportMode. **No itinerary table, no structured address, no per-experience languages** (languages live on the host profile).
+- **Only Amsterdam is live**; render the city list from GET /api/cities.
+
+### 6.7 API wiring map (UI element → section above)
+| UI | Bind to |
+|---|---|
+| Subheader city / hero WHERE | §4.2 Cities (`GET /api/cities`) |
+| Category rail / subheader categories | §4.2 Categories |
+| Hero search, trending & "more" cards | §4.3 Experiences & Photos |
+| Booking widget (Shared/Private, date, guests, remaining seats) | §4.4 Availability & Bookings (`slot.capacity − bookedCount`, `privateBooking`) |
+| Price / fee / Reserve → checkout | §4.5 Payments (Stripe; fee not publicly itemised) |
+| Reviews block + aggregate | §4.7 Reviews (`ratingAvg`/`totalReviews` on host; gated to COMPLETED) |
+| Host stripe / "Meet your host" | §4.2 Host Profiles (trim sensitive bank/legal fields) |
+| Heart / Save | §4.8 Wishlist |
+| Gift cards / promo / referral inputs | §4.8 |
+| Meeting point reveal post-booking | §4.4 booking + §4.6 messaging |
+| Map pin | experience lat/lng (§4.3) |
+
+### 6.8 Placeholders to replace
+- All `images.unsplash.com` / `picsum.photos` URLs → real `experience.photos`, `host.photo`, city imagery.
+- Demo numbers (ratings, review counts, "312", "€45/€240") → API values (`ratingAvg`, `totalReviews`, `priceAmount`, `privatePrice`).
+- Hardcoded category/city names in the rails & subheader → `GET /api/categories`, `GET /api/cities`.
+- Gallery's fixed 18 photos → the experience's actual photo set (variable length).
+
+### 6.9 Accessibility & performance notes
+- Inline SVG sprite (no icon-font FOIT). `prefers-reduced-motion` disables transitions/reveals.
+- Hero/first images use `fetchpriority="high"`/eager; the rest are `loading="lazy"`.
+- `:focus-visible` outlines; icon-only buttons have `aria-label`; lightbox is `role="dialog"` with keyboard nav; carousels are `scroll-snap` (work without JS, JS adds dots/arrows/counter).
+- `body{overflow-x:clip}` prevents horizontal scrollbars from full-bleed sections — keep it if you port the CSS.
+
