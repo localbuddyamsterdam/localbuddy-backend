@@ -4,701 +4,820 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Hidden Canals by Bike — LocalBuddy Amsterdam</title>
-<meta name="description" content="Discover Amsterdam's hidden canals by bike with Lars, a verified local buddy. 3 hours, up to 8 guests, bike included. Book solo, group, or private.">
+<meta name="description" content="Discover Amsterdam's hidden canals by bike with Lars, a verified local host. 3 hours, up to 8 guests, bike included. Book a shared seat or the whole slot privately.">
+<meta name="theme-color" content="#FFFFFF">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-:root{--white:#fff;--f1:#F5F5F7;--f2:#FAFAFA;--line:#D2D2D7;--ink:#1D1D1F;--ink2:#6E6E73;--ink3:#86868B;--black:#0A0A0A;--ob2:#A1A1A6;--terra:#C4602A;--teal:#1F7A8C;--amber:#C09120;--green:#1A8F4C;--bluec:#0A84FF}
+/* ════════ TOKENS (shared with index) ════════ */
+:root{
+  --paper:#FFFFFF; --cream:#F5F5F7; --card:#FFFFFF;
+  --ink:#111114; --ink2:#6E6E73; --ink3:#86868B;
+  --line:#E6E6E9; --line2:#D6D6DB;
+  --terra:#D62F2A; --terra2:#C0241F; --terra-tint:#FDECEC;
+  --teal:#3F4045; --teal-tint:#F0F0F2;
+  --amber:#17171A; --green:#1A8F4C; --green-tint:#E7F2EC;
+  --navy:#0C1320; --navy2:#0F1A2E; --yellow:#FFDE5D;
+  --ring:#0A84FF;
+  --shadow-sm:0 1px 2px rgba(17,17,20,.06),0 4px 14px rgba(17,17,20,.06);
+  --shadow-md:0 10px 34px rgba(17,17,20,.10);
+  --shadow-lg:0 20px 56px rgba(17,17,20,.17);
+  --serif:'Inter',-apple-system,BlinkMacSystemFont,sans-serif; --sans:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+  --r:18px; --r-sm:12px; --maxw:1200px;
+}
 *{box-sizing:border-box;margin:0;padding:0}
 html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
-body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Helvetica Neue',sans-serif;color:var(--ink);background:var(--white);line-height:1.5;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+body{font-family:var(--sans);color:var(--ink);background:var(--paper);line-height:1.5;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;overflow-x:clip}
 a{color:inherit;text-decoration:none}
 button{font-family:inherit}
+img{display:block}
+i.ti{font-style:normal;line-height:1}
+::selection{background:var(--terra);color:#fff}
+.pg{max-width:var(--maxw);margin:0 auto;padding:0 clamp(20px,5vw,44px)}
 
-/* ── NAV ─────────────────────────────────────────────── */
-nav{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.88);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-bottom:1px solid var(--line)}
-.navrow{display:flex;align-items:center;gap:16px;height:56px;max-width:1240px;margin:0 auto;padding:0 clamp(18px,5vw,48px)}
-.wm{font-size:18px;font-weight:600;letter-spacing:-.01em}.wm b{color:var(--ink3);font-weight:600}
-.nlinks{display:flex;gap:20px;font-size:13.5px;color:var(--ink2);margin-left:32px}
+/* ════════ NAV ════════ */
+#nav{position:sticky;top:0;z-index:60;background:rgba(255,255,255,.86);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-bottom:1px solid var(--line)}
+.navrow{display:flex;align-items:center;gap:18px;height:64px;max-width:var(--maxw);margin:0 auto;padding:0 clamp(20px,5vw,44px)}
+.wm{font-family:var(--serif);font-size:22px;font-weight:600;letter-spacing:-.01em;display:inline-flex;align-items:center;gap:7px}
+.wm .dot{width:9px;height:9px;border-radius:50%;background:var(--terra);display:inline-block}
+.nlinks{display:flex;gap:26px;font-size:14px;font-weight:500;color:var(--ink2);margin-left:14px}
 .nlinks a:hover{color:var(--ink)}
-.nright{margin-left:auto;display:flex;align-items:center;gap:14px}
-.becomehost{font-size:13.5px;color:var(--ink2)}.becomehost:hover{color:var(--ink)}
-.signin{background:var(--terra);color:#fff;border-radius:20px;padding:8px 17px;font-size:13.5px;font-weight:500;cursor:pointer}
-.burger{display:none;font-size:22px;background:none;border:0;color:var(--ink);cursor:pointer;margin-left:auto;line-height:1}
+.nright{margin-left:auto;display:flex;align-items:center;gap:8px}
+.becomehost{font-size:14px;font-weight:500;color:var(--ink2);padding:9px 14px;border-radius:30px}
+.becomehost:hover{background:var(--card);color:var(--ink)}
+.signin{background:var(--ink);color:#fff;border-radius:30px;padding:10px 20px;font-size:14px;font-weight:600;transition:.15s}
+.signin:hover{background:var(--terra)}
+.burger{display:none;width:42px;height:42px;border-radius:30px;border:1px solid var(--line2);background:#fff;font-size:20px;color:var(--ink);cursor:pointer;margin-left:auto;align-items:center;justify-content:center}
+.mmenu{display:none;position:fixed;inset:64px 0 0;z-index:55;background:var(--paper);padding:18px clamp(20px,5vw,44px);flex-direction:column;gap:4px}
+.mmenu.open{display:flex}
+.mmenu a{font-size:18px;font-weight:500;padding:15px 0;border-bottom:1px solid var(--line)}
 
-/* ── PAGE WRAPPER ─────────────────────────────────────── */
-.pg{max-width:1240px;margin:0 auto;padding:0 clamp(18px,5vw,48px)}
+/* ════════ BREADCRUMB ════════ */
+.bc{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--ink3);padding:20px 0 14px;flex-wrap:wrap}
+.bc a:hover{color:var(--ink);text-decoration:underline}
+.bc .sep{color:var(--line2)}
 
-/* ── BREADCRUMB ─────────────────────────────────────── */
-.bc{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--ink3);padding:18px 0 14px;flex-wrap:wrap}
-.bc a{color:var(--ink3)}.bc a:hover{color:var(--ink);text-decoration:underline}
-.bc .sep{color:var(--line)}
+/* ════════ GALLERY ════════ */
+.gallery{display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:repeat(2,1fr);gap:2px;height:clamp(360px,42vw,468px);border-radius:14px;overflow:hidden;position:relative;background:#fff}
+.gcell{overflow:hidden;cursor:pointer;position:relative;background:var(--cream)}
+.gcell.g-a{grid-column:1/3;grid-row:1/3}
+.gcell.g-b{grid-column:3/4;grid-row:1/2}
+.gcell.g-c{grid-column:4/5;grid-row:1/2}
+.gcell.g-d{grid-column:3/5;grid-row:2/3}
+.gcell:nth-child(n+5){display:none}
+.gallery-wrap{position:relative}
+.g-arrow{display:none}
+.gcell img{width:100%;height:100%;object-fit:cover;transition:transform .5s ease}
+.gcell:hover img{transform:scale(1.05)}
+.gcell .cover{position:absolute;inset:0;background:rgba(11,16,26,.5);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;font-weight:600}
+.gcell.g-d:hover .cover{background:rgba(11,16,26,.58)}
+.gcell .cover .big{font-size:26px}
+.gcell .cover .sm{font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:7px;opacity:.95}
+.show-all{position:absolute;bottom:16px;right:16px;background:#fff;color:var(--ink);border:1px solid var(--line2);border-radius:30px;padding:11px 18px;font-size:13.5px;font-weight:600;cursor:pointer;display:none;align-items:center;gap:8px;box-shadow:var(--shadow-md);z-index:3;transition:.15s}
+.show-all:hover{transform:translateY(-2px)}
+.gcount{display:none}
 
-/* ── GALLERY ────────────────────────────────────────── */
-.gal{display:grid;grid-template-columns:3fr 2fr;grid-template-rows:270px 270px;gap:3px;border-radius:16px;overflow:hidden;position:relative}
-.g-main{grid-row:1/3;overflow:hidden}
-.g-sub{display:grid;grid-template-rows:1fr 1fr;grid-template-columns:1fr 1fr;gap:3px}
-.gi{overflow:hidden}
-.gal img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .45s ease}
-.gal .g-main:hover img,.gal .gi:hover img{transform:scale(1.04)}
-.show-photos-btn{position:absolute;bottom:14px;right:14px;background:#fff;color:var(--ink);border:1px solid rgba(0,0,0,.14);border-radius:8px;padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:7px;box-shadow:0 2px 8px rgba(0,0,0,.10);z-index:2;transition:.15s}
-.show-photos-btn:hover{background:var(--f1)}
+/* ════════ MAIN GRID ════════ */
+.exp-grid{max-width:var(--maxw);margin:34px auto 0;padding:0 clamp(20px,5vw,44px);display:grid;grid-template-columns:1fr 372px;gap:clamp(36px,5vw,64px);align-items:start}
 
-/* ── MAIN LAYOUT ────────────────────────────────────── */
-.exp-wrap{max-width:1240px;margin:32px auto 0;padding:0 clamp(18px,5vw,48px);display:grid;grid-template-columns:1fr 360px;gap:60px;align-items:start}
-
-/* ── LEFT: TITLE AREA ───────────────────────────────── */
-.exp-title{font-size:clamp(24px,3.8vw,34px);font-weight:800;letter-spacing:-.028em;line-height:1.1;margin-bottom:10px}
-.title-row{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
-.top-actions{display:flex;gap:8px;margin-top:4px;flex-shrink:0}
-.act-btn{border:1px solid var(--line);border-radius:8px;padding:8px 14px;font-size:13px;font-weight:500;background:#fff;cursor:pointer;display:inline-flex;align-items:center;gap:6px;color:var(--ink2);transition:.15s}
-.act-btn:hover{background:var(--f1);border-color:var(--ink3)}
+/* title */
+.title-row{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;flex-wrap:wrap}
+.exp-title{font-family:var(--serif);font-optical-sizing:auto;font-size:clamp(28px,4.2vw,42px);font-weight:600;letter-spacing:-.015em;line-height:1.06}
+.top-actions{display:flex;gap:8px;flex-shrink:0}
+.act-btn{border:1px solid var(--line2);border-radius:30px;padding:9px 16px;font-size:13.5px;font-weight:600;background:#fff;cursor:pointer;display:inline-flex;align-items:center;gap:7px;color:var(--ink2);transition:.15s}
+.act-btn:hover{background:var(--cream);color:var(--ink)}
 .act-btn.saved{color:var(--terra);border-color:var(--terra)}
-.meta-line{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:14px;color:var(--ink2);margin-top:8px}
-.meta-star{display:inline-flex;align-items:center;gap:4px;color:var(--amber);font-weight:700}
-.meta-dot{color:var(--line)}
-.meta-link{font-weight:500;color:var(--ink);text-decoration:underline;cursor:pointer}
 
-/* Quick pills */
-.qpills{display:flex;flex-wrap:wrap;gap:9px;margin:20px 0 0}
-.qp{display:inline-flex;align-items:center;gap:7px;background:var(--f1);border-radius:20px;padding:8px 15px;font-size:13px;color:var(--ink2)}
-.qpi{color:var(--teal);font-size:16px;line-height:1}
+.meta-line{display:flex;align-items:center;gap:11px;flex-wrap:wrap;font-size:14px;color:var(--ink2);margin-top:14px}
+.meta-star{display:inline-flex;align-items:center;gap:5px;color:var(--ink);font-weight:700}.meta-star i{color:var(--amber)}
+.meta-dot{color:var(--line2)}
+.meta-link{font-weight:600;color:var(--ink);text-decoration:underline;cursor:pointer}
+.chip-loc{display:inline-flex;align-items:center;gap:5px}.chip-loc i{color:var(--teal)}
 
-/* Host intro stripe */
-.host-stripe{display:flex;align-items:center;gap:14px;padding:22px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);margin:24px 0 0}
-.hs-av{width:52px;height:52px;border-radius:50%;overflow:hidden;flex-shrink:0;border:2px solid var(--line);background:var(--f1)}
+/* quick pills */
+.qpills{display:flex;flex-wrap:wrap;gap:10px;margin:22px 0 0}
+.qp{display:inline-flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--line);border-radius:30px;padding:9px 15px;font-size:13.5px;font-weight:500;color:var(--ink2)}
+.qp i{color:var(--teal);font-size:17px}
+
+/* host stripe */
+.host-stripe{display:flex;align-items:center;gap:15px;padding:24px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);margin:26px 0 0}
+.hs-av{width:54px;height:54px;border-radius:50%;overflow:hidden;flex-shrink:0;border:2px solid #fff;box-shadow:0 0 0 1px var(--line);background:var(--cream)}
 .hs-av img{width:100%;height:100%;object-fit:cover}
 .hs-name{font-size:16px;font-weight:700;display:flex;align-items:center;gap:8px}
-.hs-vbadge{display:inline-flex;align-items:center;gap:4px;color:var(--teal);font-size:13px;font-weight:500}
+.hs-vbadge{display:inline-flex;align-items:center;gap:4px;color:var(--teal);font-size:13px;font-weight:600}
 .hs-meta{font-size:13px;color:var(--ink3);margin-top:3px}
 
-/* Section blocks */
-.sec-b{padding:28px 0;border-bottom:1px solid var(--line)}
-.sec-b:last-child{border-bottom:0}
-.sec-h{font-size:20px;font-weight:700;letter-spacing:-.015em;margin-bottom:16px}
-.body-p{font-size:15px;color:var(--ink2);line-height:1.7}
-.body-p+.body-p{margin-top:13px}
+/* section blocks */
+.sec-b{padding:30px 0;border-bottom:1px solid var(--line)}
+.sec-h{font-family:var(--serif);font-size:23px;font-weight:600;letter-spacing:-.01em;margin-bottom:18px}
+.body-p{font-size:15.5px;color:var(--ink2);line-height:1.72}
+.body-p+.body-p{margin-top:14px}
 
-/* Itinerary */
+/* itinerary */
 .itin{list-style:none}
-.itin li{display:flex;gap:20px;padding:15px 0;border-bottom:1px solid var(--f1)}
-.itin li:last-child{border-bottom:0}
-.i-num{font-size:11px;font-weight:800;color:var(--terra);letter-spacing:.04em;min-width:22px;padding-top:3px}
-.i-title{font-size:15px;font-weight:600;margin-bottom:3px}
-.i-desc{font-size:13.5px;color:var(--ink3);line-height:1.5}
+.itin li{display:flex;gap:18px;padding:16px 0;position:relative}
+.itin li:not(:last-child)::before{content:"";position:absolute;left:13px;top:38px;bottom:-6px;width:2px;background:var(--line)}
+.i-num{flex:0 0 auto;width:28px;height:28px;border-radius:50%;background:var(--terra-tint);color:var(--terra);font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;z-index:1}
+.i-title{font-size:15.5px;font-weight:600;margin-bottom:4px}
+.i-desc{font-size:14px;color:var(--ink3);line-height:1.55}
 
-/* Includes */
-.inc-grid{display:grid;grid-template-columns:1fr 1fr;gap:2px}
-.inc-row{display:flex;align-items:flex-start;gap:10px;padding:9px 0;font-size:14px}
+/* includes */
+.inc-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 24px}
+.inc-row{display:flex;align-items:flex-start;gap:11px;padding:10px 0;font-size:14.5px}
 .inc-row.yes .inc-icon{color:var(--teal)}
-.inc-row.no{color:var(--ink3)}
-.inc-row.no .inc-icon{color:var(--ob2)}
-.inc-icon{font-size:17px;flex-shrink:0;margin-top:1px}
+.inc-row.no{color:var(--ink3)}.inc-row.no .inc-icon{color:var(--ink3)}
+.inc-icon{font-size:18px;flex-shrink:0;margin-top:1px}
 
-/* Host card */
-.host-card{display:flex;gap:20px;align-items:flex-start}
-.hc-av{width:80px;height:80px;border-radius:50%;overflow:hidden;flex-shrink:0;border:2px solid var(--line);background:var(--f1)}
+/* meet buddy card */
+.host-card{display:flex;gap:22px;align-items:flex-start}
+.hc-av{width:88px;height:88px;border-radius:50%;overflow:hidden;flex-shrink:0;border:3px solid #fff;box-shadow:0 0 0 1px var(--line);background:var(--cream)}
 .hc-av img{width:100%;height:100%;object-fit:cover}
-.hc-name{font-size:18px;font-weight:700;display:flex;align-items:center;gap:8px;margin-bottom:8px}
-.hc-stats{display:flex;gap:18px;font-size:13px;color:var(--ink3);margin-bottom:12px;flex-wrap:wrap}
-.hc-stat{display:flex;align-items:center;gap:5px}
-.hc-bio{font-size:14.5px;color:var(--ink2);line-height:1.65;margin-bottom:14px}
-.hc-resp{display:flex;gap:20px;font-size:13px;color:var(--ink3);flex-wrap:wrap}
-.hc-resp span{display:flex;align-items:center;gap:6px}
-.see-link{display:inline-flex;align-items:center;gap:5px;color:var(--terra);font-size:14px;font-weight:600;margin-top:14px}
-.see-link:hover{text-decoration:underline}
+.hc-name{font-size:19px;font-weight:700;display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.hc-stats{display:flex;gap:22px;font-size:13.5px;color:var(--ink2);margin-bottom:14px;flex-wrap:wrap}
+.hc-stat{display:flex;align-items:center;gap:6px}.hc-stat b{font-weight:700}
+.hc-bio{font-family:var(--serif);font-size:16px;font-style:italic;color:var(--ink);line-height:1.6;margin-bottom:16px}
+.hc-resp{display:flex;gap:22px;font-size:13.5px;color:var(--ink3);flex-wrap:wrap}
+.hc-resp span{display:flex;align-items:center;gap:7px}
+.see-link{display:inline-flex;align-items:center;gap:6px;color:var(--terra);font-size:14px;font-weight:600;margin-top:16px}
+.see-link:hover{gap:9px}
 
-/* Reviews aggregate */
-.rev-agg{display:flex;gap:24px;align-items:center;margin-bottom:24px;flex-wrap:wrap}
-.rev-score{font-size:56px;font-weight:800;letter-spacing:-.03em;line-height:1;color:var(--ink)}
-.rev-score-right{display:flex;flex-direction:column;gap:5px}
-.rev-stars-big{color:var(--amber);font-size:17px;letter-spacing:1px}
-.rev-count{font-size:13px;color:var(--ink3)}
-.rev-bars{flex:1;min-width:160px}
-.rbar{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink3);margin-bottom:5px}
-.rbar .lbl{min-width:28px}
-.rbar .track{flex:1;height:4px;background:var(--line);border-radius:2px;overflow:hidden}
-.rbar .fill{height:100%;background:var(--amber);border-radius:2px;transition:width .6s ease}
-.rbar .pct{min-width:26px;text-align:right}
-/* Review cards */
-.revs-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-.rev-card{background:var(--f1);border-radius:13px;padding:18px}
-.rev-top{display:flex;align-items:center;gap:11px;margin-bottom:10px}
-.rev-av{width:38px;height:38px;border-radius:50%;overflow:hidden;flex-shrink:0;background:var(--line)}
-.rev-av img{width:100%;height:100%;object-fit:cover}
-.rev-who{font-size:13.5px;font-weight:600}
-.rev-when{font-size:12px;color:var(--ink3)}
-.rev-stars{color:var(--amber);font-size:13px;letter-spacing:1px;margin-bottom:8px}
-.rev-text{font-size:13.5px;color:var(--ink2);line-height:1.58}
-.btn-outline{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--ink);border-radius:9px;padding:11px 20px;font-size:14px;font-weight:600;cursor:pointer;margin-top:20px;background:#fff;transition:.15s}
-.btn-outline:hover{background:var(--f1)}
-
-/* Map */
-.map-ph{position:relative;height:260px;border-radius:13px;background:var(--f1);border:1px solid var(--line);overflow:hidden;margin-bottom:16px;cursor:pointer;transition:.15s}
-.map-ph:hover{border-color:var(--ink3)}
-.map-ph img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
-.map-pin-badge{position:absolute;left:50%;top:50%;transform:translate(-50%,-100%);font-size:34px;line-height:1;z-index:2;filter:drop-shadow(0 3px 6px rgba(0,0,0,.35));pointer-events:none}
-.map-addr{font-size:15px;font-weight:600;margin-bottom:3px}
-.map-note{font-size:13px;color:var(--ink3)}
-
-/* ── RIGHT: BOOKING WIDGET ─────────────────────────── */
-.widget{position:sticky;top:72px;background:#fff;border:1px solid var(--line);border-radius:16px;padding:26px;box-shadow:0 6px 44px rgba(0,0,0,.09)}
-.w-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:20px}
-.w-price{font-size:26px;font-weight:800;letter-spacing:-.02em}
-.w-price small{font-size:14px;font-weight:400;color:var(--ink3);letter-spacing:0}
-.w-rating{font-size:13px;color:var(--ink3);display:flex;align-items:center;gap:4px}
-.w-rating .s{color:var(--amber);font-size:13px}
-/* Mode tabs */
-.mode-tabs{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:18px}
-.mtab{padding:10px 4px;font-size:12.5px;font-weight:600;text-align:center;cursor:pointer;color:var(--ink2);border-right:1px solid var(--line);background:#fff;transition:background .15s,color .15s;line-height:1.3;user-select:none}
-.mtab:last-child{border-right:0}
-.mtab.on{background:var(--ink);color:#fff}
-.mtab .msub{font-size:10.5px;font-weight:400;display:block;margin-top:2px;opacity:.75}
-/* Fields */
-.w-fields{border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:16px}
-.w-field{padding:12px 15px;border-bottom:1px solid var(--line)}
-.w-field:last-child{border-bottom:0}
-.wfl{font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink3);margin-bottom:4px}
-.wfv{font-size:14px;color:var(--ink)}
-.w-field input[type="date"]{border:0;outline:0;font-family:inherit;font-size:14px;color:var(--ink);background:transparent;width:100%;cursor:pointer}
+/* ════════ BOOKING WIDGET ════════ */
+.aside-wrap{position:sticky;top:84px}
+.widget{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:24px;box-shadow:var(--shadow-md)}
+.w-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:20px}
+.w-price{font-family:var(--serif);font-size:28px;font-weight:600;letter-spacing:-.01em}
+.w-price small{font-size:14px;font-weight:400;color:var(--ink3);letter-spacing:0;font-family:var(--sans)}
+.w-rating{font-size:13px;color:var(--ink2);display:flex;align-items:center;gap:5px;white-space:nowrap}
+.w-rating .s{color:var(--amber)}
+.w-rating u{cursor:pointer}
+.mode-tabs{display:grid;grid-template-columns:repeat(2,1fr);background:var(--cream);border-radius:12px;padding:4px;gap:4px;margin-bottom:16px}
+.mtab{padding:10px 4px;font-size:12.5px;font-weight:600;text-align:center;cursor:pointer;color:var(--ink2);border-radius:9px;transition:.15s;line-height:1.3;user-select:none}
+.mtab.on{background:#fff;color:var(--ink);box-shadow:var(--shadow-sm)}
+.mtab .msub{font-size:10.5px;font-weight:500;display:block;margin-top:2px;color:var(--ink3)}
+.mtab.on .msub{color:var(--terra)}
+.w-fields{border:1px solid var(--line2);border-radius:12px;overflow:hidden;margin-bottom:16px}
+.w-field{padding:13px 16px}
+.w-field+.w-field{border-top:1px solid var(--line2)}
+.wfl{font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink3);margin-bottom:5px}
+.wfv{font-size:14.5px;color:var(--ink);font-weight:500}
+.w-field input[type="date"]{border:0;outline:0;font-family:inherit;font-size:14.5px;font-weight:500;color:var(--ink);background:transparent;width:100%;cursor:pointer}
 .guests-row{display:flex;align-items:center;justify-content:space-between}
-.gctr{display:flex;align-items:center;gap:13px}
-.gbtn{width:30px;height:30px;border-radius:50%;border:1px solid var(--line);background:#fff;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--ink);transition:.15s;line-height:1;padding-bottom:1px}
-.gbtn:hover:not(:disabled){border-color:var(--ink)}
-.gbtn:disabled{color:var(--line);cursor:default}
-.gcnt{font-size:15px;font-weight:700;min-width:18px;text-align:center}
-/* Breakdown */
-.w-breakdown{font-size:14px;display:flex;flex-direction:column;gap:9px;margin:16px 0}
+.gctr{display:flex;align-items:center;gap:14px}
+.gbtn{width:32px;height:32px;border-radius:50%;border:1px solid var(--line2);background:#fff;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--ink);transition:.15s;line-height:1}
+.gbtn:hover:not(:disabled){border-color:var(--ink);background:var(--cream)}
+.gbtn:disabled{color:var(--line2);cursor:default}
+.gcnt{font-size:16px;font-weight:700;min-width:18px;text-align:center}
+.w-breakdown{font-size:14.5px;display:flex;flex-direction:column;gap:11px;margin:18px 0}
 .wbr{display:flex;justify-content:space-between;color:var(--ink2)}
-.wbr.total{font-weight:700;color:var(--ink);padding-top:12px;border-top:1px solid var(--line);font-size:15px}
-.wbr .note{font-size:12px;color:var(--ink3);font-weight:400}
-/* Reserve button */
-.reserve-btn{width:100%;background:var(--terra);color:#fff;border:0;border-radius:11px;padding:16px;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:14px;transition:.15s;letter-spacing:-.01em}
-.reserve-btn:hover{background:#A3501F}
+.wbr.total{font-weight:700;color:var(--ink);padding-top:14px;border-top:1px solid var(--line);font-size:16px}
+.reserve-btn{width:100%;background:var(--terra);color:#fff;border:0;border-radius:12px;padding:16px;font-size:15.5px;font-weight:700;cursor:pointer;margin-bottom:14px;transition:.15s;letter-spacing:-.01em}
+.reserve-btn:hover{background:var(--terra2)}
 .reserve-btn:active{transform:scale(.99)}
-/* Trust */
-.w-trust{display:flex;flex-direction:column;gap:8px;font-size:12.5px;color:var(--ink3)}
-.wt{display:flex;align-items:center;gap:7px}
-.wt-icon{font-size:15px;color:var(--teal)}
+.w-cancel{text-align:center;font-size:12.5px;color:var(--ink3);margin-bottom:16px}
+.w-trust{display:flex;flex-direction:column;gap:10px;font-size:12.5px;color:var(--ink2);border-top:1px solid var(--line);padding-top:16px}
+.wt{display:flex;align-items:center;gap:9px}
+.wt i{font-size:16px;color:var(--teal)}
 
-/* ── MORE FROM HOST ──────────────────────────────────── */
-.more-sec{border-top:1px solid var(--line);padding:48px 0 64px}
-.more-head{font-size:22px;font-weight:700;letter-spacing:-.015em;margin-bottom:22px}
-.more-rail{display:flex;gap:16px;overflow-x:auto;padding:2px 0 12px;scrollbar-width:none}
+/* ════════ FULL-WIDTH SECTIONS ════════ */
+.fullsec{border-top:1px solid var(--line);padding:clamp(40px,6vw,68px) 0}
+.fullsec .pg-h{font-family:var(--serif);font-size:clamp(24px,3.4vw,32px);font-weight:600;letter-spacing:-.01em;margin-bottom:6px}
+.fullsec .pg-sub{font-size:15px;color:var(--ink2);margin-bottom:28px}
+
+/* reviews aggregate */
+.rev-agg{display:grid;grid-template-columns:auto auto 1fr;gap:clamp(24px,4vw,52px);align-items:center;margin-bottom:34px;padding-bottom:30px;border-bottom:1px solid var(--line)}
+.rev-score-box{text-align:center}
+.rev-score{font-family:var(--serif);font-size:62px;font-weight:600;letter-spacing:-.03em;line-height:1;color:var(--ink)}
+.rev-stars-big{color:var(--amber);font-size:16px;letter-spacing:2px;margin-top:8px}
+.rev-count{font-size:13px;color:var(--ink3);margin-top:6px}
+.rev-summary{font-size:14px;color:var(--ink2);line-height:1.6;max-width:240px}
+.rev-summary b{color:var(--ink)}
+.rev-bars{max-width:340px}
+.rbar{display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--ink3);margin-bottom:7px}
+.rbar .lbl{min-width:30px;display:inline-flex;align-items:center;gap:3px}
+.rbar .track{flex:1;height:6px;background:var(--line);border-radius:3px;overflow:hidden}
+.rbar .fill{height:100%;background:var(--amber);border-radius:3px;transition:width .8s ease}
+.rbar .pct{min-width:30px;text-align:right}
+.revs-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.rev-card{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:22px}
+.rev-top{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.rev-av{width:42px;height:42px;border-radius:50%;overflow:hidden;flex-shrink:0;background:var(--cream)}
+.rev-av img{width:100%;height:100%;object-fit:cover}
+.rev-who{font-size:14px;font-weight:700}
+.rev-when{font-size:12px;color:var(--ink3);margin-top:1px}
+.rev-stars{color:var(--amber);font-size:13px;letter-spacing:1px;margin-bottom:9px}
+.rev-text{font-size:14px;color:var(--ink2);line-height:1.6}
+.btn-outline{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--ink);border-radius:30px;padding:13px 24px;font-size:14.5px;font-weight:600;cursor:pointer;margin-top:26px;background:#fff;transition:.15s}
+.btn-outline:hover{background:var(--ink);color:#fff}
+
+/* map */
+.map-wrap{display:grid;grid-template-columns:1.7fr 1fr;gap:24px;align-items:stretch}
+.map-ph{position:relative;min-height:300px;border-radius:var(--r);background:var(--cream);border:1px solid var(--line);overflow:hidden;cursor:pointer;transition:.15s}
+.map-ph:hover{box-shadow:var(--shadow-md)}
+.map-ph img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.map-pin{position:absolute;left:50%;top:50%;transform:translate(-50%,-100%);font-size:38px;z-index:2;filter:drop-shadow(0 3px 6px rgba(0,0,0,.35));pointer-events:none;color:var(--terra)}
+.map-side{display:flex;flex-direction:column;justify-content:center;background:var(--navy);border:0;border-radius:var(--r);padding:28px}
+.map-side .ms-label{font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#fff;margin-bottom:10px}
+.map-addr{font-size:17px;font-weight:600;margin-bottom:8px;line-height:1.4;color:var(--yellow)}
+.map-note{font-size:13.5px;color:rgba(255,255,255,.85);line-height:1.55}
+
+/* more from host (carousel) */
+.rail-shell{position:relative}
+.more-rail{display:flex;gap:20px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;padding:4px 2px 10px}
 .more-rail::-webkit-scrollbar{display:none}
-.mc{flex:0 0 264px;background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden;transition:.2s;cursor:pointer}
-.mc:hover{transform:translateY(-3px);box-shadow:0 5px 24px rgba(0,0,0,.08)}
-.mc-ph{height:164px;overflow:hidden;background:var(--f1)}
-.mc-ph img{width:100%;height:100%;object-fit:cover;transition:transform .4s ease;display:block}
-.mc:hover .mc-ph img{transform:scale(1.04)}
-.mc-body{padding:13px 15px 15px}
-.mc-title{font-size:15px;font-weight:600;line-height:1.25;margin-bottom:6px}
-.mc-meta{font-size:12.5px;color:var(--ink3);display:flex;align-items:center;gap:7px}
+.mc{flex:0 0 270px;scroll-snap-align:start;background:#fff;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;transition:.22s;cursor:pointer;display:block}
+.mc:hover{transform:translateY(-5px);box-shadow:var(--shadow-md)}
+.mc-ph{height:172px;overflow:hidden;background:var(--cream)}
+.mc-ph img{width:100%;height:100%;object-fit:cover;transition:transform .5s ease}
+.mc:hover .mc-ph img{transform:scale(1.05)}
+.mc-body{padding:15px 16px 17px}
+.mc-title{font-size:15.5px;font-weight:600;line-height:1.3;margin-bottom:8px}
+.mc-meta{font-size:12.5px;color:var(--ink2);display:flex;align-items:center;gap:7px}
 .mc-star{color:var(--amber)}
-.mc-price{font-size:15px;font-weight:700;margin-top:9px}
-.mc-price small{font-size:12px;font-weight:400;color:var(--ink3)}
+.mc-price{font-size:16px;font-weight:700;margin-top:10px}.mc-price small{font-size:12px;font-weight:400;color:var(--ink3)}
+.rail-arrow{position:absolute;top:64px;width:42px;height:42px;border-radius:50%;border:1px solid var(--line2);background:rgba(255,255,255,.96);box-shadow:var(--shadow-md);color:var(--ink);font-size:20px;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:5;transition:.15s;opacity:0}
+.rail-shell:hover .rail-arrow{opacity:1}
+.rail-arrow:hover{transform:scale(1.08)}
+.rail-arrow.prev{left:-14px}.rail-arrow.next{right:-14px}
+.rail-arrow[disabled]{opacity:0!important;pointer-events:none}
+.rail-dots{display:none}
 
-/* ── FOOTER ──────────────────────────────────────────── */
-footer{border-top:1px solid var(--line);padding:40px 0 28px}
-.fbot{display:flex;justify-content:space-between;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--ink3)}
-.flinks{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
-.flinks a:hover{color:var(--ink)}
+/* ════════ FOOTER ════════ */
+footer{background:var(--navy);color:#fff;padding:48px 0 30px;margin-top:20px}
+.fbot{display:flex;justify-content:space-between;flex-wrap:wrap;gap:14px;font-size:13px;color:rgba(255,255,255,.55);max-width:var(--maxw);margin:0 auto;padding:0 clamp(20px,5vw,44px)}
+.flinks{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+.flinks a:hover{color:#fff}
 
-/* ── MOBILE STICKY BAR ───────────────────────────────── */
-.mob-bar{display:none;position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);padding:12px clamp(18px,5vw,32px) max(12px,env(safe-area-inset-bottom));z-index:40;box-shadow:0 -4px 24px rgba(0,0,0,.09)}
-.mob-bar-inner{display:flex;align-items:center;justify-content:space-between;max-width:600px;margin:0 auto}
-.mob-bar-price{font-size:18px;font-weight:800;letter-spacing:-.02em}
-.mob-bar-price small{font-size:13px;font-weight:400;color:var(--ink3)}
-.mob-bar-btn{background:var(--terra);color:#fff;border:0;border-radius:10px;padding:13px 28px;font-size:15px;font-weight:700;cursor:pointer;transition:.15s}
-.mob-bar-btn:hover{background:#A3501F}
+/* ════════ MOBILE STICKY BAR ════════ */
+.mob-bar{display:none;position:fixed;bottom:0;left:0;right:0;background:rgba(255,255,255,.94);backdrop-filter:blur(14px);border-top:1px solid var(--line);padding:12px clamp(18px,5vw,32px) max(12px,env(safe-area-inset-bottom));z-index:45;box-shadow:0 -6px 24px rgba(17,17,20,.08)}
+.mob-bar-inner{display:flex;align-items:center;justify-content:space-between;gap:14px;max-width:600px;margin:0 auto}
+.mob-bar-price{font-family:var(--serif);font-size:19px;font-weight:600}
+.mob-bar-price small{font-size:13px;font-weight:400;color:var(--ink3);font-family:var(--sans)}
+.mob-bar-sub{font-size:12px;color:var(--ink3)}
+.mob-bar-btn{background:var(--terra);color:#fff;border:0;border-radius:12px;padding:14px 30px;font-size:15px;font-weight:700;cursor:pointer;transition:.15s}
+.mob-bar-btn:hover{background:var(--terra2)}
 
-/* ── SCROLL REVEAL ───────────────────────────────────── */
-.rv{opacity:0;transform:translateY(16px);transition:opacity .55s ease,transform .55s ease}
+/* ════════ LIGHTBOX ════════ */
+.lb{position:fixed;inset:0;z-index:100;background:rgba(16,12,9,.96);display:none;flex-direction:column;animation:lbin .2s ease}
+.lb.open{display:flex}
+@keyframes lbin{from{opacity:0}to{opacity:1}}
+.lb-top{display:flex;align-items:center;justify-content:space-between;padding:16px clamp(16px,4vw,32px);color:#fff;flex-shrink:0}
+.lb-count{font-size:14px;font-weight:600;letter-spacing:.02em}
+.lb-close{width:42px;height:42px;border-radius:50%;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.06);color:#fff;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s}
+.lb-close:hover{background:rgba(255,255,255,.16)}
+.lb-stage{flex:1;display:flex;align-items:center;justify-content:center;gap:12px;padding:0 clamp(8px,3vw,28px);min-height:0;position:relative}
+.lb-stage img{max-width:min(1100px,100%);max-height:100%;object-fit:contain;border-radius:10px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.lb-nav{width:50px;height:50px;flex-shrink:0;border-radius:50%;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.08);color:#fff;font-size:24px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s;z-index:2}
+.lb-nav:hover{background:rgba(255,255,255,.2)}
+.lb-thumbs{display:flex;gap:8px;overflow-x:auto;padding:16px clamp(16px,4vw,32px);flex-shrink:0;scrollbar-width:thin;scroll-snap-type:x proximity}
+.lb-thumbs::-webkit-scrollbar{height:6px}.lb-thumbs::-webkit-scrollbar-thumb{background:rgba(255,255,255,.25);border-radius:3px}
+.lb-thumb{flex:0 0 auto;width:84px;height:62px;border-radius:8px;overflow:hidden;cursor:pointer;opacity:.5;border:2px solid transparent;transition:.15s;scroll-snap-align:center}
+.lb-thumb.on{opacity:1;border-color:#fff}
+.lb-thumb img{width:100%;height:100%;object-fit:cover}
+
+/* ════════ SCROLL REVEAL ════════ */
+.rv{opacity:0;transform:translateY(18px);transition:opacity .55s cubic-bezier(.2,.7,.3,1),transform .55s cubic-bezier(.2,.7,.3,1)}
 .rv.in{opacity:1;transform:none}
+:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
 
-/* ── RESPONSIVE ──────────────────────────────────────── */
-/* Tablet: stack the booking widget below the content so the column isn't cramped. */
+/* ════════ RESPONSIVE ════════ */
 @media(max-width:1024px){
-  .exp-wrap{grid-template-columns:1fr;gap:0;padding-bottom:84px}
-  .widget{position:static;border:none;padding:24px 0 28px;box-shadow:none;border-radius:0;border-bottom:1px solid var(--line)}
+  /* stack booking widget below content; mobile bar takes over */
+  .exp-grid{grid-template-columns:1fr;gap:0;padding-bottom:90px}
+  .aside-wrap{position:static;margin-top:6px}
+  .widget{margin-bottom:8px}
   .mob-bar{display:block}
+  .map-wrap{grid-template-columns:1fr}
+  .revs-grid{grid-template-columns:1fr 1fr}
 }
 @media(max-width:900px){
-  .nlinks,.becomehost{display:none}
-  .burger{display:block}
+  .nlinks,.becomehost,.signin{display:none}
+  .burger{display:flex}
 }
-@media(max-width:640px){
-  .gal{grid-template-rows:240px;grid-template-columns:1fr}
-  .g-sub{display:none}
-  .show-photos-btn{bottom:12px;right:12px}
+@media(max-width:720px){
+  /* mobile swipe gallery */
+  .gallery{display:flex;height:auto;grid-template-columns:none;grid-template-rows:none;gap:8px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;border-radius:0;margin-inline:calc(50% - 50vw);padding:0 clamp(20px,5vw,44px);scroll-padding-left:clamp(20px,5vw,44px)}
+  .gallery::-webkit-scrollbar{display:none}
+  .gcell{flex:0 0 86vw;aspect-ratio:4/3;height:auto;scroll-snap-align:start;border-radius:14px}
+  .gcell:nth-child(n+5){display:block}
+  .gcell .cover{display:none}
+  .show-all{display:none}
+  .gcount{display:flex;position:absolute;top:12px;right:8px;background:rgba(11,16,26,.72);color:#fff;font-size:12.5px;font-weight:600;border-radius:30px;padding:6px 12px;z-index:5;-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}
+  .g-arrow{display:flex;position:absolute;top:calc(50% - 21px);width:42px;height:42px;border-radius:50%;border:1px solid rgba(255,255,255,.55);background:rgba(255,255,255,.42);box-shadow:var(--shadow-md);color:var(--ink);align-items:center;justify-content:center;cursor:pointer;z-index:5;-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
+  .g-arrow.left{left:8px}
+  .g-arrow.right{right:8px}
+  .g-arrow .ic{width:22px;height:22px}
   .revs-grid{grid-template-columns:1fr}
+  .rev-agg{grid-template-columns:1fr;text-align:left;gap:22px}
+  .rev-score-box{display:flex;align-items:center;gap:16px;text-align:left}
+  .rev-stars-big{margin-top:0}
   .inc-grid{grid-template-columns:1fr}
+  .host-card{flex-direction:column;gap:14px}
 }
-@media(prefers-reduced-motion:reduce){*{transition:none!important}.rv{opacity:1;transform:none}}
-:focus-visible{outline:2px solid var(--bluec);outline-offset:2px}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}.rv{opacity:1;transform:none}}
+.ic{width:1em;height:1em;display:inline-block;vertical-align:-.14em;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}.heart.on .ic,.act-btn.saved .ic{fill:currentColor}
+/* ── v2: yellow header · blue headings · softer search ── */
+#nav{background:var(--yellow);border-bottom:1px solid rgba(12,19,32,.16);backdrop-filter:none;-webkit-backdrop-filter:none}
+.wm{color:var(--navy)}
+.nlinks,.nlinks a{color:var(--navy)}
+.nlinks a:hover{color:#000}
+.becomehost{color:var(--navy)}
+.becomehost:hover{background:rgba(12,19,32,.08);color:var(--navy)}
+.signin{background:var(--navy);color:#fff}
+.burger{color:var(--navy);border-color:rgba(12,19,32,.26);background:rgba(255,255,255,.4)}
+.citypill{color:var(--navy);border-color:rgba(12,19,32,.26);background:rgba(255,255,255,.5)}
+.h2,.sec-h,.pg-h{color:var(--navy)}
+.hl{background:var(--yellow);color:var(--navy);padding:.02em .16em;border-radius:4px;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+.vpill{display:inline-flex;align-items:center;gap:5px;background:var(--yellow);color:var(--navy);border-radius:30px;padding:4px 11px;font-size:12.5px;font-weight:600}
+.vpill .ic{color:var(--navy)}
+.hs-vbadge{background:var(--yellow);color:var(--navy);border-radius:30px;padding:2px 9px}
+.mob-bar{transition:transform .28s ease}
+.mob-bar.bar-hidden{transform:translateY(120%)}
+/* ── black sub-header ── */
+.subnav{background:#0B0C10;border-bottom:1px solid rgba(255,255,255,.08)}
+.subnav-row{display:flex;align-items:center;gap:18px;height:46px;overflow-x:auto;scrollbar-width:none}
+.subnav-row::-webkit-scrollbar{display:none}
+.subnav-row a,.subnav-city{font-size:13.5px;white-space:nowrap;flex:0 0 auto}
+.subnav-city{display:inline-flex;align-items:center;gap:6px;color:#fff;font-weight:600}
+.subnav-city .ic{color:var(--yellow)}
+.subnav-row a{color:rgba(255,255,255,.72);font-weight:500;transition:color .15s}
+.subnav-row a:hover{color:var(--yellow)}
+.subnav-div{width:1px;height:18px;background:rgba(255,255,255,.16);flex:0 0 auto}
 </style>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs><symbol id="arrow-right" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol><symbol id="chevron-down" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol><symbol id="chevron-left" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></symbol><symbol id="chevron-right" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol><symbol id="check" viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></symbol><symbol id="x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol><symbol id="menu-2" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol><symbol id="search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></symbol><symbol id="map-pin" viewBox="0 0 24 24"><path d="M12 21s7-6.3 7-11a7 7 0 1 0-14 0c0 4.7 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></symbol><symbol id="map-pin-filled" viewBox="0 0 24 24"><path fill="currentColor" stroke="none" fill-rule="evenodd" d="M12 2a7 7 0 0 0-7 7c0 4.7 7 12 7 12s7-7.3 7-12a7 7 0 0 0-7-7zm0 9.6A2.6 2.6 0 1 1 12 6.4a2.6 2.6 0 0 1 0 5.2z"/></symbol><symbol id="clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></symbol><symbol id="users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20v-1a5.5 5.5 0 0 1 11 0v1"/><path d="M16 4.7a3.5 3.5 0 0 1 0 6.6M21.5 20v-1a5.5 5.5 0 0 0-4-5.3"/></symbol><symbol id="users-group" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20v-1a5.5 5.5 0 0 1 11 0v1"/><path d="M16 4.7a3.5 3.5 0 0 1 0 6.6M21.5 20v-1a5.5 5.5 0 0 0-4-5.3"/></symbol><symbol id="user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M5 21v-1a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v1"/></symbol><symbol id="lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol><symbol id="heart" viewBox="0 0 24 24"><path d="M12 7.7C10.4 4.8 6.9 4.5 4.9 6.8c-2 2.2-1.4 5.3 1 7.6L12 20l6.1-5.6c2.4-2.3 3-5.4 1-7.6-2-2.3-5.5-2-7.1.9z"/></symbol><symbol id="star-filled" viewBox="0 0 24 24"><path fill="currentColor" stroke="none" d="M12 3.2l2.6 5.3 5.9.9-4.25 4.15 1 5.85L12 16.7 6.75 19.45l1-5.85L3.5 9.4l5.9-.9z"/></symbol><symbol id="shield-check" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 4.5-3.2 7.8-8 9-4.8-1.2-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/></symbol><symbol id="rosette-discount-check" viewBox="0 0 24 24"><path d="M12 3l2.3 1.7 2.8-.1.9 2.7 2.4 1.5-1 2.7 1 2.7-2.4 1.5-.9 2.7-2.8-.1L12 21l-2.3-1.7-2.8.1-.9-2.7-2.4-1.5 1-2.7-1-2.7 2.4-1.5.9-2.7 2.8.1z"/><path d="M9 12l2 2 4-4"/></symbol><symbol id="rosette-discount-check-filled" viewBox="0 0 24 24"><path fill="currentColor" stroke="none" d="M12 2.6l2.5 1.85 3.05-.1.98 2.92 2.62 1.63-1.1 2.9 1.1 2.9-2.62 1.63-.98 2.92-3.05-.1L12 21.4l-2.5-1.85-3.05.1-.98-2.92L2.85 15.1l1.1-2.9-1.1-2.9 2.62-1.63.98-2.92 3.05.1z"/><path d="M8.8 12l2.1 2.1 4.3-4.3" stroke="#fff"/></symbol><symbol id="point-filled" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="currentColor" stroke="none"/></symbol><symbol id="message-2" viewBox="0 0 24 24"><path d="M5 4h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-9l-4 3v-3H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></symbol><symbol id="message-2-check" viewBox="0 0 24 24"><path d="M5 4h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-9l-4 3v-3H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/><path d="M8.5 9.5l2 2 4-4"/></symbol><symbol id="share-2" viewBox="0 0 24 24"><circle cx="6" cy="12" r="2.5"/><circle cx="17" cy="6" r="2.5"/><circle cx="17" cy="18" r="2.5"/><path d="M8.2 10.9l6.6-3.7M8.2 13.1l6.6 3.7"/></symbol><symbol id="mood-smile" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9 10h.01M15 10h.01M8.5 14a4 4 0 0 0 7 0"/></symbol><symbol id="world" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.7 2.7 2.7 15.3 0 18M12 3c-2.7 2.7-2.7 15.3 0 18"/></symbol><symbol id="language" viewBox="0 0 24 24"><path d="M4 5h9M8 4v1.5C8 9 6 12 3 13.5"/><path d="M5 8.5c0 2 2.5 4 6 4.5"/><path d="M12 20l4-9 4 9M13.5 17h5"/></symbol><symbol id="compass" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M14.5 9.5l-1.5 4-4 1.5 1.5-4z" fill="currentColor" stroke="none"/></symbol><symbol id="route" viewBox="0 0 24 24"><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="6" r="2.5"/><path d="M8.5 18H14a3 3 0 0 0 0-6h-4a3 3 0 0 1 0-6h5.5"/></symbol><symbol id="ticket" viewBox="0 0 24 24"><path d="M4 9a2 2 0 0 0 0 6v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2a2 2 0 0 1 0-6V7a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1z"/><path d="M14.5 6.5v11"/></symbol><symbol id="flame" viewBox="0 0 24 24"><path d="M12 3c2.2 3 4 4.7 4 8.2A4 4 0 0 1 8 11.2c0-1.3.4-2.3 1.3-3.2C10.2 9.5 11.5 8 12 3z"/></symbol><symbol id="confetti" viewBox="0 0 24 24"><path d="M4.5 20l5.5-13M4.5 20l8-3M4.5 20l3-7.5"/><path d="M14 5l.7.7M18.5 7.5l.7-.7M16.5 12h1M20 13.5l-.7.7M19 4.5h.01"/></symbol><symbol id="businessplan" viewBox="0 0 24 24"><circle cx="9" cy="14" r="5"/><path d="M9 12v4M7.6 14h2.8"/><path d="M14 7h6M14 4h6v6M14 10h4"/></symbol><symbol id="camera" viewBox="0 0 24 24"><path d="M5 8h2.5L9 6h6l1.5 2H19a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2z"/><circle cx="12" cy="13" r="3.3"/></symbol><symbol id="palette" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18 1.8 1.8 0 0 0 1.5-2.9 1.8 1.8 0 0 1 1.5-2.9H18a3 3 0 0 0 3-3c0-4.5-4-7.2-9-7.2z"/><circle cx="7.5" cy="11" r="1" fill="currentColor" stroke="none"/><circle cx="12" cy="7.5" r="1" fill="currentColor" stroke="none"/><circle cx="16" cy="11" r="1" fill="currentColor" stroke="none"/></symbol><symbol id="music" viewBox="0 0 24 24"><path d="M9 17V5l11-2v12"/><circle cx="6" cy="17" r="3"/><circle cx="17" cy="15" r="3"/></symbol><symbol id="building-arch" viewBox="0 0 24 24"><path d="M4 21V9l8-5 8 5v12"/><path d="M9 21v-5a3 3 0 0 1 6 0v5"/></symbol><symbol id="basket" viewBox="0 0 24 24"><path d="M3.5 9h17l-1.6 9.3a2 2 0 0 1-2 1.7H7.1a2 2 0 0 1-2-1.7z"/><path d="M8.5 9L11 4M15.5 9L13 4"/><path d="M9.5 13v3M14.5 13v3"/></symbol><symbol id="bike" viewBox="0 0 24 24"><circle cx="6" cy="17" r="3.2"/><circle cx="18" cy="17" r="3.2"/><path d="M6 17l4-9h4M9.5 8h5l3 9"/><circle cx="13.5" cy="5.5" r="1"/></symbol><symbol id="sailboat" viewBox="0 0 24 24"><path d="M4 17h16l-2.3 3.3H6.3z"/><path d="M11.2 15V3.5L4.5 15zM12.6 15V6l5.4 9z"/></symbol><symbol id="walk" viewBox="0 0 24 24"><circle cx="13" cy="4.5" r="1.8"/><path d="M11 21l1.4-6L10 12l1-4 3.2 1.6 2.3 2.4"/><path d="M12.4 15L11 18M9 9l-1 4"/></symbol><symbol id="tools-kitchen-2" viewBox="0 0 24 24"><path d="M5 3v5a2.2 2.2 0 0 0 4.4 0V3"/><path d="M7.2 10v11"/><path d="M17 3c-1.8 1.2-2.6 3.6-2.6 6.1 0 1.8 1 2.7 2.6 2.7V21"/></symbol><symbol id="layout-grid" viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.3"/><rect x="13" y="4" width="7" height="7" rx="1.3"/><rect x="4" y="13" width="7" height="7" rx="1.3"/><rect x="13" y="13" width="7" height="7" rx="1.3"/></symbol><symbol id="brand-instagram" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="5"/><circle cx="12" cy="12" r="3.8"/><circle cx="16.7" cy="7.3" r="1" fill="currentColor" stroke="none"/></symbol><symbol id="brand-tiktok" viewBox="0 0 24 24"><path d="M10 12.5a3 3 0 1 0 3 3V5.5c.6 1.8 2.1 3.2 4 3.6"/></symbol><symbol id="brand-x" viewBox="0 0 24 24"><path d="M5 5l14 14M19 5L5 19"/></symbol></defs></svg>
 
-<!-- ── NAV ─────────────────────────────────────────────── -->
+<!-- ════════ NAV ════════ -->
 <nav id="nav">
   <div class="navrow">
-    <a href="index.html" class="wm">Local<b>Buddy</b></a>
-    <span class="nlinks">
-      <a href="index.html#trending">Experiences</a>
-      <a href="index.html#buddies">Buddies</a>
-      <a href="index.html#free">Free</a>
-    </span>
+    <a href="index.html" class="wm"><span class="dot"></span>LocalBuddy</a>
+    <span class="nlinks"><a href="index.html#trending">Experiences</a><a href="index.html#buddies">Locals</a><a href="index.html#how">How it works</a></span>
     <div class="nright">
       <a href="index.html#host" class="becomehost">Become a host</a>
       <a href="#" class="signin">Sign in</a>
     </div>
-    <button class="burger" id="burger" aria-label="Open menu">☰</button>
+    <button class="burger" id="burger" aria-label="Open menu" aria-expanded="false"><i class="ti ti-menu-2"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#menu-2"></use></svg></i></button>
   </div>
 </nav>
+<div class="mmenu" id="mmenu">
+  <a href="index.html#trending">Experiences</a>
+  <a href="index.html#buddies">Locals</a>
+  <a href="index.html#host">Become a host</a>
+  <a href="#">Sign in</a>
+</div>
 
-<!-- ── BREADCRUMB + GALLERY ─────────────────────────────── -->
+<!-- ════════ BREADCRUMB + GALLERY ════════ -->
+<div class="subnav">
+  <div class="ct subnav-row">
+    <span class="subnav-city"><i class="ti ti-map-pin"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#map-pin"></use></svg></i>Amsterdam</span>
+    <span class="subnav-div"></span>
+    <a href="index.html#trending">All experiences</a>
+    <a href="index.html#trending">Food</a>
+    <a href="index.html#trending">Hidden Gems</a>
+    <a href="index.html#trending">Café Hopping</a>
+    <a href="index.html#trending">Nightlife</a>
+    <a href="index.html#trending">Local Markets</a>
+    <span class="subnav-div"></span>
+    <a href="#">Gift cards</a>
+    <a href="index.html#how">How it works</a>
+    <a href="#">Help centre</a>
+    <a href="#">Contact</a>
+  </div>
+</div>
+
 <div class="pg">
   <nav class="bc" aria-label="Breadcrumb">
-    <a href="index.html">Amsterdam</a>
-    <span class="sep">›</span>
-    <a href="#">Cycling</a>
-    <span class="sep">›</span>
+    <a href="index.html">Amsterdam</a><span class="sep">›</span>
+    <a href="#">Hidden Gems</a><span class="sep">›</span>
     <span>Hidden Canals by Bike</span>
   </nav>
 
-  <div class="gal rv">
-    <div class="g-main">
-      <img src="https://images.unsplash.com/photo-1534351590666-13e3e96b5017?auto=format&fit=crop&w=1200&q=75"
-           alt="Cycling along Amsterdam canals" fetchpriority="high">
-    </div>
-    <div class="g-sub">
-      <div class="gi"><img loading="lazy" src="https://images.unsplash.com/photo-1576924542622-772281b13aa8?auto=format&fit=crop&w=600&q=70" alt="Amsterdam canal view"></div>
-      <div class="gi"><img loading="lazy" src="https://images.unsplash.com/photo-1512470876302-972faa2aa9a4?auto=format&fit=crop&w=600&q=70" alt="Amsterdam at dusk"></div>
-      <div class="gi"><img loading="lazy" src="https://images.unsplash.com/photo-1560969184-10fe8719e047?auto=format&fit=crop&w=600&q=70" alt="European city streets"></div>
-      <div class="gi"><img loading="lazy" src="https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=600&q=70" alt="European street scene"></div>
-    </div>
-    <button class="show-photos-btn" aria-label="Show all photos">⊞ Show all 18 photos</button>
+  <div class="gallery-wrap rv">
+    <div class="gallery" id="gallery"><!-- cells injected by JS --></div>
+    <span class="gcount" id="gcount">1 / 18</span>
+    <button class="g-arrow left" id="gPrev" aria-label="Previous photo"><i class="ti ti-chevron-left"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#chevron-left"></use></svg></i></button>
+    <button class="g-arrow right" id="gNext" aria-label="Next photo"><i class="ti ti-chevron-right"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#chevron-right"></use></svg></i></button>
   </div>
 </div>
 
-<!-- ── MAIN TWO-COLUMN LAYOUT ───────────────────────────── -->
-<div class="exp-wrap">
+<!-- ════════ MAIN TWO-COLUMN ════════ -->
+<div class="exp-grid">
 
-  <!-- LEFT: CONTENT ────────────────────────────────────── -->
+  <!-- LEFT -->
   <div>
-
-    <!-- Title -->
     <div class="title-row rv">
       <h1 class="exp-title">Hidden Canals by Bike</h1>
       <div class="top-actions">
-        <button class="act-btn" id="shareBtn" aria-label="Share">↗ Share</button>
-        <button class="act-btn" id="saveBtn" aria-label="Save to wishlist">♡ Save</button>
+        <button class="act-btn" id="shareBtn"><i class="ti ti-share-2"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#share-2"></use></svg></i>Share</button>
+        <button class="act-btn" id="saveBtn"><i class="ti ti-heart"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#heart"></use></svg></i>Save</button>
       </div>
     </div>
     <div class="meta-line rv">
-      <span class="meta-star">★ 4.9</span>
+      <span class="meta-star"><i class="ti ti-star-filled"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#star-filled"></use></svg></i>4.9</span>
       <span class="meta-link" role="button" tabindex="0">312 reviews</span>
       <span class="meta-dot">·</span>
-      <span>Verified buddy</span>
+      <span class="vpill"><i class="ti ti-rosette-discount-check-filled"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#rosette-discount-check-filled"></use></svg></i>Verified local</span>
       <span class="meta-dot">·</span>
-      <span>Amsterdam West</span>
+      <span class="chip-loc"><i class="ti ti-map-pin"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#map-pin"></use></svg></i>Amsterdam West</span>
     </div>
 
-    <!-- Quick pills -->
     <div class="qpills rv">
-      <span class="qp"><span class="qpi">⏱</span>3 hours</span>
-      <span class="qp"><span class="qpi">👥</span>Up to 8 guests</span>
-      <span class="qp"><span class="qpi">🚲</span>Bike included</span>
-      <span class="qp"><span class="qpi">🌍</span>English · Dutch</span>
-      <span class="qp"><span class="qpi">📍</span>Jordaan, Amsterdam</span>
+      <span class="qp"><i class="ti ti-clock"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#clock"></use></svg></i>3 hours</span>
+      <span class="qp"><i class="ti ti-users"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#users"></use></svg></i>Up to 8 guests</span>
+      <span class="qp"><i class="ti ti-bike"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#bike"></use></svg></i>Bike included</span>
+      <span class="qp"><i class="ti ti-language"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#language"></use></svg></i>English · Dutch</span>
+      <span class="qp"><i class="ti ti-map-pin"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#map-pin"></use></svg></i>Jordaan, Amsterdam</span>
     </div>
 
-    <!-- Host stripe -->
     <div class="host-stripe rv">
-      <div class="hs-av">
-        <img loading="lazy" src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=104&q=70" alt="Lars">
-      </div>
+      <div class="hs-av"><img loading="lazy" src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=108&q=70" alt="Lars" onerror="this.onerror=null;this.src='https://picsum.photos/seed/lars/110/110'"></div>
       <div>
-        <div class="hs-name">Hosted by Lars <span class="hs-vbadge">✓ Verified</span></div>
-        <div class="hs-meta">18 experiences · 5 years on LocalBuddy · Responds within 1 hour</div>
+        <div class="hs-name">Hosted by Lars <span class="hs-vbadge"><i class="ti ti-rosette-discount-check-filled"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#rosette-discount-check-filled"></use></svg></i>Verified</span></div>
+        <div class="hs-meta">ID-verified, admin-approved local · <i class="ti ti-star-filled" style="color:var(--amber)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#star-filled"></use></svg></i> 4.9 (312 reviews) · Speaks English &amp; Dutch</div>
       </div>
     </div>
 
-    <!-- About -->
     <div class="sec-b rv">
       <h2 class="sec-h">About this experience</h2>
       <p class="body-p">Amsterdam is best understood from a bike saddle — and best of all on the canals that tourists never find. Lars has spent 12 years cycling every alley, bridge, and hidden hofje in the Jordaan, and this route is the distillation of everything he's discovered.</p>
-      <p class="body-p">You'll leave the main ring canals behind within the first ten minutes, weaving into a quieter city of moss-covered bridges, courtyard gardens, and local brown cafés where the menu is still written in chalk. No headsets, no crowds — just Lars, your group, and three hours of the Amsterdam that most visitors never reach.</p>
+      <p class="body-p">You'll leave the main ring canals behind within the first ten minutes, weaving into a quieter city of moss-covered bridges, courtyard gardens, and local brown cafés where the menu is still written in chalk. No headsets, no crowds — just Lars, your group, and three hours of the Amsterdam most visitors never reach.</p>
     </div>
 
-    <!-- Itinerary -->
     <div class="sec-b rv">
-      <h2 class="sec-h">What you'll do</h2>
-      <ul class="itin">
-        <li>
-          <span class="i-num">01</span>
-          <div><div class="i-title">Meet at Westerkerk</div><div class="i-desc">Lars will be waiting with bikes and helmets at the church entrance. Everyone gets fitted and briefed in five minutes flat.</div></div>
-        </li>
-        <li>
-          <span class="i-num">02</span>
-          <div><div class="i-title">The Jordaan's hidden hofjes</div><div class="i-desc">Locked courtyards that only locals know the entrances to. Lars has access to two that have been here since the 17th century.</div></div>
-        </li>
-        <li>
-          <span class="i-num">03</span>
-          <div><div class="i-title">Seven forgotten canal bridges</div><div class="i-desc">Each with its own story — the history of the city told through the oldest crossings on the lesser-known waterways.</div></div>
-        </li>
-        <li>
-          <span class="i-num">04</span>
-          <div><div class="i-title">Brown café break</div><div class="i-desc">A 300-year-old café that doesn't serve tourists — just regulars and people lucky enough to know Lars. Snack included.</div></div>
-        </li>
-        <li>
-          <span class="i-num">05</span>
-          <div><div class="i-title">Return loop via Prinsengracht</div><div class="i-desc">An evening canal view that'll make your photos look like you paid a professional to find it — which, in a sense, you did.</div></div>
-        </li>
-      </ul>
+      <h2 class="sec-h">Good to know</h2>
+      <div class="inc-grid">
+        <div class="inc-row yes"><span class="inc-icon"><i class="ti ti-users"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#users"></use></svg></i></span>Small group — up to 8 guests</div>
+        <div class="inc-row yes"><span class="inc-icon"><i class="ti ti-bike"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#bike"></use></svg></i></span>Getting around: by bike (provided)</div>
+        <div class="inc-row yes"><span class="inc-icon"><i class="ti ti-user"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#user"></use></svg></i></span>Minimum age: 12 years</div>
+        <div class="inc-row yes"><span class="inc-icon"><i class="ti ti-clock"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#clock"></use></svg></i></span>Duration: 3 hours, starts on time</div>
+        <div class="inc-row yes"><span class="inc-icon"><i class="ti ti-shield-check"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#shield-check"></use></svg></i></span>Bring a rain layer &amp; comfortable shoes</div>
+        <div class="inc-row yes"><span class="inc-icon"><i class="ti ti-language"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#language"></use></svg></i></span>Hosted in English &amp; Dutch</div>
+      </div>
     </div>
 
-    <!-- Includes -->
     <div class="sec-b rv">
       <h2 class="sec-h">What's included</h2>
       <div class="inc-grid">
-        <div class="inc-row yes"><span class="inc-icon">✓</span>Bike rental (city bike)</div>
-        <div class="inc-row yes"><span class="inc-icon">✓</span>Helmet for every guest</div>
-        <div class="inc-row yes"><span class="inc-icon">✓</span>Local snack &amp; coffee stop</div>
-        <div class="inc-row yes"><span class="inc-icon">✓</span>Insider map to take home</div>
-        <div class="inc-row no"><span class="inc-icon">✕</span>Full meals or lunch</div>
-        <div class="inc-row no"><span class="inc-icon">✕</span>Transport to start point</div>
+        <div class="inc-row yes"><span class="inc-icon"><i class="ti ti-check"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#check"></use></svg></i></span>Bike rental (city bike)</div>
+        <div class="inc-row yes"><span class="inc-icon"><i class="ti ti-check"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#check"></use></svg></i></span>Helmet for every guest</div>
+        <div class="inc-row yes"><span class="inc-icon"><i class="ti ti-check"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#check"></use></svg></i></span>Local snack &amp; coffee stop</div>
+        <div class="inc-row yes"><span class="inc-icon"><i class="ti ti-check"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#check"></use></svg></i></span>Insider map to take home</div>
+        <div class="inc-row no"><span class="inc-icon"><i class="ti ti-x"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#x"></use></svg></i></span>Full meals or lunch</div>
+        <div class="inc-row no"><span class="inc-icon"><i class="ti ti-x"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#x"></use></svg></i></span>Transport to start point</div>
       </div>
     </div>
 
-    <!-- Host card -->
     <div class="sec-b rv">
-      <h2 class="sec-h">Meet your buddy</h2>
+      <h2 class="sec-h">Meet your host</h2>
       <div class="host-card">
-        <div class="hc-av">
-          <img loading="lazy" src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=160&q=70" alt="Lars van der Berg">
-        </div>
+        <div class="hc-av"><img loading="lazy" src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=176&q=70" alt="Lars van der Berg" onerror="this.onerror=null;this.src='https://picsum.photos/seed/lars2/180/180'"></div>
         <div>
-          <div class="hc-name">Lars van der Berg <span class="hs-vbadge">✓</span></div>
+          <div class="hc-name">Lars van der Berg <span class="hs-vbadge"><i class="ti ti-rosette-discount-check-filled"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#rosette-discount-check-filled"></use></svg></i></span></div>
           <div class="hc-stats">
-            <span class="hc-stat"><span style="color:var(--amber)">★</span> 4.9 average</span>
-            <span class="hc-stat">312 reviews</span>
-            <span class="hc-stat">18 experiences</span>
-            <span class="hc-stat">5 years hosting</span>
+            <span class="hc-stat"><i class="ti ti-star-filled" style="color:var(--amber)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#star-filled"></use></svg></i><b>4.9</b> rating</span>
+            <span class="hc-stat"><b>312</b> reviews</span>
+            <span class="hc-stat"><i class="ti ti-rosette-discount-check" style="color:var(--teal)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#rosette-discount-check"></use></svg></i> ID-verified, admin-approved</span>
           </div>
-          <p class="hc-bio">"I've lived on the Prinsengracht for 12 years and I've cycled every canal in this city. My favourite thing is watching people fall in love with the Amsterdam that doesn't appear in any guidebook — the one that's just been sitting here quietly, waiting for someone to notice."</p>
+          <p class="hc-bio">"I've lived on the Prinsengracht for 12 years and cycled every canal in this city. My favourite thing is watching people fall in love with the Amsterdam that doesn't appear in any guidebook — the one that's just been sitting here quietly, waiting for someone to notice."</p>
           <div class="hc-resp">
-            <span>💬 Response rate: 98%</span>
-            <span>⏱ Responds within 1 hour</span>
+            <span><i class="ti ti-language"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#language"></use></svg></i>Speaks English &amp; Dutch</span>
+            <span><i class="ti ti-map-pin"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#map-pin"></use></svg></i>Lives in Amsterdam West</span>
           </div>
-          <a href="#" class="see-link">View all experiences by Lars →</a>
+          <a href="#" class="see-link">View all experiences by Lars <i class="ti ti-arrow-right"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#arrow-right"></use></svg></i></a>
         </div>
       </div>
     </div>
+  </div>
 
-    <!-- Reviews -->
-    <div class="sec-b rv" id="reviews">
-      <h2 class="sec-h">Reviews</h2>
-      <div class="rev-agg">
-        <div>
-          <div class="rev-score">4.9</div>
-        </div>
-        <div class="rev-score-right">
-          <div class="rev-stars-big">★★★★★</div>
-          <div class="rev-count">312 verified reviews</div>
-        </div>
-        <div class="rev-bars">
-          <div class="rbar"><span class="lbl">5 ★</span><div class="track"><div class="fill" style="width:89%"></div></div><span class="pct">89%</span></div>
-          <div class="rbar"><span class="lbl">4 ★</span><div class="track"><div class="fill" style="width:8%"></div></div><span class="pct">8%</span></div>
-          <div class="rbar"><span class="lbl">3 ★</span><div class="track"><div class="fill" style="width:2%"></div></div><span class="pct">2%</span></div>
-          <div class="rbar"><span class="lbl">2 ★</span><div class="track"><div class="fill" style="width:1%"></div></div><span class="pct">1%</span></div>
-          <div class="rbar"><span class="lbl">1 ★</span><div class="track"><div class="fill" style="width:0%"></div></div><span class="pct">0%</span></div>
-        </div>
-      </div>
-
-      <div class="revs-grid">
-        <div class="rev-card">
-          <div class="rev-top">
-            <div class="rev-av"><img loading="lazy" src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=76&q=70" alt="Sophie"></div>
-            <div><div class="rev-who">Sophie</div><div class="rev-when">May 2026 · Private buyout</div></div>
-          </div>
-          <div class="rev-stars">★★★★★</div>
-          <p class="rev-text">"Lars showed us courtyards we'd have walked straight past for an entire week. We booked the private slot for our anniversary and it was worth every cent — the café stop alone was worth it."</p>
-        </div>
-        <div class="rev-card">
-          <div class="rev-top">
-            <div class="rev-av"><img loading="lazy" src="https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=76&q=70" alt="Mia"></div>
-            <div><div class="rev-who">Mia</div><div class="rev-when">April 2026 · Group</div></div>
-          </div>
-          <div class="rev-stars">★★★★★</div>
-          <p class="rev-text">"Joined solo on the group booking and ended up cycling with four strangers who became actual friends. The brown café stop was the highlight of my entire two weeks in Europe."</p>
-        </div>
-        <div class="rev-card">
-          <div class="rev-top">
-            <div class="rev-av"><img loading="lazy" src="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=76&q=70" alt="Emma"></div>
-            <div><div class="rev-who">Emma</div><div class="rev-when">March 2026 · Solo</div></div>
-          </div>
-          <div class="rev-stars">★★★★★</div>
-          <p class="rev-text">"Already been to Amsterdam three times and thought I'd seen it all. Lars took us to places I had no idea existed. Already looking at his other experiences for my next trip."</p>
-        </div>
-        <div class="rev-card">
-          <div class="rev-top">
-            <div class="rev-av"><img loading="lazy" src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=76&q=70" alt="James"></div>
-            <div><div class="rev-who">James</div><div class="rev-when">February 2026 · Group</div></div>
-          </div>
-          <div class="rev-stars">★★★★☆</div>
-          <p class="rev-text">"Fantastic route and a genuinely knowledgeable host. Knocked off half a star only because the pace was a little fast in the middle section — I would have liked more time at the bridges."</p>
-        </div>
-      </div>
-      <button class="btn-outline">Show all 312 reviews ›</button>
-    </div>
-
-    <!-- Map -->
-    <div class="sec-b rv">
-      <h2 class="sec-h">Where you'll meet</h2>
-      <div class="map-ph" role="img" aria-label="Map showing the Westerkerk meeting point">
-        <img loading="lazy" alt="Map of the meeting point near Westerkerk, Amsterdam"
-             src="https://images.unsplash.com/photo-1569336415962-a4bd9f69cd83?auto=format&fit=crop&w=1100&q=70"
-             onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1524661135-423995f22d0b?auto=format&fit=crop&w=1100&q=70'">
-        <span class="map-pin-badge">📍</span>
-      </div>
-      <div class="map-addr">Westerkerk entrance, Westermarkt 12, 1016 DK Amsterdam</div>
-      <div class="map-note">Lars will message you the exact meeting spot the day before your experience starts.</div>
-    </div>
-
-  </div><!-- /left -->
-
-  <!-- RIGHT: BOOKING WIDGET ───────────────────────────── -->
+  <!-- RIGHT: BOOKING -->
   <div>
-    <div class="widget" id="widget">
-
-      <div class="w-head">
-        <div class="w-price" id="wPrice">€22 <small>/ person</small></div>
-        <div class="w-rating"><span class="s">★</span> 4.9 · <span style="text-decoration:underline;cursor:pointer">312 reviews</span></div>
-      </div>
-
-      <!-- Booking mode -->
-      <div class="mode-tabs" role="group" aria-label="Booking mode">
-        <div class="mtab on" data-mode="group" data-price="22" data-unit="person" data-max="8" role="button" tabindex="0">Group<span class="msub">from €22/pp</span></div>
-        <div class="mtab" data-mode="solo" data-price="45" data-unit="person" data-max="1" role="button" tabindex="0">Solo<span class="msub">€45/person</span></div>
-        <div class="mtab" data-mode="private" data-price="180" data-unit="slot" data-max="8" role="button" tabindex="0">Private<span class="msub">€180/slot</span></div>
-      </div>
-
-      <!-- Date + guests -->
-      <div class="w-fields">
-        <div class="w-field">
-          <div class="wfl">Date</div>
-          <input type="date" id="dateInput" aria-label="Experience date">
+    <div class="aside-wrap">
+      <div class="widget" id="widget">
+        <div class="w-head">
+          <div class="w-price" id="wPrice">€45 <small>/ person</small></div>
+          <div class="w-rating"><span class="s"><i class="ti ti-star-filled"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#star-filled"></use></svg></i></span> 4.9 · <u>312</u></div>
         </div>
-        <div class="w-field" id="guestField">
-          <div class="wfl">Guests</div>
-          <div class="guests-row">
-            <div class="wfv" id="gLabel">2 guests</div>
-            <div class="gctr">
-              <button class="gbtn" id="gDown" aria-label="Remove guest">−</button>
-              <span class="gcnt" id="gCnt" aria-live="polite">2</span>
-              <button class="gbtn" id="gUp" aria-label="Add guest">+</button>
+        <div class="mode-tabs" role="group" aria-label="Booking option">
+          <div class="mtab on" data-mode="shared" role="button" tabindex="0">Shared<span class="msub">€45 / person</span></div>
+          <div class="mtab" data-mode="private" role="button" tabindex="0">Private<span class="msub">€240 / slot</span></div>
+        </div>
+        <div class="w-fields">
+          <div class="w-field">
+            <div class="wfl">Date</div>
+            <input type="date" id="dateInput" aria-label="Experience date">
+          </div>
+          <div class="w-field" id="guestField">
+            <div class="wfl">Guests</div>
+            <div class="guests-row">
+              <div class="wfv" id="gLabel">2 guests</div>
+              <div class="gctr">
+                <button class="gbtn" id="gDown" aria-label="Remove guest">−</button>
+                <span class="gcnt" id="gCnt" aria-live="polite">2</span>
+                <button class="gbtn" id="gUp" aria-label="Add guest">+</button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-
-      <!-- Price breakdown -->
-      <div class="w-breakdown">
-        <div class="wbr"><span id="lineA">€22 × 2 guests</span><span id="lineAmt">€44</span></div>
-        <div class="wbr"><span>Service fee</span><span id="feeLine">€3</span></div>
-        <div class="wbr total"><span>Total</span><span id="grandTotal">€47</span></div>
-      </div>
-
-      <button class="reserve-btn" id="reserveBtn">Reserve your spot</button>
-
-      <div class="w-trust">
-        <div class="wt"><span class="wt-icon">🔒</span><span>No charge until confirmed</span></div>
-        <div class="wt"><span class="wt-icon">🛡</span><span>Free cancellation up to 48 h before</span></div>
-        <div class="wt"><span class="wt-icon">⭐</span><span>312 verified reviews on this experience</span></div>
-      </div>
-
-    </div>
-  </div><!-- /right -->
-
-</div><!-- /exp-wrap -->
-
-<!-- ── MORE FROM LARS ────────────────────────────────────── -->
-<div class="pg">
-  <div class="more-sec rv">
-    <div class="more-head">More experiences with Lars</div>
-    <div class="more-rail">
-      <div class="mc">
-        <div class="mc-ph"><img loading="lazy" src="https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?auto=format&fit=crop&w=600&q=70" alt="Jenever and stories"></div>
-        <div class="mc-body">
-          <div class="mc-title">Jordaan Jenever &amp; Stories</div>
-          <div class="mc-meta"><span class="mc-star">★</span>4.8 · 2 hours · Group</div>
-          <div class="mc-price">€38 <small>/ person</small></div>
+        <div class="w-breakdown">
+          <div class="wbr"><span id="lineA">€45 × 2 guests</span><span id="lineAmt">€90</span></div>
+          <div class="wbr total"><span>Subtotal</span><span id="grandTotal">€90</span></div>
+          <div class="wbr"><span class="note">A service fee is added at checkout. Prices in EUR.</span></div>
         </div>
-      </div>
-      <div class="mc">
-        <div class="mc-ph"><img loading="lazy" src="https://images.unsplash.com/photo-1488459716781-31db52582fe9?auto=format&fit=crop&w=600&q=70" alt="Morning market"></div>
-        <div class="mc-body">
-          <div class="mc-title">Albert Cuyp Morning Market Walk</div>
-          <div class="mc-meta"><span class="mc-star">★</span>4.9 · 2.5 hours · Group</div>
-          <div class="mc-price">€29 <small>/ person</small></div>
-        </div>
-      </div>
-      <div class="mc">
-        <div class="mc-ph"><img loading="lazy" src="https://images.unsplash.com/photo-1527631746610-bca00a040d60?auto=format&fit=crop&w=600&q=70" alt="Sunset boat tour"></div>
-        <div class="mc-body">
-          <div class="mc-title">Sunset Canal Boat with a Local</div>
-          <div class="mc-meta"><span class="mc-star">★</span>5.0 · 2 hours · Private available</div>
-          <div class="mc-price">€68 <small>/ person</small></div>
-        </div>
-      </div>
-      <div class="mc">
-        <div class="mc-ph"><img loading="lazy" src="https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=600&q=70" alt="Food walk"></div>
-        <div class="mc-body">
-          <div class="mc-title">Jordaan Food &amp; Hidden Bars</div>
-          <div class="mc-meta"><span class="mc-star">★</span>4.7 · 3 hours · Group</div>
-          <div class="mc-price">€42 <small>/ person</small></div>
+        <button class="reserve-btn" id="reserveBtn">Reserve your spot</button>
+        <div class="w-cancel">You won't be charged yet</div>
+        <div class="w-trust">
+          <div class="wt"><i class="ti ti-lock"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#lock"></use></svg></i><span>Secure prepaid — card, Apple&nbsp;Pay, Google&nbsp;Pay, Klarna</span></div>
+          <div class="wt"><i class="ti ti-shield-check"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#shield-check"></use></svg></i><span>Full refund if you cancel 24&nbsp;h before</span></div>
+          <div class="wt"><i class="ti ti-star-filled"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#star-filled"></use></svg></i><span>Reviews left only after a completed trip</span></div>
         </div>
       </div>
     </div>
   </div>
 </div>
 
-<!-- ── FOOTER ─────────────────────────────────────────────── -->
-<footer>
+<!-- ════════ REVIEWS (FULL WIDTH) ════════ -->
+<section class="fullsec" id="reviews">
   <div class="pg">
-    <div class="fbot">
-      <div class="flinks"><span>© 2026 LocalBuddy B.V.</span><span>Netherlands · EUR €</span><span>English</span></div>
-      <div class="flinks"><a href="#">Terms</a><a href="#">Privacy</a><a href="#">Help centre</a><a href="#">Cookies</a></div>
+    <div class="rv">
+      <h2 class="pg-h">What travellers say about Lars</h2>
+      <p class="pg-sub">Reviews come only from guests who actually completed this experience.</p>
     </div>
+    <div class="rev-agg rv">
+      <div class="rev-score-box">
+        <div class="rev-score">4.9</div>
+        <div class="rev-stars-big">★★★★★</div>
+        <div class="rev-count">312 reviews</div>
+      </div>
+      <div class="rev-summary">Guests consistently praise the <b>hidden routes</b>, Lars's <b>storytelling</b>, and the <b>brown-café stop</b>.</div>
+      <div class="rev-bars">
+        <div class="rbar"><span class="lbl">5<i class="ti ti-star-filled" style="font-size:11px;color:var(--amber)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#star-filled"></use></svg></i></span><div class="track"><div class="fill" style="width:89%"></div></div><span class="pct">89%</span></div>
+        <div class="rbar"><span class="lbl">4<i class="ti ti-star-filled" style="font-size:11px;color:var(--amber)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#star-filled"></use></svg></i></span><div class="track"><div class="fill" style="width:8%"></div></div><span class="pct">8%</span></div>
+        <div class="rbar"><span class="lbl">3<i class="ti ti-star-filled" style="font-size:11px;color:var(--amber)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#star-filled"></use></svg></i></span><div class="track"><div class="fill" style="width:2%"></div></div><span class="pct">2%</span></div>
+        <div class="rbar"><span class="lbl">2<i class="ti ti-star-filled" style="font-size:11px;color:var(--amber)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#star-filled"></use></svg></i></span><div class="track"><div class="fill" style="width:1%"></div></div><span class="pct">1%</span></div>
+        <div class="rbar"><span class="lbl">1<i class="ti ti-star-filled" style="font-size:11px;color:var(--amber)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#star-filled"></use></svg></i></span><div class="track"><div class="fill" style="width:0%"></div></div><span class="pct">0%</span></div>
+      </div>
+    </div>
+    <div class="revs-grid rv">
+      <div class="rev-card"><div class="rev-top"><div class="rev-av"><img loading="lazy" src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=84&q=70" alt="Sophie" onerror="this.onerror=null;this.src='https://picsum.photos/seed/rv1/84/84'"></div><div><div class="rev-who">Sophie</div><div class="rev-when">May 2026</div></div></div><div class="rev-stars">★★★★★</div><p class="rev-text">"Lars showed us courtyards we'd have walked straight past for a week. We booked the private slot for our anniversary and it was worth every cent — the café stop alone made the trip."</p></div>
+      <div class="rev-card"><div class="rev-top"><div class="rev-av"><img loading="lazy" src="https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=84&q=70" alt="Mia" onerror="this.onerror=null;this.src='https://picsum.photos/seed/rv2/84/84'"></div><div><div class="rev-who">Mia</div><div class="rev-when">April 2026</div></div></div><div class="rev-stars">★★★★★</div><p class="rev-text">"Booked a shared slot on my own and ended up cycling with four strangers who became actual friends. The brown café stop was the highlight of my two weeks in Europe."</p></div>
+      <div class="rev-card"><div class="rev-top"><div class="rev-av"><img loading="lazy" src="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=84&q=70" alt="Emma" onerror="this.onerror=null;this.src='https://picsum.photos/seed/rv3/84/84'"></div><div><div class="rev-who">Emma</div><div class="rev-when">March 2026</div></div></div><div class="rev-stars">★★★★★</div><p class="rev-text">"Already been to Amsterdam three times and thought I'd seen it all. Lars took us to places I had no idea existed. Already eyeing his other experiences for next trip."</p></div>
+      <div class="rev-card"><div class="rev-top"><div class="rev-av"><img loading="lazy" src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=84&q=70" alt="James" onerror="this.onerror=null;this.src='https://picsum.photos/seed/rv4/84/84'"></div><div><div class="rev-who">James</div><div class="rev-when">February 2026</div></div></div><div class="rev-stars">★★★★☆</div><p class="rev-text">"Fantastic route and a genuinely knowledgeable host. Knocked off half a star only because the pace was a little fast mid-section — I'd have liked more time at the bridges."</p></div>
+      <div class="rev-card"><div class="rev-top"><div class="rev-av"><img loading="lazy" src="https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?auto=format&fit=crop&w=84&q=70" alt="Priya" onerror="this.onerror=null;this.src='https://picsum.photos/seed/rv5/84/84'"></div><div><div class="rev-who">Priya</div><div class="rev-when">February 2026</div></div></div><div class="rev-stars">★★★★★</div><p class="rev-text">"Booked the whole slot for my parents' visit. Lars adapted the pace perfectly and even found a step-free route. Thoughtful, warm, and an incredible storyteller."</p></div>
+      <div class="rev-card"><div class="rev-top"><div class="rev-av"><img loading="lazy" src="https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?auto=format&fit=crop&w=84&q=70" alt="Tom" onerror="this.onerror=null;this.src='https://picsum.photos/seed/rv6/84/84'"></div><div><div class="rev-who">Tom</div><div class="rev-when">January 2026</div></div></div><div class="rev-stars">★★★★★</div><p class="rev-text">"The kind of morning you remember years later. Quiet canals, zero crowds, and a coffee in a café I'd never have found alone. Can't recommend Lars highly enough."</p></div>
+    </div>
+    <button class="btn-outline" id="moreRevBtn">Show all 312 reviews <i class="ti ti-arrow-right"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#arrow-right"></use></svg></i></button>
+  </div>
+</section>
+
+<!-- ════════ MAP (FULL WIDTH) ════════ -->
+<section class="fullsec">
+  <div class="pg">
+    <div class="rv"><h2 class="pg-h">Where you'll meet</h2><p class="pg-sub">Your exact spot is confirmed the day before you go.</p></div>
+    <div class="map-wrap rv">
+      <div class="map-ph" role="img" aria-label="Map of the meeting area">
+        <img loading="lazy" alt="Map near Westerkerk, Amsterdam" src="https://images.unsplash.com/photo-1569336415962-a4bd9f69cd83?auto=format&fit=crop&w=1100&q=70" onerror="this.onerror=null;this.src='https://picsum.photos/seed/map1/1100/600'">
+        <span class="map-pin"><i class="ti ti-map-pin-filled"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#map-pin-filled"></use></svg></i></span>
+      </div>
+      <div class="map-side">
+        <div class="ms-label">Meeting point</div>
+        <div class="map-addr">Jordaan,<br>Amsterdam West</div>
+        <div class="map-note">You'll get the exact meeting point and how to find the bikes after you book — usually the day before.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════ MORE FROM HOST (FULL WIDTH) ════════ -->
+<section class="fullsec">
+  <div class="pg">
+    <div class="rv"><h2 class="pg-h">More experiences with Lars</h2><p class="pg-sub">If you liked this route, you'll love these.</p></div>
+    <div class="rail-shell rv">
+      <button class="rail-arrow prev" aria-label="Previous"><i class="ti ti-chevron-left"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#chevron-left"></use></svg></i></button>
+      <button class="rail-arrow next" aria-label="Next"><i class="ti ti-chevron-right"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#chevron-right"></use></svg></i></button>
+      <div class="more-rail" data-rail>
+        <a href="experience.html" class="mc"><div class="mc-ph"><img loading="lazy" src="https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?auto=format&fit=crop&w=600&q=70" alt="Jenever and stories" onerror="this.onerror=null;this.src='https://picsum.photos/seed/mc1/600/400'"></div><div class="mc-body"><div class="mc-title">Jordaan Jenever &amp; Stories</div><div class="mc-meta"><span class="mc-star">★</span>4.8 · 2 hours · Shared</div><div class="mc-price">€38 <small>/ person</small></div></div></a>
+        <a href="experience.html" class="mc"><div class="mc-ph"><img loading="lazy" src="https://images.unsplash.com/photo-1488459716781-31db52582fe9?auto=format&fit=crop&w=600&q=70" alt="Morning market" onerror="this.onerror=null;this.src='https://picsum.photos/seed/mc2/600/400'"></div><div class="mc-body"><div class="mc-title">Albert Cuyp Morning-Market Walk</div><div class="mc-meta"><span class="mc-star">★</span>4.9 · 2.5 hours · Shared</div><div class="mc-price">€29 <small>/ person</small></div></div></a>
+        <a href="experience.html" class="mc"><div class="mc-ph"><img loading="lazy" src="https://images.unsplash.com/photo-1527631746610-bca00a040d60?auto=format&fit=crop&w=600&q=70" alt="Sunset boat" onerror="this.onerror=null;this.src='https://picsum.photos/seed/mc3/600/400'"></div><div class="mc-body"><div class="mc-title">Sunset Canal Boat with a Local</div><div class="mc-meta"><span class="mc-star">★</span>5.0 · 2 hours · Private</div><div class="mc-price">€68 <small>/ person</small></div></div></a>
+        <a href="experience.html" class="mc"><div class="mc-ph"><img loading="lazy" src="https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=600&q=70" alt="Food walk" onerror="this.onerror=null;this.src='https://picsum.photos/seed/mc4/600/400'"></div><div class="mc-body"><div class="mc-title">Jordaan Food &amp; Hidden Bars</div><div class="mc-meta"><span class="mc-star">★</span>4.7 · 3 hours · Shared</div><div class="mc-price">€42 <small>/ person</small></div></div></a>
+        <a href="experience.html" class="mc"><div class="mc-ph"><img loading="lazy" src="https://images.unsplash.com/photo-1499856871958-5b9627545d1a?auto=format&fit=crop&w=600&q=70" alt="Street art" onerror="this.onerror=null;this.src='https://picsum.photos/seed/mc5/600/400'"></div><div class="mc-body"><div class="mc-title">NDSM Street-Art Ride</div><div class="mc-meta"><span class="mc-star">★</span>4.9 · 2.5 hours · Shared</div><div class="mc-price">€34 <small>/ person</small></div></div></a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════ FOOTER ════════ -->
+<footer>
+  <div class="fbot">
+    <div class="flinks"><span>© 2026 LocalBuddy B.V.</span><span>Netherlands · EUR €</span><span>English</span></div>
+    <div class="flinks"><a href="#">Terms</a><a href="#">Privacy</a><a href="#">Help centre</a><a href="#">Cookies</a></div>
   </div>
 </footer>
 
-<!-- ── MOBILE STICKY BAR ─────────────────────────────────── -->
+<!-- ════════ MOBILE STICKY BAR ════════ -->
 <div class="mob-bar" id="mobBar">
   <div class="mob-bar-inner">
-    <div class="mob-bar-price" id="mobPrice">€22 <small>/ person</small></div>
+    <div>
+      <div class="mob-bar-price" id="mobPrice">€45 <small>/ person</small></div>
+      <div class="mob-bar-sub"><i class="ti ti-star-filled" style="color:var(--amber);font-size:11px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#star-filled"></use></svg></i> 4.9 · 312 reviews</div>
+    </div>
     <button class="mob-bar-btn" id="mobBtn">Reserve</button>
   </div>
 </div>
 
+<!-- ════════ LIGHTBOX ════════ -->
+<div class="lb" id="lb" role="dialog" aria-modal="true" aria-label="Photo gallery">
+  <div class="lb-top">
+    <span class="lb-count" id="lbCount">1 / 18</span>
+    <button class="lb-close" id="lbClose" aria-label="Close gallery"><i class="ti ti-x"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#x"></use></svg></i></button>
+  </div>
+  <div class="lb-stage">
+    <button class="lb-nav" id="lbPrev" aria-label="Previous photo"><i class="ti ti-chevron-left"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#chevron-left"></use></svg></i></button>
+    <img id="lbImg" src="" alt="Experience photo">
+    <button class="lb-nav" id="lbNext" aria-label="Next photo"><i class="ti ti-chevron-right"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#chevron-right"></use></svg></i></button>
+  </div>
+  <div class="lb-thumbs" id="lbThumbs"></div>
+</div>
+
 <script>
 (function(){
-  /* ── BOOKING WIDGET ── */
-  var tabs = document.querySelectorAll('.mtab');
-  var gField = document.getElementById('guestField');
-  var lineA = document.getElementById('lineA');
-  var lineAmt = document.getElementById('lineAmt');
-  var feeLine = document.getElementById('feeLine');
-  var grandTotal = document.getElementById('grandTotal');
-  var gCnt = document.getElementById('gCnt');
-  var gLabel = document.getElementById('gLabel');
-  var wPrice = document.getElementById('wPrice');
-  var mobPrice = document.getElementById('mobPrice');
-  var gDown = document.getElementById('gDown');
-  var gUp = document.getElementById('gUp');
+  /* ════ 18 PHOTOS ════ */
+  var IDS = [
+    '1534351590666-13e3e96b5017',
+    '1576924542622-772281b13aa8',
+    '1512470876302-972faa2aa9a4',
+    '1527631746610-bca00a040d60',
+    '1488459716781-31db52582fe9',
+    '1504674900247-0877df9cc836',
+    '1514362545857-3bc16c4c7d1b',
+    '1572116469696-31de0f17cc34',
+    '1558551649-e44c8f992010',
+    '1476480862126-209bfaa8edc8',
+    '1534351590666-13e3e96b5017',
+    '1512470876302-972faa2aa9a4',
+    '1488459716781-31db52582fe9',
+    '1504674900247-0877df9cc836',
+    '1527631746610-bca00a040d60',
+    '1576924542622-772281b13aa8',
+    '1572116469696-31de0f17cc34',
+    '1514362545857-3bc16c4c7d1b'
+  ];
+  function url(id,w){return 'https://images.unsplash.com/photo-'+id+'?auto=format&fit=crop&w='+w+'&q=70';}
+  function fallback(i,w){return 'https://picsum.photos/seed/lbph'+i+'/'+w+'/'+Math.round(w*0.7);}
+  var TOTAL = IDS.length; // 18
 
-  var mode = 'group';
-  var prices = {group:22, solo:45, private:180};
-  var units = {group:'person', solo:'person', private:'slot'};
-  var maxGuests = {group:8, solo:1, private:8};
-  var guests = 2;
+  /* ════ BUILD GALLERY — desktop shows first 4 as a collage; mobile swipes all 18 ════ */
+  var gallery = document.getElementById('gallery');
+  var gcount = document.getElementById('gcount');
+  var gPrev = document.getElementById('gPrev');
+  var gNext = document.getElementById('gNext');
+  var CLS=['g-a','g-b','g-c','g-d'];
+  for(var i=0;i<TOTAL;i++){
+    (function(i){
+      var cell=document.createElement('div'); cell.className='gcell'+(i<4?' '+CLS[i]:'');
+      var w=i===0?900:600;
+      var img=document.createElement('img'); img.loading=i<2?'eager':'lazy';
+      img.alt='Hidden Canals by Bike — photo '+(i+1);
+      img.src=url(IDS[i], w);
+      img.onerror=function(){this.onerror=null;this.src=fallback(i, w);};
+      cell.appendChild(img);
+      if(i===3){ /* darkened "show all" tile (desktop collage only) */
+        var cov=document.createElement('div'); cov.className='cover';
+        cov.innerHTML='<span class="big">+'+(TOTAL-4)+'</span><span class="sm"><i class="ti ti-layout-grid"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#layout-grid"></use></svg></i>Show all '+TOTAL+' photos</span>';
+        cell.appendChild(cov);
+      }
+      cell.addEventListener('click',function(){openLB(i);});
+      gallery.appendChild(cell);
+    })(i);
+  }
 
-  function fmt(n){ return '€'+n; }
+  /* mobile gallery: live counter + directional arrows (first->right, middle->both, last->left) */
+  function syncGallery(){
+    if(getComputedStyle(gcount).display==='none')return;
+    var cells=gallery.querySelectorAll('.gcell');
+    var center=gallery.scrollLeft+gallery.clientWidth/2, best=0, bd=Infinity;
+    cells.forEach(function(c,i){var cc=c.offsetLeft+c.clientWidth/2,d=Math.abs(cc-center);if(d<bd){bd=d;best=i;}});
+    gcount.textContent=(best+1)+' / '+TOTAL;
+    var atStart=gallery.scrollLeft<=4, atEnd=gallery.scrollLeft>=gallery.scrollWidth-gallery.clientWidth-4;
+    if(gPrev)gPrev.style.display=atStart?'none':'flex';
+    if(gNext)gNext.style.display=atEnd?'none':'flex';
+  }
+  gallery.addEventListener('scroll',function(){requestAnimationFrame(syncGallery);},{passive:true});
+  if(gPrev)gPrev.addEventListener('click',function(){gallery.scrollBy({left:-gallery.clientWidth*0.86,behavior:'smooth'});});
+  if(gNext)gNext.addEventListener('click',function(){gallery.scrollBy({left:gallery.clientWidth*0.86,behavior:'smooth'});});
+  setTimeout(syncGallery,60);
 
+  /* ════ LIGHTBOX ════ */
+  var lb=document.getElementById('lb'), lbImg=document.getElementById('lbImg'),
+      lbCount=document.getElementById('lbCount'), lbThumbs=document.getElementById('lbThumbs'),
+      lbClose=document.getElementById('lbClose'), lbPrev=document.getElementById('lbPrev'), lbNext=document.getElementById('lbNext');
+  var idx=0, built=false;
+  function buildThumbs(){
+    if(built)return; built=true;
+    IDS.forEach(function(id,i){
+      var t=document.createElement('div'); t.className='lb-thumb';
+      var im=document.createElement('img'); im.loading='lazy'; im.alt='Thumbnail '+(i+1);
+      im.src=url(id,160); im.onerror=(function(i){return function(){this.onerror=null;this.src=fallback(i,160);};})(i);
+      t.appendChild(im);
+      t.addEventListener('click',function(){idx=i;render();});
+      lbThumbs.appendChild(t);
+    });
+  }
+  function render(){
+    lbImg.onerror=(function(i){return function(){this.onerror=null;this.src=fallback(i,1600);};})(idx);
+    lbImg.src=url(IDS[idx],1600);
+    lbCount.textContent=(idx+1)+' / '+TOTAL;
+    var thumbs=lbThumbs.children;
+    for(var i=0;i<thumbs.length;i++)thumbs[i].classList.toggle('on',i===idx);
+    if(thumbs[idx])thumbs[idx].scrollIntoView({inline:'center',block:'nearest',behavior:'smooth'});
+  }
+  function openLB(i){ buildThumbs(); idx=i; render(); lb.classList.add('open'); document.body.style.overflow='hidden'; lbClose.focus(); }
+  function closeLB(){ lb.classList.remove('open'); document.body.style.overflow=''; }
+  function navLB(d){ idx=(idx+d+TOTAL)%TOTAL; render(); }
+  lbClose.addEventListener('click',closeLB);
+  lbPrev.addEventListener('click',function(){navLB(-1);});
+  lbNext.addEventListener('click',function(){navLB(1);});
+  lb.addEventListener('click',function(e){ if(e.target===lb||e.target.classList.contains('lb-stage'))closeLB(); });
+  document.addEventListener('keydown',function(e){
+    if(!lb.classList.contains('open'))return;
+    if(e.key==='Escape')closeLB();
+    else if(e.key==='ArrowLeft')navLB(-1);
+    else if(e.key==='ArrowRight')navLB(1);
+  });
+
+  /* ════ MOBILE MENU ════ */
+  var burger=document.getElementById('burger'), mmenu=document.getElementById('mmenu');
+  burger.addEventListener('click',function(){
+    var open=mmenu.classList.toggle('open');
+    burger.setAttribute('aria-expanded',open?'true':'false');
+    document.body.style.overflow=open?'hidden':'';
+  });
+  mmenu.querySelectorAll('a').forEach(function(a){a.addEventListener('click',function(){mmenu.classList.remove('open');document.body.style.overflow='';});});
+
+  /* ════ BOOKING WIDGET ════ */
+  var tabs=document.querySelectorAll('.mtab');
+  var gField=document.getElementById('guestField');
+  var lineA=document.getElementById('lineA'), lineAmt=document.getElementById('lineAmt');
+  var grandTotal=document.getElementById('grandTotal');
+  var gCnt=document.getElementById('gCnt'), gLabel=document.getElementById('gLabel');
+  var wPrice=document.getElementById('wPrice'), mobPrice=document.getElementById('mobPrice');
+  var gDown=document.getElementById('gDown'), gUp=document.getElementById('gUp');
+  var mode='shared';
+  var prices={shared:45,private:240}, units={shared:'person',private:'slot'}, maxGuests={shared:8,private:8};
+  var guests=2;
+  function fmt(n){return '€'+n;}
+  function setG(){ gCnt.textContent=guests; gLabel.textContent=guests+' guest'+(guests!==1?'s':''); }
   function updateWidget(){
-    var p = prices[mode];
-    var unit = units[mode];
-    var isPrivate = mode === 'private';
-    var isSolo = mode === 'solo';
-    var g = (isPrivate || isSolo) ? 1 : guests;
-    var sub = isPrivate ? p : p * g;
-    var fee = Math.max(1, Math.round(sub * 0.05));
-    var total = sub + fee;
-
-    wPrice.innerHTML = fmt(p) + ' <small>/ ' + unit + '</small>';
-    mobPrice.innerHTML = fmt(p) + ' <small>/ ' + unit + '</small>';
-
-    if(isPrivate){
-      lineA.textContent = 'Private slot (whole booking)';
-      lineAmt.textContent = fmt(p);
-    } else {
-      lineA.textContent = fmt(p) + ' × ' + g + ' guest' + (g !== 1 ? 's' : '');
-      lineAmt.textContent = fmt(sub);
-    }
-    feeLine.textContent = fmt(fee);
-    grandTotal.textContent = fmt(total);
-
-    gField.style.display = (isPrivate || isSolo) ? 'none' : '';
-    gUp.disabled = guests >= maxGuests[mode];
-    gDown.disabled = guests <= 1;
+    var p=prices[mode], unit=units[mode], isPriv=mode==='private';
+    var g=isPriv?1:guests, sub=isPriv?p:p*g;
+    wPrice.innerHTML=fmt(p)+' <small>/ '+unit+'</small>';
+    mobPrice.innerHTML=fmt(p)+' <small>/ '+unit+'</small>';
+    if(isPriv){ lineA.textContent='Whole slot · private buyout'; lineAmt.textContent=fmt(p); }
+    else { lineA.textContent=fmt(p)+' × '+g+' guest'+(g!==1?'s':''); lineAmt.textContent=fmt(sub); }
+    grandTotal.textContent=fmt(isPriv?p:sub);
+    gField.style.display=isPriv?'none':'';
+    gUp.disabled=guests>=maxGuests[mode]; gDown.disabled=guests<=1;
   }
-
   tabs.forEach(function(t){
-    t.addEventListener('click', function(){
-      tabs.forEach(function(x){ x.classList.remove('on'); });
-      t.classList.add('on');
-      mode = t.dataset.mode;
-      if(mode === 'solo') guests = 1;
-      if(mode === 'group' && guests < 2) guests = 2;
-      gCnt.textContent = guests;
-      gLabel.textContent = guests + ' guest' + (guests !== 1 ? 's' : '');
-      updateWidget();
+    t.addEventListener('click',function(){
+      tabs.forEach(function(x){x.classList.remove('on');}); t.classList.add('on');
+      mode=t.dataset.mode;
+      if(mode==='shared'&&guests<1)guests=1;
+      setG(); updateWidget();
     });
-    t.addEventListener('keydown', function(e){
-      if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); t.click(); }
-    });
+    t.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();t.click();}});
+  });
+  gDown.addEventListener('click',function(){if(guests>1){guests--;setG();updateWidget();}});
+  gUp.addEventListener('click',function(){if(guests<maxGuests[mode]){guests++;setG();updateWidget();}});
+  var d=new Date(); d.setDate(d.getDate()+1); document.getElementById('dateInput').value=d.toISOString().split('T')[0];
+  document.getElementById('reserveBtn').addEventListener('click',function(){
+    var b=this; b.textContent='Confirming…'; setTimeout(function(){b.textContent='Reserve your spot';},1800);
+  });
+  document.getElementById('mobBtn').addEventListener('click',function(){
+    document.getElementById('widget').scrollIntoView({behavior:'smooth',block:'center'});
+  });
+  var saveBtn=document.getElementById('saveBtn'), saved=false;
+  saveBtn.addEventListener('click',function(){saved=!saved; saveBtn.classList.toggle('saved',saved); saveBtn.lastChild.textContent=saved?'Saved':'Save';});
+
+  /* ════ MORE-FROM-HOST RAIL ════ */
+  document.querySelectorAll('[data-rail]').forEach(function(rail){
+    var shell=rail.closest('.rail-shell');
+    var prev=shell.querySelector('.rail-arrow.prev'), next=shell.querySelector('.rail-arrow.next');
+    function by(dir){rail.scrollBy({left:dir*rail.clientWidth*0.85,behavior:'smooth'});}
+    if(prev)prev.addEventListener('click',function(){by(-1);});
+    if(next)next.addEventListener('click',function(){by(1);});
+    function upd(){ if(prev)prev.disabled=rail.scrollLeft<=4; if(next)next.disabled=rail.scrollLeft>=rail.scrollWidth-rail.clientWidth-4; }
+    rail.addEventListener('scroll',upd,{passive:true}); upd();
   });
 
-  gDown.addEventListener('click', function(){
-    if(guests > 1){ guests--; gCnt.textContent = guests; gLabel.textContent = guests + ' guest' + (guests !== 1 ? 's' : ''); updateWidget(); }
-  });
-  gUp.addEventListener('click', function(){
-    if(guests < maxGuests[mode]){ guests++; gCnt.textContent = guests; gLabel.textContent = guests + ' guest' + (guests !== 1 ? 's' : ''); updateWidget(); }
-  });
+  /* ════ SCROLL REVEAL ════ */
+  var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}});},{threshold:.1});
+  document.querySelectorAll('.rv').forEach(function(el){io.observe(el);});
 
-  /* default date = tomorrow */
-  var d = new Date(); d.setDate(d.getDate() + 1);
-  document.getElementById('dateInput').value = d.toISOString().split('T')[0];
+  /* hide the mobile reserve bar once the footer comes into view */
+  var _mb=document.getElementById('mobBar'), _ft=document.querySelector('footer');
+  if(_mb&&_ft){ new IntersectionObserver(function(es){es.forEach(function(e){ _mb.classList.toggle('bar-hidden', e.isIntersecting); });},{threshold:0.02}).observe(_ft); }
 
-  /* reserve buttons → scroll to widget or confirm */
-  document.getElementById('reserveBtn').addEventListener('click', function(){
-    this.textContent = 'Confirming…';
-    var btn = this;
-    setTimeout(function(){ btn.textContent = 'Reserve your spot'; }, 2000);
-  });
-  document.getElementById('mobBtn').addEventListener('click', function(){
-    document.getElementById('widget').scrollIntoView({behavior:'smooth', block:'start'});
-  });
-
-  /* save toggle */
-  var saveBtn = document.getElementById('saveBtn');
-  var saved = false;
-  saveBtn.addEventListener('click', function(){
-    saved = !saved;
-    saveBtn.textContent = saved ? '♥ Saved' : '♡ Save';
-    saveBtn.classList.toggle('saved', saved);
-  });
-
-  /* show mobile bar only once scrolled past widget */
-  var mobBar = document.getElementById('mobBar');
-  function syncMobBar(){
-    mobBar.style.display = window.matchMedia('(max-width:1024px)').matches ? 'block' : 'none';
-  }
-  syncMobBar();
-  window.addEventListener('resize', syncMobBar);
-
-  /* scroll reveal */
-  var io = new IntersectionObserver(function(es){
-    es.forEach(function(e){
-      if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); }
-    });
-  }, {threshold: 0.08});
-  document.querySelectorAll('.rv').forEach(function(el){ io.observe(el); });
-
-  /* initial calc */
   updateWidget();
 })();
 </script>
