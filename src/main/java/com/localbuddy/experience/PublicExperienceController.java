@@ -26,7 +26,8 @@ public class PublicExperienceController {
 
     @Operation(
             summary = "List approved experiences",
-            description = "Public endpoint. Returns approved experiences, optionally filtered by city and category."
+            description = "Public endpoint. Returns approved experiences, optionally filtered by city, category, "
+                    + "and booking mode (shared vs private)."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Approved experiences retrieved successfully")
@@ -34,9 +35,15 @@ public class PublicExperienceController {
     @GetMapping
     public ResponseEntity<List<ExperienceResponse>> getApprovedExperiences(
             @RequestParam(required = false) String citySlug,
-            @RequestParam(required = false) String categorySlug
+            @RequestParam(required = false) String categorySlug,
+            @Parameter(description = "Filter by booking mode: SHARED, PRIVATE_ALLOWED, or PRIVATE_ONLY. Omit for all.")
+            @RequestParam(required = false) BookingMode bookingMode,
+            @Parameter(description = "Convenience filter: true = shared only (SHARED); false = private only "
+                    + "(PRIVATE_ALLOWED or PRIVATE_ONLY). Ignored when bookingMode is provided.")
+            @RequestParam(required = false) Boolean shared
     ) {
-        return ResponseEntity.ok(experienceService.getApprovedExperiences(citySlug, categorySlug));
+        return ResponseEntity.ok(
+                experienceService.getApprovedExperiences(citySlug, categorySlug, bookingMode, shared));
     }
 
     @Operation(

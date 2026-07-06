@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -37,6 +38,27 @@ public interface ExperienceRepository extends JpaRepository<Experience, UUID> {
     List<Experience> findByCategory_SlugAndStatus(
             String categorySlug,
             ExperienceStatus status
+    );
+
+    /**
+     * Public listing of APPROVED experiences with optional city/category and
+     * booking-mode filters. A null {@code bookingModes} collection means "any mode";
+     * otherwise only experiences whose {@code bookingMode} is in the set are returned.
+     */
+    @Query("""
+            SELECT e FROM Experience e
+            JOIN e.city c
+            LEFT JOIN e.category cat
+            WHERE e.status = com.localbuddy.experience.ExperienceStatus.APPROVED
+              AND (:citySlug IS NULL OR c.slug = :citySlug)
+              AND (:categorySlug IS NULL OR cat.slug = :categorySlug)
+              AND (:bookingModes IS NULL OR e.bookingMode IN :bookingModes)
+            ORDER BY e.createdAt DESC
+            """)
+    List<Experience> findApprovedForListing(
+            @Param("citySlug") String citySlug,
+            @Param("categorySlug") String categorySlug,
+            @Param("bookingModes") Collection<BookingMode> bookingModes
     );
 
     long countByStatus(ExperienceStatus status);

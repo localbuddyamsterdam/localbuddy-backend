@@ -19,6 +19,7 @@ import java.text.Normalizer;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -593,7 +594,14 @@ public class ExperienceService {
 
     @Transactional(readOnly = true)
     public List<ExperienceResponse> getApprovedExperiences(String citySlug, String categorySlug) {
-        return findApprovedExperiences(citySlug, categorySlug).stream()
+        return getApprovedExperiences(citySlug, categorySlug, null, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ExperienceResponse> getApprovedExperiences(String citySlug, String categorySlug,
+                                                           BookingMode bookingMode, Boolean shared) {
+        Collection<BookingMode> bookingModes = resolveBookingModes(bookingMode, shared);
+        return findApprovedExperiences(citySlug, categorySlug, bookingModes).stream()
                 .map(this::toResponse)
                 .toList();
     }
@@ -609,7 +617,7 @@ public class ExperienceService {
         boolean hasOrigin = lat != null && lng != null;
         List<ExperienceMapMarker> markers = new java.util.ArrayList<>();
 
-        for (Experience e : findApprovedExperiences(citySlug, categorySlug)) {
+        for (Experience e : findApprovedExperiences(citySlug, categorySlug, null)) {
             if (e.getLatitude() == null || e.getLongitude() == null) {
                 continue;
             }
@@ -633,27 +641,24 @@ public class ExperienceService {
         return markers;
     }
 
-    private List<Experience> findApprovedExperiences(String citySlug, String categorySlug) {
-        String city = optionalTrim(citySlug);
-        String category = optionalTrim(categorySlug);
-        if (city != null) {
-            city = city.toLowerCase(Locale.ROOT);
-        }
-        if (category != null) {
-            category = category.toLowerCase(Locale.ROOT);
-        }
+    private List<Experience> findApprovedExperiences(String citySlug, String categorySlug,
+                                                     Collection<BookingMode> bookingModes) {
+        String city = normalizeSlug(citySlug);
+        String category = normalizeSlug(categorySlug);
+        return experienceRepository.findApprovedForListing(city, category, bookingModes);
+    }
 
-        if (city != null && category != null) {
-            return experienceRepository.findByCity_SlugAndCategory_SlugAndStatus(
-                    city, category, ExperienceStatus.APPROVED);
+    private Collection<BookingMode> resolveBookingModes(BookingMode bookingMode, Boolean shared) {
+        if (bookingMode != null) {
+            return List.of(bookingMode);
         }
-        if (city != null) {
-            return experienceRepository.findByCity_SlugAndStatus(city, ExperienceStatus.APPROVED);
+        if (Boolean.TRUE.equals(shared)) {
+            return List.of(BookingMode.SHARED);
         }
-        if (category != null) {
-            return experienceRepository.findByCategory_SlugAndStatus(category, ExperienceStatus.APPROVED);
+        if (Boolean.FALSE.equals(shared)) {
+            return List.of(BookingMode.PRIVATE_ALLOWED, BookingMode.PRIVATE_ONLY);
         }
-        return experienceRepository.findByStatus(ExperienceStatus.APPROVED);
+        return null;
     }
 
     private void applyCoordinates(Experience experience, BigDecimal latitude, BigDecimal longitude) {
