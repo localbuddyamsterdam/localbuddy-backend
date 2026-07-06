@@ -12,5 +12,9 @@ public interface ExperienceCategoryRepository extends JpaRepository<ExperienceCa
 
     boolean existsBySlug(String slug);
 
+    boolean existsByNameIgnoreCase(String name);
+
     List<ExperienceCategory> findByActiveTrueOrderByDisplayOrderAscNameAsc();
+
+    List<ExperienceCategory> findAllByOrderByDisplayOrderAscNameAsc();
 }

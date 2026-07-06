@@ -207,6 +207,7 @@ public class AdminOpsService {
                 category.getName(),
                 category.getSlug(),
                 category.getDescription(),
+                category.isActive(),
                 category.getDisplayOrder()
         );
     }

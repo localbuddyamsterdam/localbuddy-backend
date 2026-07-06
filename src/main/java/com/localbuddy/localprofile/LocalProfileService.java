@@ -378,6 +378,7 @@ public class LocalProfileService {
                 category.getName(),
                 category.getSlug(),
                 category.getDescription(),
+                category.isActive(),
                 category.getDisplayOrder()
         );
     }

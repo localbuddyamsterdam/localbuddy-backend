@@ -7,6 +7,7 @@ public record ExperienceCategoryResponse(
         String name,
         String slug,
         String description,
+        boolean active,
         Integer displayOrder
 ) {
 }
