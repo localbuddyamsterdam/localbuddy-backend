@@ -7,10 +7,13 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.UUID;
 
 @RestController
@@ -76,6 +79,29 @@ public class LocalProfileController {
     ) {
         UUID userId = UUID.fromString(authentication.getName());
         return ResponseEntity.ok(localProfileService.updateMyLocalProfile(userId, request));
+    }
+
+    @Operation(
+            summary = "Upload my profile photo",
+            description = "Uploads an image (JPEG/PNG/WebP/GIF, max 5 MB) to blob storage and sets it as the host "
+                    + "profile picture. Requires Azure Blob storage to be configured; otherwise supply the "
+                    + "profilePhotoUrl field on create/update instead."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Profile photo uploaded successfully"),
+            @ApiResponse(responseCode = "400", description = "Invalid/missing image, unsupported type, or storage not configured"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "404", description = "Local profile not found"),
+            @ApiResponse(responseCode = "413", description = "Image exceeds the maximum upload size")
+    })
+    @PostMapping(value = "/me/photo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<LocalProfileResponse> uploadMyProfilePhoto(
+            Authentication authentication,
+            @RequestParam("file") MultipartFile file
+    ) throws IOException {
+        UUID userId = UUID.fromString(authentication.getName());
+        return ResponseEntity.ok(localProfileService.uploadMyProfilePhoto(
+                userId, file.getBytes(), file.getContentType(), file.getOriginalFilename()));
     }
 
     @Operation(

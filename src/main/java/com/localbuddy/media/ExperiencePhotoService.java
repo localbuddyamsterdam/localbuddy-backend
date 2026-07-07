@@ -43,9 +43,7 @@ public class ExperiencePhotoService {
     public ExperiencePhotoResponse uploadPhoto(UUID userId, UUID experienceId,
                                                byte[] data, String contentType, String filename, String caption) {
         Experience experience = requireOwnedExperience(userId, experienceId);
-        if (data == null || data.length == 0) {
-            throw new BadRequestException("Uploaded file is empty");
-        }
+        ImageUploadValidator.validate(data, contentType);
         enforceLimit(experienceId);
 
         StoredObject stored = storageProvider.upload(data, contentType, filename);

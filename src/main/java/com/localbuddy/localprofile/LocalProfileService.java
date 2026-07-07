@@ -8,6 +8,9 @@ import com.localbuddy.experience.CityResponse;
 import com.localbuddy.experience.ExperienceCategory;
 import com.localbuddy.experience.ExperienceCategoryRepository;
 import com.localbuddy.experience.ExperienceCategoryResponse;
+import com.localbuddy.media.ImageUploadValidator;
+import com.localbuddy.media.MediaStorageProvider;
+import com.localbuddy.media.StoredObject;
 import com.localbuddy.notification.NotificationService;
 import com.localbuddy.notification.NotificationType;
 import com.localbuddy.user.User;
@@ -31,17 +34,20 @@ public class LocalProfileService {
     private final NotificationService notificationService;
     private final CityRepository cityRepository;
     private final ExperienceCategoryRepository categoryRepository;
+    private final MediaStorageProvider storageProvider;
 
     public LocalProfileService(LocalProfileRepository localProfileRepository,
                                UserRepository userRepository,
                                NotificationService notificationService,
                                CityRepository cityRepository,
-                               ExperienceCategoryRepository categoryRepository) {
+                               ExperienceCategoryRepository categoryRepository,
+                               MediaStorageProvider storageProvider) {
         this.localProfileRepository = localProfileRepository;
         this.userRepository = userRepository;
         this.notificationService = notificationService;
         this.cityRepository = cityRepository;
         this.categoryRepository = categoryRepository;
+        this.storageProvider = storageProvider;
     }
 
     @Transactional
@@ -65,6 +71,24 @@ public class LocalProfileService {
     public LocalProfileResponse getMyLocalProfile(UUID userId) {
         LocalProfile profile = getProfileByUserId(userId);
         return toResponse(profile);
+    }
+
+    @Transactional
+    public LocalProfileResponse uploadMyProfilePhoto(UUID userId, byte[] data, String contentType, String filename) {
+        LocalProfile profile = getProfileByUserId(userId);
+        ImageUploadValidator.validate(data, contentType);
+
+        String previousKey = profile.getProfilePhotoStorageKey();
+        StoredObject stored = storageProvider.upload("profiles", data, contentType, filename);
+        profile.setProfilePhotoUrl(stored.url());
+        profile.setProfilePhotoStorageKey(stored.storageKey());
+        LocalProfile saved = localProfileRepository.save(profile);
+
+        // Best-effort cleanup of the previously stored blob (if any).
+        if (previousKey != null && !previousKey.isBlank()) {
+            storageProvider.delete(previousKey);
+        }
+        return toResponse(saved);
     }
 
     @Transactional

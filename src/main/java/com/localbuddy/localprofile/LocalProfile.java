@@ -80,6 +80,9 @@ public class LocalProfile {
     @Column(name = "profile_photo_url", nullable = false, columnDefinition = "TEXT")
     private String profilePhotoUrl;
 
+    @Column(name = "profile_photo_storage_key", length = 512)
+    private String profilePhotoStorageKey;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "verification_status", nullable = false, length = 40)
     private LocalVerificationStatus verificationStatus = LocalVerificationStatus.NOT_STARTED;

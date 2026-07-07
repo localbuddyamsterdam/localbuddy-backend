@@ -41,10 +41,10 @@ public class AzureBlobStorageProvider implements MediaStorageProvider {
     }
 
     @Override
-    public StoredObject upload(byte[] data, String contentType, String originalFilename) {
+    public StoredObject upload(String keyPrefix, byte[] data, String contentType, String originalFilename) {
         requireConfigured();
         try {
-            String key = "experiences/" + UUID.randomUUID() + extension(originalFilename, contentType);
+            String key = normalizePrefix(keyPrefix) + UUID.randomUUID() + extension(originalFilename, contentType);
             BlobClient blob = container().getBlobClient(key);
             blob.upload(BinaryData.fromBytes(data), true);
             if (contentType != null && !contentType.isBlank()) {
@@ -94,6 +94,12 @@ public class AzureBlobStorageProvider implements MediaStorageProvider {
             return base + key;
         }
         return blob.getBlobUrl();
+    }
+
+    private String normalizePrefix(String keyPrefix) {
+        String p = (keyPrefix == null || keyPrefix.isBlank()) ? "experiences" : keyPrefix.trim();
+        p = p.replaceAll("^/+", "").replaceAll("/+$", "");
+        return p.isEmpty() ? "experiences/" : p + "/";
     }
 
     private String extension(String originalFilename, String contentType) {
