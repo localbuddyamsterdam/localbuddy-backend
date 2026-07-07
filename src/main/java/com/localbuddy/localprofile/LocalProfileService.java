@@ -92,6 +92,19 @@ public class LocalProfileService {
     }
 
     @Transactional
+    public LocalProfileResponse deleteMyProfilePhoto(UUID userId) {
+        LocalProfile profile = getProfileByUserId(userId);
+        String key = profile.getProfilePhotoStorageKey();
+        profile.setProfilePhotoUrl(null);
+        profile.setProfilePhotoStorageKey(null);
+        LocalProfile saved = localProfileRepository.save(profile);
+        if (key != null && !key.isBlank()) {
+            storageProvider.delete(key);
+        }
+        return toResponse(saved);
+    }
+
+    @Transactional
     public LocalProfileResponse updateMyLocalProfile(UUID userId, UpdateLocalProfileRequest request) {
         LocalProfile profile = getProfileByUserId(userId);
 

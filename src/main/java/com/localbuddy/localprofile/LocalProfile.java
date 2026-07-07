@@ -77,7 +77,7 @@ public class LocalProfile {
     @Column(name = "experience_info", nullable = false, columnDefinition = "TEXT")
     private String experienceInfo;
 
-    @Column(name = "profile_photo_url", nullable = false, columnDefinition = "TEXT")
+    @Column(name = "profile_photo_url", columnDefinition = "TEXT")
     private String profilePhotoUrl;
 
     @Column(name = "profile_photo_storage_key", length = 512)

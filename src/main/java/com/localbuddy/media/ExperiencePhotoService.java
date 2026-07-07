@@ -59,6 +59,49 @@ public class ExperiencePhotoService {
     }
 
     @Transactional
+    public List<ExperiencePhotoResponse> uploadPhotos(UUID userId, UUID experienceId, List<PhotoUpload> uploads) {
+        Experience experience = requireOwnedExperience(userId, experienceId);
+        if (uploads == null || uploads.isEmpty()) {
+            throw new BadRequestException("No files provided");
+        }
+        long existing = photoRepository.countByExperienceId(experienceId);
+        if (existing + uploads.size() > MAX_PHOTOS_PER_EXPERIENCE) {
+            throw new BadRequestException("An experience can have at most " + MAX_PHOTOS_PER_EXPERIENCE
+                    + " photos (has " + existing + ", tried to add " + uploads.size() + ")");
+        }
+        // Validate every file before storing any, so a bad file fails the whole batch cleanly.
+        for (PhotoUpload upload : uploads) {
+            ImageUploadValidator.validate(upload.data(), upload.contentType());
+        }
+
+        List<ExperiencePhotoResponse> responses = new ArrayList<>();
+        int index = 0;
+        for (PhotoUpload upload : uploads) {
+            StoredObject stored = storageProvider.upload(upload.data(), upload.contentType(), upload.filename());
+            ExperiencePhoto photo = new ExperiencePhoto();
+            photo.setExperience(experience);
+            photo.setStorageKey(stored.storageKey());
+            photo.setUrl(stored.url());
+            photo.setContentType(upload.contentType());
+            photo.setSizeBytes((long) upload.data().length);
+            photo.setSortOrder((int) (existing + index));
+            photo.setCover(existing == 0 && index == 0);
+            responses.add(ExperiencePhotoResponse.from(photoRepository.save(photo)));
+            index++;
+        }
+        return responses;
+    }
+
+    @Transactional
+    public ExperiencePhotoResponse updateCaption(UUID userId, UUID experienceId, UUID photoId,
+                                                 UpdateExperiencePhotoRequest request) {
+        requireOwnedExperience(userId, experienceId);
+        ExperiencePhoto photo = requirePhoto(experienceId, photoId);
+        photo.setCaption(trimToNull(request.caption()));
+        return ExperiencePhotoResponse.from(photoRepository.save(photo));
+    }
+
+    @Transactional
     public ExperiencePhotoResponse registerPhotoUrl(UUID userId, UUID experienceId, RegisterPhotoUrlRequest request) {
         Experience experience = requireOwnedExperience(userId, experienceId);
         enforceLimit(experienceId);

@@ -105,6 +105,21 @@ public class LocalProfileController {
     }
 
     @Operation(
+            summary = "Delete my profile photo",
+            description = "Removes the host profile picture: deletes the stored blob and clears the photo URL."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Profile photo removed"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "404", description = "Local profile not found")
+    })
+    @DeleteMapping("/me/photo")
+    public ResponseEntity<LocalProfileResponse> deleteMyProfilePhoto(Authentication authentication) {
+        UUID userId = UUID.fromString(authentication.getName());
+        return ResponseEntity.ok(localProfileService.deleteMyProfilePhoto(userId));
+    }
+
+    @Operation(
             summary = "Submit my local profile for review",
             description = "Submits the authenticated user's local profile so an admin can review it."
     )
