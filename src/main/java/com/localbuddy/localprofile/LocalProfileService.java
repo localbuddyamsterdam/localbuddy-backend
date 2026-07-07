@@ -207,7 +207,7 @@ public class LocalProfileService {
         profile.setDisplayName(requiredTrim(request.displayName()));
         profile.setPhoneNumber(requiredTrim(request.phoneNumber()));
         profile.setBio(requiredTrim(request.bio()));
-        profile.setProfilePhotoUrl(requiredTrim(request.profilePhotoUrl()));
+        profile.setProfilePhotoUrl(optionalTrim(request.profilePhotoUrl()));
         profile.setHostCity(requiredTrim(request.hostCity()));
         profile.setZipCode(requiredTrim(request.zipCode()));
         profile.setCountry(requiredTrim(request.country()));
@@ -243,7 +243,7 @@ public class LocalProfileService {
         profile.setDisplayName(requiredTrim(request.displayName()));
         profile.setPhoneNumber(requiredTrim(request.phoneNumber()));
         profile.setBio(requiredTrim(request.bio()));
-        profile.setProfilePhotoUrl(requiredTrim(request.profilePhotoUrl()));
+        profile.setProfilePhotoUrl(optionalTrim(request.profilePhotoUrl()));
         profile.setHostCity(requiredTrim(request.hostCity()));
         profile.setZipCode(requiredTrim(request.zipCode()));
         profile.setCountry(requiredTrim(request.country()));

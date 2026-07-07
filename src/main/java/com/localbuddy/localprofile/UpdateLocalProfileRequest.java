@@ -21,7 +21,6 @@ public record UpdateLocalProfileRequest(
         @Size(max = 2000, message = "Bio cannot exceed 2000 characters")
         String bio,
 
-        @NotBlank(message = "Profile photo is required")
         @Size(max = 2000, message = "Profile photo URL cannot exceed 2000 characters")
         String profilePhotoUrl,
 
