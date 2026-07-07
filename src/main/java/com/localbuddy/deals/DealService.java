@@ -2,11 +2,16 @@ package com.localbuddy.deals;
 
 import com.localbuddy.common.exception.BadRequestException;
 import com.localbuddy.common.exception.ResourceNotFoundException;
+import com.localbuddy.experience.Experience;
+import com.localbuddy.experience.ExperienceRepository;
+import com.localbuddy.experience.ExperienceStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -17,9 +22,11 @@ public class DealService {
     private static final BigDecimal MAX_PERCENTAGE = BigDecimal.valueOf(100);
 
     private final DealRepository dealRepository;
+    private final ExperienceRepository experienceRepository;
 
-    public DealService(DealRepository dealRepository) {
+    public DealService(DealRepository dealRepository, ExperienceRepository experienceRepository) {
         this.dealRepository = dealRepository;
+        this.experienceRepository = experienceRepository;
     }
 
     @Transactional
@@ -125,6 +132,85 @@ public class DealService {
                 .stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    /**
+     * Resolves the single best currently-live deal for an approved experience and computes the
+     * discounted price. Precedence: EXPERIENCE &gt; CATEGORY &gt; CITY &gt; GLOBAL, then higher priority,
+     * then most recent. Returns null when no deal applies. Fixed-amount deals only apply when their
+     * currency matches the experience currency.
+     */
+    @Transactional(readOnly = true)
+    public ResolvedDealResponse resolveBestDealForExperience(UUID experienceId) {
+        Experience experience = experienceRepository.findById(experienceId)
+                .orElseThrow(() -> new ResourceNotFoundException("Experience not found"));
+        if (experience.getStatus() != ExperienceStatus.APPROVED) {
+            throw new ResourceNotFoundException("Experience not found");
+        }
+
+        UUID cityId = experience.getCity() == null ? null : experience.getCity().getId();
+        UUID categoryId = experience.getCategory() == null ? null : experience.getCategory().getId();
+        BigDecimal price = experience.getPriceAmount();
+        String currency = experience.getCurrency() == null ? null
+                : experience.getCurrency().toUpperCase(Locale.ROOT);
+
+        List<Deal> candidates =
+                dealRepository.findLiveDeals(Instant.now(), null, cityId, experienceId, categoryId);
+
+        Comparator<Deal> byBest = Comparator
+                .comparingInt((Deal d) -> specificityRank(d.getScope()))
+                .thenComparingInt(d -> -(d.getPriority() == null ? 0 : d.getPriority()))
+                .thenComparing(Deal::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder()));
+
+        Deal best = candidates.stream()
+                .filter(d -> isApplicable(d, currency))
+                .min(byBest)
+                .orElse(null);
+
+        if (best == null || price == null) {
+            return null;
+        }
+
+        BigDecimal discount = computeDiscount(best, price);
+        return new ResolvedDealResponse(
+                best.getId(), best.getName(), best.getBadgeText(),
+                best.getDiscountType(), best.getDiscountValue(),
+                price, discount, price.subtract(discount), currency);
+    }
+
+    private boolean isApplicable(Deal deal, String experienceCurrency) {
+        if (deal.getDiscountType() == DealDiscountType.FIXED_AMOUNT) {
+            String dealCurrency = deal.getCurrency() == null ? null
+                    : deal.getCurrency().toUpperCase(Locale.ROOT);
+            return dealCurrency == null || dealCurrency.equals(experienceCurrency);
+        }
+        return true;
+    }
+
+    private int specificityRank(DealScope scope) {
+        return switch (scope) {
+            case EXPERIENCE -> 0;
+            case CATEGORY -> 1;
+            case CITY -> 2;
+            case GLOBAL -> 3;
+        };
+    }
+
+    private BigDecimal computeDiscount(Deal deal, BigDecimal price) {
+        BigDecimal raw;
+        if (deal.getDiscountType() == DealDiscountType.PERCENTAGE) {
+            raw = price.multiply(deal.getDiscountValue())
+                    .divide(MAX_PERCENTAGE, 2, RoundingMode.HALF_UP);
+        } else {
+            raw = deal.getDiscountValue();
+        }
+        if (raw.signum() < 0) {
+            raw = BigDecimal.ZERO;
+        }
+        if (raw.compareTo(price) > 0) {
+            raw = price;
+        }
+        return raw.setScale(2, RoundingMode.HALF_UP);
     }
 
     private void validateDealConfig(DealDiscountType discountType,

@@ -6,6 +6,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -43,5 +44,20 @@ public class PublicDealController {
         return ResponseEntity.ok(
                 dealService.listLiveDeals(dealType, cityId, experienceId, categoryId)
         );
+    }
+
+    @Operation(
+            summary = "Resolve the best live deal for an experience",
+            description = "Returns the single best currently-live deal applicable to the given approved experience "
+                    + "(experience-specific beats category, then city, then global) with the computed discounted "
+                    + "price. The response body is empty when no deal applies."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Resolved deal, or empty when none applies"),
+            @ApiResponse(responseCode = "404", description = "Approved experience not found")
+    })
+    @GetMapping("/for-experience/{experienceId}")
+    public ResponseEntity<ResolvedDealResponse> resolveForExperience(@PathVariable UUID experienceId) {
+        return ResponseEntity.ok(dealService.resolveBestDealForExperience(experienceId));
     }
 }
