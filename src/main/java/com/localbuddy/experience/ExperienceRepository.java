@@ -72,7 +72,7 @@ public interface ExperienceRepository extends JpaRepository<Experience, UUID> {
      * AVAILABLE slot on that date with enough remaining capacity.
      */
     @Query(value = """
-            SELECT DISTINCT e FROM Experience e
+            SELECT e FROM Experience e
             JOIN e.city c
             LEFT JOIN e.category cat
             WHERE e.status = com.localbuddy.experience.ExperienceStatus.APPROVED
@@ -92,7 +92,7 @@ public interface ExperienceRepository extends JpaRepository<Experience, UUID> {
               )
             """,
             countQuery = """
-            SELECT COUNT(DISTINCT e) FROM Experience e
+            SELECT COUNT(e) FROM Experience e
             JOIN e.city c
             LEFT JOIN e.category cat
             WHERE e.status = com.localbuddy.experience.ExperienceStatus.APPROVED
@@ -129,7 +129,7 @@ public interface ExperienceRepository extends JpaRepository<Experience, UUID> {
      * already be lower-cased and wrapped in {@code %...%} (or null).
      */
     @Query(value = """
-            SELECT DISTINCT e FROM Experience e
+            SELECT e FROM Experience e
             JOIN e.city c
             LEFT JOIN e.category cat
             JOIN e.localProfile lp
@@ -156,7 +156,7 @@ public interface ExperienceRepository extends JpaRepository<Experience, UUID> {
               )
             """,
             countQuery = """
-            SELECT COUNT(DISTINCT e) FROM Experience e
+            SELECT COUNT(e) FROM Experience e
             JOIN e.city c
             LEFT JOIN e.category cat
             JOIN e.localProfile lp
