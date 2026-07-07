@@ -33,6 +33,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
+import com.localbuddy.deals.AppliedDeal;
+import com.localbuddy.deals.DealService;
 import java.math.RoundingMode;
 import java.security.SecureRandom;
 import java.time.Duration;
@@ -71,12 +73,13 @@ public class BookingService {
     private final AgeBandPricing ageBandPricing;
     private final BookingConfirmationNotifier bookingConfirmationNotifier;
     private final ConversationRepository conversationRepository;
+    private final DealService dealService;
 
     public BookingService(BookingRepository bookingRepository,
                           UserRepository userRepository,
                           ExperienceRepository experienceRepository,
                           AvailabilitySlotRepository availabilitySlotRepository,
-                          LocalProfileRepository localProfileRepository, NotificationService notificationService, ConsentService consentService, PromoCodeService promoCodeService, ReferralService referralService, BookingSafetyChecklistRepository bookingSafetyChecklistRepository, PaymentService paymentService, TrustSafetyService trustSafetyService, ApplicationEventPublisher eventPublisher, BookingReferenceGenerator bookingReferenceGenerator, WaitlistService waitlistService, AgeBandPricing ageBandPricing, BookingConfirmationNotifier bookingConfirmationNotifier, ConversationRepository conversationRepository) {
+                          LocalProfileRepository localProfileRepository, NotificationService notificationService, ConsentService consentService, PromoCodeService promoCodeService, ReferralService referralService, BookingSafetyChecklistRepository bookingSafetyChecklistRepository, PaymentService paymentService, TrustSafetyService trustSafetyService, ApplicationEventPublisher eventPublisher, BookingReferenceGenerator bookingReferenceGenerator, WaitlistService waitlistService, AgeBandPricing ageBandPricing, BookingConfirmationNotifier bookingConfirmationNotifier, ConversationRepository conversationRepository, DealService dealService) {
         this.bookingRepository = bookingRepository;
         this.userRepository = userRepository;
         this.experienceRepository = experienceRepository;
@@ -95,6 +98,7 @@ public class BookingService {
         this.ageBandPricing = ageBandPricing;
         this.bookingConfirmationNotifier = bookingConfirmationNotifier;
         this.conversationRepository = conversationRepository;
+        this.dealService = dealService;
     }
 
     @Transactional
@@ -183,11 +187,13 @@ public class BookingService {
         log.info("LOGGED_IN_BOOKING_TIMING updateSlotMemoryMs={}", System.currentTimeMillis() - stepStart);
 
         stepStart = System.currentTimeMillis();
+        AppliedDeal appliedDeal = dealService.resolveDealForBooking(experience, pricing.baseForPromo());
+        BigDecimal baseAfterDeal = pricing.baseForPromo().subtract(appliedDeal.discountAmount());
         AppliedPromoCodes appliedPromos = promoCodeService.applyPromoCodesForBooking(
                 loggedInUserId,
                 mergePromoCodes(request.promoCode(), request.promoCodes()),
                 null,
-                pricing.baseForPromo(),
+                baseAfterDeal,
                 currency
         );
         log.info("LOGGED_IN_BOOKING_TIMING applyPromoMs={}", System.currentTimeMillis() - stepStart);
@@ -220,6 +226,8 @@ public class BookingService {
         booking.setOriginalAmount(originalAmount);
         booking.setPrivateDiscountAmount(pricing.privateDiscountAmount());
         booking.setDiscountAmount(appliedPromos.totalDiscount());
+        booking.setDealId(appliedDeal.dealId());
+        booking.setDealDiscountAmount(appliedDeal.discountAmount());
         booking.setTotalAmount(totalAmount);
         booking.setCurrency(currency);
 
@@ -449,7 +457,9 @@ public class BookingService {
                 booking.getReferralCodeText(),
                 booking.isPrivateBooking(),
                 booking.getPrivateDiscountAmount(),
-                booking.getSeatsBlocked()
+                booking.getSeatsBlocked(),
+                booking.getDealId(),
+                booking.getDealDiscountAmount()
         );
     }
 
@@ -734,11 +744,13 @@ public class BookingService {
         log.info("GUEST_BOOKING_TIMING updateSlotMemoryMs={}", System.currentTimeMillis() - stepStart);
 
         stepStart = System.currentTimeMillis();
+        AppliedDeal appliedDeal = dealService.resolveDealForBooking(experience, pricing.baseForPromo());
+        BigDecimal baseAfterDeal = pricing.baseForPromo().subtract(appliedDeal.discountAmount());
         AppliedPromoCodes appliedPromos = promoCodeService.applyPromoCodesForBooking(
                 null,
                 mergePromoCodes(request.promoCode(), request.promoCodes()),
                 normalizedGuestEmail,
-                pricing.baseForPromo(),
+                baseAfterDeal,
                 currency
         );
         log.info("GUEST_BOOKING_TIMING applyPromoMs={}", System.currentTimeMillis() - stepStart);
@@ -787,6 +799,8 @@ public class BookingService {
         booking.setOriginalAmount(originalAmount);
         booking.setPrivateDiscountAmount(pricing.privateDiscountAmount());
         booking.setDiscountAmount(appliedPromos.totalDiscount());
+        booking.setDealId(appliedDeal.dealId());
+        booking.setDealDiscountAmount(appliedDeal.discountAmount());
         booking.setTotalAmount(totalAmount);
         booking.setCurrency(currency);
 

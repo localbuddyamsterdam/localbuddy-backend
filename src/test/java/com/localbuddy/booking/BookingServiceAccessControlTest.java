@@ -4,6 +4,7 @@ import com.localbuddy.availability.AvailabilitySlot;
 import com.localbuddy.availability.AvailabilitySlotRepository;
 import com.localbuddy.common.exception.ResourceNotFoundException;
 import com.localbuddy.consent.ConsentService;
+import com.localbuddy.deals.DealService;
 import com.localbuddy.experience.Experience;
 import com.localbuddy.experience.ExperienceRepository;
 import com.localbuddy.localprofile.LocalProfile;
@@ -63,7 +64,8 @@ class BookingServiceAccessControlTest {
             mock(WaitlistService.class),
             mock(AgeBandPricing.class),
             mock(BookingConfirmationNotifier.class),
-            conversationRepository
+            conversationRepository,
+            mock(DealService.class)
     );
 
     private User user(UUID id, UserRole role) {

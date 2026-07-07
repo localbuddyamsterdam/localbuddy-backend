@@ -45,4 +45,28 @@ public interface DealRepository extends JpaRepository<Deal, UUID> {
             @Param("experienceId") UUID experienceId,
             @Param("categoryId") UUID categoryId
     );
+
+    /**
+     * All live deals APPLICABLE to one experience: GLOBAL, or matching the experience's own id,
+     * its category, or its city (OR semantics — unlike {@link #findLiveDeals}, which AND-combines
+     * independent filters and is meant for one-dimension browsing). The caller ranks by specificity.
+     */
+    @Query("""
+            SELECT d FROM Deal d
+            WHERE d.active = true
+              AND (d.startsAt IS NULL OR d.startsAt <= :now)
+              AND (d.endsAt IS NULL OR d.endsAt >= :now)
+              AND (
+                    d.scope = com.localbuddy.deals.DealScope.GLOBAL
+                 OR (d.scope = com.localbuddy.deals.DealScope.EXPERIENCE AND d.targetExperienceId = :experienceId)
+                 OR (d.scope = com.localbuddy.deals.DealScope.CATEGORY AND d.targetCategoryId = :categoryId)
+                 OR (d.scope = com.localbuddy.deals.DealScope.CITY AND d.targetCityId = :cityId)
+              )
+            """)
+    List<Deal> findApplicableForExperience(
+            @Param("now") Instant now,
+            @Param("experienceId") UUID experienceId,
+            @Param("categoryId") UUID categoryId,
+            @Param("cityId") UUID cityId
+    );
 }

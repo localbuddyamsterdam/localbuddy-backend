@@ -148,34 +148,52 @@ public class DealService {
             throw new ResourceNotFoundException("Experience not found");
         }
 
+        BigDecimal price = experience.getPriceAmount();
+        Deal best = resolveBestDeal(experience).orElse(null);
+        if (best == null || price == null) {
+            return null;
+        }
+
+        BigDecimal discount = computeDiscount(best, price);
+        String currency = experience.getCurrency() == null ? null
+                : experience.getCurrency().toUpperCase(Locale.ROOT);
+        return new ResolvedDealResponse(
+                best.getId(), best.getName(), best.getBadgeText(),
+                best.getDiscountType(), best.getDiscountValue(),
+                price, discount, price.subtract(discount), currency);
+    }
+
+    /**
+     * Resolves the deal to apply to a booking of the given experience against a base amount.
+     * Returns {@link AppliedDeal#none()} (zero discount) when no live deal applies.
+     */
+    @Transactional(readOnly = true)
+    public AppliedDeal resolveDealForBooking(Experience experience, BigDecimal baseAmount) {
+        if (experience == null || baseAmount == null || baseAmount.signum() <= 0) {
+            return AppliedDeal.none();
+        }
+        return resolveBestDeal(experience)
+                .map(deal -> new AppliedDeal(deal.getId(), computeDiscount(deal, baseAmount), deal.getBadgeText()))
+                .orElse(AppliedDeal.none());
+    }
+
+    private java.util.Optional<Deal> resolveBestDeal(Experience experience) {
         UUID cityId = experience.getCity() == null ? null : experience.getCity().getId();
         UUID categoryId = experience.getCategory() == null ? null : experience.getCategory().getId();
-        BigDecimal price = experience.getPriceAmount();
         String currency = experience.getCurrency() == null ? null
                 : experience.getCurrency().toUpperCase(Locale.ROOT);
 
         List<Deal> candidates =
-                dealRepository.findLiveDeals(Instant.now(), null, cityId, experienceId, categoryId);
+                dealRepository.findApplicableForExperience(Instant.now(), experience.getId(), categoryId, cityId);
 
         Comparator<Deal> byBest = Comparator
                 .comparingInt((Deal d) -> specificityRank(d.getScope()))
                 .thenComparingInt(d -> -(d.getPriority() == null ? 0 : d.getPriority()))
                 .thenComparing(Deal::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder()));
 
-        Deal best = candidates.stream()
+        return candidates.stream()
                 .filter(d -> isApplicable(d, currency))
-                .min(byBest)
-                .orElse(null);
-
-        if (best == null || price == null) {
-            return null;
-        }
-
-        BigDecimal discount = computeDiscount(best, price);
-        return new ResolvedDealResponse(
-                best.getId(), best.getName(), best.getBadgeText(),
-                best.getDiscountType(), best.getDiscountValue(),
-                price, discount, price.subtract(discount), currency);
+                .min(byBest);
     }
 
     private boolean isApplicable(Deal deal, String experienceCurrency) {

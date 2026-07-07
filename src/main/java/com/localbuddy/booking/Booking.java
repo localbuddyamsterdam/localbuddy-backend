@@ -185,6 +185,12 @@ public class Booking {
     @Column(name = "referral_code_text", length = 80)
     private String referralCodeText;
 
+    @Column(name = "deal_id")
+    private UUID dealId;
+
+    @Column(name = "deal_discount_amount", nullable = false, precision = 10, scale = 2)
+    private BigDecimal dealDiscountAmount = BigDecimal.ZERO;
+
     @OneToMany(mappedBy = "booking", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<BookingPromoCode> appliedPromoCodes = new ArrayList<>();
 
@@ -252,6 +258,10 @@ public class Booking {
 
         if (discountAmount == null) {
             discountAmount = BigDecimal.ZERO;
+        }
+
+        if (dealDiscountAmount == null) {
+            dealDiscountAmount = BigDecimal.ZERO;
         }
     }
 

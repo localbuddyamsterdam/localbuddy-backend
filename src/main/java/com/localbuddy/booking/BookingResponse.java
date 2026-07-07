@@ -45,6 +45,8 @@ public record BookingResponse(
         String referralCodeText,
         boolean privateBooking,
         BigDecimal privateDiscountAmount,
-        Integer seatsBlocked
+        Integer seatsBlocked,
+        UUID dealId,
+        BigDecimal dealDiscountAmount
 ) {
 }
