@@ -75,6 +75,32 @@ public class RateAdminService {
         return toResponse(saved);
     }
 
+    @Transactional
+    public CommissionRuleResponse updateCommissionRule(UUID id, UpdateCommissionRuleRequest req, UUID adminId) {
+        CommissionRule rule = commissionRuleRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Commission rule not found: " + id));
+        Map<String, Object> before = commissionSnapshot(rule);
+
+        validateRate(req.rate());
+        if (req.rate().compareTo(maxCommissionRate) > 0) {
+            throw new BadRequestException(
+                    "Commission rate " + req.rate() + " exceeds the maximum allowed (" + maxCommissionRate
+                            + "). A higher rate could drive a host payout negative once commission VAT is added.");
+        }
+        validateWindow(req.effectiveFrom(), req.effectiveTo());
+
+        rule.setRate(req.rate());
+        rule.setEffectiveFrom(req.effectiveFrom());
+        rule.setEffectiveTo(req.effectiveTo());
+        rule.setNote(req.note());
+        if (req.active() != null) {
+            rule.setActive(req.active());
+        }
+        CommissionRule saved = commissionRuleRepository.save(rule);
+        audit("COMMISSION", id, before, commissionSnapshot(saved), adminId);
+        return toResponse(saved);
+    }
+
     @Transactional(readOnly = true)
     public List<CommissionRuleResponse> listCommissionRules() {
         return commissionRuleRepository.findAll().stream().map(this::toResponse).toList();

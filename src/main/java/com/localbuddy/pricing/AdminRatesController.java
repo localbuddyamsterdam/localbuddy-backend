@@ -1,5 +1,8 @@
 package com.localbuddy.pricing;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -33,17 +36,56 @@ public class AdminRatesController {
 
     // -------- Commission
 
+    @Operation(summary = "List commission rules",
+            description = "All commission rules across scopes (PLATFORM/CITY/CATEGORY/HOST/EXPERIENCE), including inactive. Admin only.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Commission rules retrieved"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "403", description = "Not authorized (admin only)")
+    })
     @GetMapping("/commission")
     public ResponseEntity<List<CommissionRuleResponse>> listCommission() {
         return ResponseEntity.ok(rateAdminService.listCommissionRules());
     }
 
+    @Operation(summary = "Create a commission rule",
+            description = "Adds a scoped, time-boxed commission rate (fraction 0.00–1.00, capped by app.platform.max-commission-rate). Admin only.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Commission rule created"),
+            @ApiResponse(responseCode = "400", description = "Invalid rate (negative, >1, or above the max cap) or effective window"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "403", description = "Not authorized (admin only)")
+    })
     @PostMapping("/commission")
     public ResponseEntity<CommissionRuleResponse> createCommission(Authentication authentication,
                                                                    @Valid @RequestBody CreateCommissionRuleRequest request) {
         return ResponseEntity.ok(rateAdminService.createCommissionRule(request, adminId(authentication)));
     }
 
+    @Operation(summary = "Update a commission rule",
+            description = "Edits the rate, effective window, note, or active flag of an existing commission rule in place (scope is immutable). Admin only.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Commission rule updated"),
+            @ApiResponse(responseCode = "400", description = "Invalid rate or effective window"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "403", description = "Not authorized (admin only)"),
+            @ApiResponse(responseCode = "404", description = "Commission rule not found")
+    })
+    @PutMapping("/commission/{id}")
+    public ResponseEntity<CommissionRuleResponse> updateCommission(Authentication authentication,
+                                                                   @PathVariable UUID id,
+                                                                   @Valid @RequestBody UpdateCommissionRuleRequest request) {
+        return ResponseEntity.ok(rateAdminService.updateCommissionRule(id, request, adminId(authentication)));
+    }
+
+    @Operation(summary = "Deactivate a commission rule",
+            description = "Soft-deletes a commission rule so it no longer applies during pricing. Admin only.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Commission rule deactivated"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "403", description = "Not authorized (admin only)"),
+            @ApiResponse(responseCode = "404", description = "Commission rule not found")
+    })
     @PostMapping("/commission/{id}/deactivate")
     public ResponseEntity<CommissionRuleResponse> deactivateCommission(Authentication authentication,
                                                                        @PathVariable UUID id) {
