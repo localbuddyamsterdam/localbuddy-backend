@@ -227,10 +227,16 @@ public class ExperienceService {
         Integer guests = totalGuests > 0 ? totalGuests : null;
 
         // Exclude experiences whose minimum age would bar the youngest requested band.
-        Integer maxMinimumAge = infantCount > 0 ? 0
-                : childCount > 0 ? 2
-                : teenCount > 0 ? 13
-                : null;
+        Integer maxMinimumAge;
+        if (infantCount > 0) {
+            maxMinimumAge = 0;
+        } else if (childCount > 0) {
+            maxMinimumAge = 2;
+        } else if (teenCount > 0) {
+            maxMinimumAge = 13;
+        } else {
+            maxMinimumAge = null;
+        }
 
         Instant dateStart = null;
         Instant dateEnd = null;
@@ -287,10 +293,16 @@ public class ExperienceService {
         int totalGuests = adultCount + teenCount + childCount + infantCount;
         Integer guests = totalGuests > 0 ? totalGuests : null;
 
-        Integer maxMinimumAge = infantCount > 0 ? 0
-                : childCount > 0 ? 2
-                : teenCount > 0 ? 13
-                : null;
+        Integer maxMinimumAge;
+        if (infantCount > 0) {
+            maxMinimumAge = 0;
+        } else if (childCount > 0) {
+            maxMinimumAge = 2;
+        } else if (teenCount > 0) {
+            maxMinimumAge = 13;
+        } else {
+            maxMinimumAge = null;
+        }
 
         Instant dateStart = null;
         Instant dateEnd = null;
