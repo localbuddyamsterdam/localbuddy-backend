@@ -133,6 +133,27 @@ public class PublicExperienceController {
     }
 
     @Operation(
+            summary = "Trending approved experiences",
+            description = "Public endpoint. Returns approved experiences ranked by recent confirmed/completed "
+                    + "bookings within the look-back window, tie-broken by host rating and recency. Falls back "
+                    + "to top-rated/newest when booking data is sparse."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Trending experiences retrieved successfully")
+    })
+    @GetMapping("/trending")
+    public ResponseEntity<List<ExperienceResponse>> getTrendingExperiences(
+            @Parameter(description = "Restrict to a city by slug")
+            @RequestParam(required = false) String citySlug,
+            @Parameter(description = "Look-back window in days (default 30, max 365)")
+            @RequestParam(defaultValue = "30") int windowDays,
+            @Parameter(description = "Max results (default 10, max 50)")
+            @RequestParam(defaultValue = "10") int limit
+    ) {
+        return ResponseEntity.ok(experienceService.getTrendingExperiences(citySlug, windowDays, limit));
+    }
+
+    @Operation(
             summary = "Get approved experience by ID",
             description = "Public endpoint. Returns a single approved experience by its ID."
     )

@@ -1,5 +1,7 @@
 package com.localbuddy.experience;
 
+import com.localbuddy.booking.BookingRepository;
+import com.localbuddy.booking.BookingStatus;
 import com.localbuddy.common.exception.BadRequestException;
 import com.localbuddy.common.exception.ResourceNotFoundException;
 import com.localbuddy.consent.ConsentService;
@@ -19,10 +21,15 @@ import java.text.Normalizer;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -36,11 +43,13 @@ public class ExperienceService {
     private final ConsentService consentService;
     private final TrustSafetyService trustSafetyService;
     private final VatService vatService;
+    private final BookingRepository bookingRepository;
 
     public ExperienceService(ExperienceRepository experienceRepository,
                              ExperienceCategoryRepository categoryRepository,
                              CityRepository cityRepository,
-                             LocalProfileRepository localProfileRepository  , ConsentService consentService, TrustSafetyService trustSafetyService, VatService vatService) {
+                             LocalProfileRepository localProfileRepository  , ConsentService consentService, TrustSafetyService trustSafetyService, VatService vatService,
+                             BookingRepository bookingRepository) {
         this.experienceRepository = experienceRepository;
         this.categoryRepository = categoryRepository;
         this.cityRepository = cityRepository;
@@ -48,6 +57,7 @@ public class ExperienceService {
         this.consentService = consentService;
         this.trustSafetyService = trustSafetyService;
         this.vatService = vatService;
+        this.bookingRepository = bookingRepository;
     }
 
     @Transactional
@@ -604,6 +614,42 @@ public class ExperienceService {
         return findApprovedExperiences(citySlug, categorySlug, bookingModes).stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<ExperienceResponse> getTrendingExperiences(String citySlug, Integer windowDays, Integer limit) {
+        int days = (windowDays == null || windowDays <= 0) ? 30 : Math.min(windowDays, 365);
+        int max = (limit == null || limit <= 0) ? 10 : Math.min(limit, 50);
+        Instant since = Instant.now().minus(days, ChronoUnit.DAYS);
+
+        Map<UUID, Long> recentBookings = new HashMap<>();
+        for (Object[] row : bookingRepository.countBookingsByExperienceSince(
+                List.of(BookingStatus.CONFIRMED, BookingStatus.COMPLETED), since)) {
+            recentBookings.put((UUID) row[0], (Long) row[1]);
+        }
+
+        List<Experience> approved = new ArrayList<>(findApprovedExperiences(citySlug, null, null));
+
+        Comparator<Experience> byTrending = Comparator
+                .comparingLong((Experience e) -> recentBookings.getOrDefault(e.getId(), 0L))
+                .reversed()
+                .thenComparing(ExperienceService::hostRating,
+                        Comparator.nullsLast(Comparator.<BigDecimal>reverseOrder()))
+                .thenComparing(Experience::getCreatedAt,
+                        Comparator.nullsLast(Comparator.<Instant>reverseOrder()));
+        approved.sort(byTrending);
+
+        return approved.stream()
+                .limit(max)
+                .map(this::toResponse)
+                .toList();
+    }
+
+    private static BigDecimal hostRating(Experience e) {
+        if (e.getLocalProfile() == null || e.getLocalProfile().getUser() == null) {
+            return null;
+        }
+        return e.getLocalProfile().getUser().getRatingAvg();
     }
 
     /**

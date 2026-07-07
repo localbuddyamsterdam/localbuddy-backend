@@ -93,6 +93,16 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
 
     long countByExperienceIdAndStatus(UUID experienceId, BookingStatus status);
 
+    /** Booking counts per experience for the given statuses created since a cutoff — trending signal. */
+    @org.springframework.data.jpa.repository.Query("""
+            SELECT b.experience.id, COUNT(b)
+            FROM Booking b
+            WHERE b.status IN :statuses
+              AND b.createdAt >= :since
+            GROUP BY b.experience.id
+            """)
+    List<Object[]> countBookingsByExperienceSince(Collection<BookingStatus> statuses, Instant since);
+
     long countByLoggedInUserIdAndAttendanceOutcome(UUID loggedInUserId, AttendanceOutcome attendanceOutcome);
 
     /** Host no-shows counted once per slot occurrence, even if several guests reported the same slot. */
