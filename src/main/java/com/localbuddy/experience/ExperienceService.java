@@ -249,8 +249,12 @@ public class ExperienceService {
         int pageSize = size <= 0 ? 20 : Math.min(size, 100);
         Pageable pageable = PageRequest.of(pageNumber, pageSize);
 
+        boolean filterByDate = dateStart != null;
+        boolean filterByAvailability = guests != null || dateStart != null;
+
         Page<Experience> result = experienceRepository.searchApproved(
-                city, category, maxMinimumAge, guests, Instant.now(), dateStart, dateEnd, pageable);
+                city, category, maxMinimumAge, guests, Instant.now(), dateStart, dateEnd,
+                filterByAvailability, filterByDate, pageable);
 
         List<ExperienceResponse> content = result.getContent().stream()
                 .map(this::toResponse)
@@ -327,10 +331,13 @@ public class ExperienceService {
         int pageSize = size <= 0 ? 20 : Math.min(size, 100);
         Pageable pageable = PageRequest.of(pageNumber, pageSize);
 
+        boolean filterByDate = dateStart != null;
+        boolean filterByAvailability = guests != null || dateStart != null;
+
         Page<Experience> result = experienceRepository.searchApprovedAdvanced(
                 city, category, maxMinimumAge, guests, Instant.now(), dateStart, dateEnd,
                 normalizedMinPrice, normalizedMaxPrice, normalizedMaxDuration, normalizedMinRating,
-                keywordPattern, pageable);
+                keywordPattern, filterByAvailability, filterByDate, pageable);
 
         List<ExperienceResponse> content = result.getContent().stream()
                 .map(this::toResponse)

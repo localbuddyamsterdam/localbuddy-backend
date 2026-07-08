@@ -80,14 +80,14 @@ public interface ExperienceRepository extends JpaRepository<Experience, UUID> {
               AND (:categorySlug IS NULL OR cat.slug = :categorySlug)
               AND (:maxMinimumAge IS NULL OR e.minimumAge <= :maxMinimumAge)
               AND (
-                    (:guests IS NULL AND :dateStart IS NULL)
+                    :filterByAvailability = false
                     OR EXISTS (
                         SELECT 1 FROM AvailabilitySlot s
                         WHERE s.experience = e
                           AND s.status = com.localbuddy.availability.AvailabilityStatus.AVAILABLE
                           AND s.startTime > :now
                           AND (:guests IS NULL OR (s.capacity - s.bookedCount) >= :guests)
-                          AND (:dateStart IS NULL OR (s.startTime >= :dateStart AND s.startTime < :dateEnd))
+                          AND (:filterByDate = false OR (s.startTime >= :dateStart AND s.startTime < :dateEnd))
                     )
               )
             """,
@@ -100,14 +100,14 @@ public interface ExperienceRepository extends JpaRepository<Experience, UUID> {
               AND (:categorySlug IS NULL OR cat.slug = :categorySlug)
               AND (:maxMinimumAge IS NULL OR e.minimumAge <= :maxMinimumAge)
               AND (
-                    (:guests IS NULL AND :dateStart IS NULL)
+                    :filterByAvailability = false
                     OR EXISTS (
                         SELECT 1 FROM AvailabilitySlot s
                         WHERE s.experience = e
                           AND s.status = com.localbuddy.availability.AvailabilityStatus.AVAILABLE
                           AND s.startTime > :now
                           AND (:guests IS NULL OR (s.capacity - s.bookedCount) >= :guests)
-                          AND (:dateStart IS NULL OR (s.startTime >= :dateStart AND s.startTime < :dateEnd))
+                          AND (:filterByDate = false OR (s.startTime >= :dateStart AND s.startTime < :dateEnd))
                     )
               )
             """)
@@ -119,6 +119,8 @@ public interface ExperienceRepository extends JpaRepository<Experience, UUID> {
             @Param("now") Instant now,
             @Param("dateStart") Instant dateStart,
             @Param("dateEnd") Instant dateEnd,
+            @Param("filterByAvailability") boolean filterByAvailability,
+            @Param("filterByDate") boolean filterByDate,
             Pageable pageable
     );
 
@@ -144,14 +146,14 @@ public interface ExperienceRepository extends JpaRepository<Experience, UUID> {
               AND (:minHostRating IS NULL OR (u IS NOT NULL AND u.ratingAvg >= :minHostRating))
               AND (:keyword IS NULL OR lower(e.title) LIKE :keyword OR lower(e.description) LIKE :keyword)
               AND (
-                    (:guests IS NULL AND :dateStart IS NULL)
+                    :filterByAvailability = false
                     OR EXISTS (
                         SELECT 1 FROM AvailabilitySlot s
                         WHERE s.experience = e
                           AND s.status = com.localbuddy.availability.AvailabilityStatus.AVAILABLE
                           AND s.startTime > :now
                           AND (:guests IS NULL OR (s.capacity - s.bookedCount) >= :guests)
-                          AND (:dateStart IS NULL OR (s.startTime >= :dateStart AND s.startTime < :dateEnd))
+                          AND (:filterByDate = false OR (s.startTime >= :dateStart AND s.startTime < :dateEnd))
                     )
               )
             """,
@@ -171,14 +173,14 @@ public interface ExperienceRepository extends JpaRepository<Experience, UUID> {
               AND (:minHostRating IS NULL OR (u IS NOT NULL AND u.ratingAvg >= :minHostRating))
               AND (:keyword IS NULL OR lower(e.title) LIKE :keyword OR lower(e.description) LIKE :keyword)
               AND (
-                    (:guests IS NULL AND :dateStart IS NULL)
+                    :filterByAvailability = false
                     OR EXISTS (
                         SELECT 1 FROM AvailabilitySlot s
                         WHERE s.experience = e
                           AND s.status = com.localbuddy.availability.AvailabilityStatus.AVAILABLE
                           AND s.startTime > :now
                           AND (:guests IS NULL OR (s.capacity - s.bookedCount) >= :guests)
-                          AND (:dateStart IS NULL OR (s.startTime >= :dateStart AND s.startTime < :dateEnd))
+                          AND (:filterByDate = false OR (s.startTime >= :dateStart AND s.startTime < :dateEnd))
                     )
               )
             """)
@@ -195,6 +197,8 @@ public interface ExperienceRepository extends JpaRepository<Experience, UUID> {
             @Param("maxDurationMinutes") Integer maxDurationMinutes,
             @Param("minHostRating") BigDecimal minHostRating,
             @Param("keyword") String keyword,
+            @Param("filterByAvailability") boolean filterByAvailability,
+            @Param("filterByDate") boolean filterByDate,
             Pageable pageable
     );
 }
