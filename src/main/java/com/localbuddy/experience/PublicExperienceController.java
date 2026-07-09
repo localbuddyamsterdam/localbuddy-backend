@@ -76,6 +76,10 @@ public class PublicExperienceController {
     public ResponseEntity<ExperiencePageResponse> searchApprovedExperiences(
             @RequestParam(required = false) String citySlug,
             @RequestParam(required = false) String categorySlug,
+            @Parameter(description = "Filter by booking mode: SHARED, PRIVATE_ALLOWED, or PRIVATE_ONLY. Omit for all.")
+            @RequestParam(required = false) BookingMode bookingMode,
+            @Parameter(description = "Convenience filter: true = shared only; false = private only. Ignored when bookingMode is provided.")
+            @RequestParam(required = false) Boolean shared,
             @Parameter(description = "Desired experience date (ISO-8601, yyyy-MM-dd)")
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             @Parameter(description = "Number of adults in the party")
@@ -92,7 +96,7 @@ public class PublicExperienceController {
             @RequestParam(defaultValue = "20") int size
     ) {
         return ResponseEntity.ok(experienceService.searchApprovedExperiences(
-                citySlug, categorySlug, date, adults, teens, children, infants, page, size));
+                citySlug, categorySlug, bookingMode, shared, date, adults, teens, children, infants, page, size));
     }
 
     @Operation(
@@ -108,6 +112,10 @@ public class PublicExperienceController {
     public ResponseEntity<ExperiencePageResponse> advancedSearch(
             @RequestParam(required = false) String citySlug,
             @RequestParam(required = false) String categorySlug,
+            @Parameter(description = "Filter by booking mode: SHARED, PRIVATE_ALLOWED, or PRIVATE_ONLY. Omit for all.")
+            @RequestParam(required = false) BookingMode bookingMode,
+            @Parameter(description = "Convenience filter: true = shared only; false = private only. Ignored when bookingMode is provided.")
+            @RequestParam(required = false) Boolean shared,
             @Parameter(description = "Desired experience date (ISO-8601, yyyy-MM-dd)")
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             @RequestParam(required = false) Integer adults,
@@ -128,7 +136,7 @@ public class PublicExperienceController {
             @RequestParam(defaultValue = "20") int size
     ) {
         return ResponseEntity.ok(experienceService.advancedSearch(
-                citySlug, categorySlug, date, adults, teens, children, infants,
+                citySlug, categorySlug, bookingMode, shared, date, adults, teens, children, infants,
                 minPrice, maxPrice, maxDurationMinutes, minHostRating, keyword, page, size));
     }
 

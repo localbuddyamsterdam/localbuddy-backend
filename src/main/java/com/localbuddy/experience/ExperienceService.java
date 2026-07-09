@@ -207,6 +207,8 @@ public class ExperienceService {
     public ExperiencePageResponse searchApprovedExperiences(
             String citySlug,
             String categorySlug,
+            BookingMode bookingMode,
+            Boolean shared,
             LocalDate date,
             Integer adults,
             Integer teens,
@@ -252,8 +254,9 @@ public class ExperienceService {
         boolean filterByDate = dateStart != null;
         boolean filterByAvailability = guests != null || dateStart != null;
 
+        Collection<BookingMode> bookingModes = resolveBookingModes(bookingMode, shared);
         Page<Experience> result = experienceRepository.searchApproved(
-                city, category, maxMinimumAge, guests, Instant.now(), dateStart, dateEnd,
+                city, category, bookingModes, maxMinimumAge, guests, Instant.now(), dateStart, dateEnd,
                 filterByAvailability, filterByDate, pageable);
 
         List<ExperienceResponse> content = result.getContent().stream()
@@ -273,6 +276,8 @@ public class ExperienceService {
     public ExperiencePageResponse advancedSearch(
             String citySlug,
             String categorySlug,
+            BookingMode bookingMode,
+            Boolean shared,
             LocalDate date,
             Integer adults,
             Integer teens,
@@ -334,8 +339,9 @@ public class ExperienceService {
         boolean filterByDate = dateStart != null;
         boolean filterByAvailability = guests != null || dateStart != null;
 
+        Collection<BookingMode> bookingModes = resolveBookingModes(bookingMode, shared);
         Page<Experience> result = experienceRepository.searchApprovedAdvanced(
-                city, category, maxMinimumAge, guests, Instant.now(), dateStart, dateEnd,
+                city, category, bookingModes, maxMinimumAge, guests, Instant.now(), dateStart, dateEnd,
                 normalizedMinPrice, normalizedMaxPrice, normalizedMaxDuration, normalizedMinRating,
                 keywordPattern, filterByAvailability, filterByDate, pageable);
 
