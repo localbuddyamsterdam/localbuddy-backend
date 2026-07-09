@@ -44,7 +44,7 @@ public class EmailTemplateService {
         }
 
         String calendarButton = blank(m.calendarUrl()) ? "" :
-                "<td><a class=\"lb-btn-ghost\" href=\"" + esc(m.calendarUrl()) + "\" "
+                "<td class=\"lb-cta-cell\"><a class=\"lb-btn-ghost\" href=\"" + esc(m.calendarUrl()) + "\" "
                         + "style=\"display:inline-block;background:#ffffff;color:#111114;font-size:15px;font-weight:600;line-height:1;padding:13px 24px;border-radius:999px;border:1px solid #d6d6db;\">Add to calendar</a></td>";
 
         return TEMPLATE
@@ -103,6 +103,11 @@ public class EmailTemplateService {
                 .lb-container { width:100% !important; border-radius:0 !important; }
                 .lb-pad { padding-left:22px !important; padding-right:22px !important; }
                 .lb-stack { display:block !important; width:100% !important; padding:0 0 18px 0 !important; }
+                .lb-cta { width:100% !important; }
+                .lb-cta-cell { display:block !important; width:100% !important; padding:0 0 12px 0 !important; }
+                .lb-cta-cell a { display:block !important; text-align:center !important; }
+                .lb-ref-label, .lb-ref-value { display:block !important; width:100% !important; text-align:left !important; }
+                .lb-ref-value { padding-top:10px !important; }
               }
             </style>
             </head>
@@ -166,18 +171,18 @@ public class EmailTemplateService {
                         <td style="padding:16px 22px 20px;">
                           <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                             <tr>
-                              <td style="vertical-align:middle; font-size:11px; font-weight:600; letter-spacing:0.05em; text-transform:uppercase; color:#86868b;">Booking reference</td>
-                              <td style="vertical-align:middle; text-align:right;">
-                                <span style="font-family:'SFMono-Regular',ui-monospace,Consolas,monospace; font-size:14px; font-weight:600; color:#111114; background:#f5f5f7; border:1px solid #e6e6e9; border-radius:8px; padding:5px 11px;">{{ref}}</span>
+                              <td class="lb-ref-label" style="vertical-align:middle; font-size:11px; font-weight:600; letter-spacing:0.05em; text-transform:uppercase; color:#86868b;">Booking reference</td>
+                              <td class="lb-ref-value" style="vertical-align:middle; text-align:right;">
+                                <span style="display:inline-block; white-space:nowrap; font-family:'SFMono-Regular',ui-monospace,Consolas,monospace; font-size:14px; font-weight:600; color:#111114; background:#f5f5f7; border:1px solid #e6e6e9; border-radius:8px; padding:5px 11px;">{{ref}}</span>
                               </td>
                             </tr>
                           </table>
                         </td>
                       </tr>
                     </table>
-                    <table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px 0 4px;">
+                    <table role="presentation" class="lb-cta" cellpadding="0" cellspacing="0" style="margin:24px 0 4px;">
                       <tr>
-                        <td style="padding-right:10px;">
+                        <td class="lb-cta-cell" style="padding-right:10px;">
                           <a class="lb-btn-primary" href="{{manageUrl}}" style="display:inline-block; background:#d62f2a; color:#ffffff; font-size:15px; font-weight:600; line-height:1; padding:14px 26px; border-radius:999px;">Manage your booking</a>
                         </td>
                         {{calendarButton}}
