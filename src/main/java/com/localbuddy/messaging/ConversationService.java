@@ -248,8 +248,8 @@ public class ConversationService {
 
         Instant since = participants.stream()
                 .filter(p -> p.getUser().getId().equals(viewerUserId))
-                .map(ConversationParticipant::getLastReadAt)
                 .findFirst()
+                .map(ConversationParticipant::getLastReadAt)
                 .orElse(null);
         boolean filterSince = since != null;
         long unread = viewerUserId == null ? 0
