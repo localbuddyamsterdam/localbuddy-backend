@@ -251,8 +251,9 @@ public class ConversationService {
                 .map(ConversationParticipant::getLastReadAt)
                 .findFirst()
                 .orElse(null);
+        boolean filterSince = since != null;
         long unread = viewerUserId == null ? 0
-                : messageRepository.countUnread(conversation.getId(), viewerUserId, since);
+                : messageRepository.countUnread(conversation.getId(), viewerUserId, since, filterSince);
 
         return new ConversationResponse(
                 conversation.getId(),

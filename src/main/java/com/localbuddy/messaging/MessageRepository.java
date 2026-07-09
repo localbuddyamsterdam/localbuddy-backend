@@ -17,9 +17,10 @@ public interface MessageRepository extends JpaRepository<Message, UUID> {
             select count(m) from Message m
             where m.conversation.id = :conversationId
               and m.senderUser.id <> :userId
-              and (:since is null or m.createdAt > :since)
+              and (:filterSince = false or m.createdAt > :since)
             """)
     long countUnread(@Param("conversationId") UUID conversationId,
                      @Param("userId") UUID userId,
-                     @Param("since") Instant since);
+                     @Param("since") Instant since,
+                     @Param("filterSince") boolean filterSince);
 }
