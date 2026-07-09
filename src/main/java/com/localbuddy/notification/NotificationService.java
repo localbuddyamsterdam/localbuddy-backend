@@ -128,6 +128,72 @@ public class NotificationService {
         );
     }
 
+    // --- HTML-email overloads: carry a rendered html body alongside the plain-text message ---
+
+    @Transactional
+    public void createEmailNotificationForUser(
+            User recipientUser,
+            NotificationType notificationType,
+            String subject,
+            String message,
+            String htmlBody,
+            String relatedEntityType,
+            UUID relatedEntityId,
+            String dedupeKey
+    ) {
+        if (recipientUser == null || recipientUser.getEmail() == null) {
+            return;
+        }
+        createNotification(
+                recipientUser, recipientUser.getEmail(), recipientUser.getPhone(),
+                NotificationChannel.EMAIL, notificationType, subject, message, htmlBody,
+                relatedEntityType, relatedEntityId, dedupeKey
+        );
+    }
+
+    @Transactional
+    public void createEmailNotificationForGuest(
+            String recipientEmail,
+            String recipientPhone,
+            NotificationType notificationType,
+            String subject,
+            String message,
+            String htmlBody,
+            String relatedEntityType,
+            UUID relatedEntityId,
+            String dedupeKey
+    ) {
+        if (recipientEmail == null || recipientEmail.trim().isEmpty()) {
+            return;
+        }
+        createNotification(
+                null, recipientEmail.trim().toLowerCase(), recipientPhone,
+                NotificationChannel.EMAIL, notificationType, subject, message, htmlBody,
+                relatedEntityType, relatedEntityId, dedupeKey
+        );
+    }
+
+    @Transactional
+    public void createEmailAndInAppNotificationForUser(
+            User recipientUser,
+            NotificationType notificationType,
+            String subject,
+            String message,
+            String htmlBody,
+            String relatedEntityType,
+            UUID relatedEntityId,
+            String dedupeKeyBase
+    ) {
+        createEmailNotificationForUser(
+                recipientUser, notificationType, subject, message, htmlBody,
+                relatedEntityType, relatedEntityId, dedupeKeyBase + ":EMAIL"
+        );
+        createInAppNotificationForUser(
+                recipientUser, notificationType, subject, message,
+                relatedEntityType, relatedEntityId, dedupeKeyBase + ":INAPP"
+        );
+    }
+
     @Transactional
     public void createWhatsAppNotificationForUser(
             User recipientUser,
@@ -198,6 +264,23 @@ public class NotificationService {
             UUID relatedEntityId,
             String dedupeKey
     ) {
+        createNotification(recipientUser, recipientEmail, recipientPhone, channel, notificationType,
+                subject, message, null, relatedEntityType, relatedEntityId, dedupeKey);
+    }
+
+    private void createNotification(
+            User recipientUser,
+            String recipientEmail,
+            String recipientPhone,
+            NotificationChannel channel,
+            NotificationType notificationType,
+            String subject,
+            String message,
+            String htmlBody,
+            String relatedEntityType,
+            UUID relatedEntityId,
+            String dedupeKey
+    ) {
         if (notificationRepository.existsByDedupeKey(dedupeKey)) {
             return;
         }
@@ -210,6 +293,7 @@ public class NotificationService {
         notification.setNotificationType(notificationType);
         notification.setSubject(optionalTrim(subject));
         notification.setMessage(message.trim());
+        notification.setHtmlBody(htmlBody);
         notification.setStatus(NotificationStatus.PENDING);
         notification.setDedupeKey(dedupeKey);
         notification.setRelatedEntityType(relatedEntityType);

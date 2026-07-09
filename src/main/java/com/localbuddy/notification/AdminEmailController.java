@@ -51,7 +51,7 @@ public class AdminEmailController {
                 : request.message();
 
         EmailSendResult result = emailProviderService.sendEmail(
-                new EmailSendRequest(request.to().trim(), subject, message));
+                new EmailSendRequest(request.to().trim(), subject, message, null));
         return ResponseEntity.ok(result);
     }
 

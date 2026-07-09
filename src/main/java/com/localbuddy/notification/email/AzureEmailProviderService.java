@@ -48,6 +48,10 @@ public class AzureEmailProviderService implements EmailProviderService {
                     .setSubject(request.subject())
                     .setBodyPlainText(request.message());
 
+            if (request.htmlBody() != null && !request.htmlBody().isBlank()) {
+                message.setBodyHtml(request.htmlBody());
+            }
+
             SyncPoller<com.azure.communication.email.models.EmailSendResult,
                     com.azure.communication.email.models.EmailSendResult> poller =
                     emailClient.beginSend(message);

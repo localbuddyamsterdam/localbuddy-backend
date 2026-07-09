@@ -87,7 +87,8 @@ public class NotificationProcessingService {
                 new EmailSendRequest(
                         notification.getRecipientEmail(),
                         notification.getSubject(),
-                        notification.getMessage()
+                        notification.getMessage(),
+                        notification.getHtmlBody()
                 )
         );
 

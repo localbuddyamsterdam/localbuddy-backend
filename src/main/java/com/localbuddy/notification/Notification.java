@@ -45,6 +45,10 @@ public class Notification {
     @Column(name = "message", nullable = false, columnDefinition = "TEXT")
     private String message;
 
+    /** Rendered HTML body for email notifications; null for plain-text-only / other channels. */
+    @Column(name = "html_body", columnDefinition = "TEXT")
+    private String htmlBody;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 40)
     private NotificationStatus status = NotificationStatus.PENDING;
