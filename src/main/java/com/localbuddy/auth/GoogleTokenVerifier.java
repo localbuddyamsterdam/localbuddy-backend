@@ -3,8 +3,11 @@ package com.localbuddy.auth;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.localbuddy.common.exception.BadRequestException;
+import com.localbuddy.common.exception.ServiceUnavailableException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpStatusCodeException;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 
 @Component
@@ -32,6 +35,13 @@ public class GoogleTokenVerifier implements SocialTokenVerifier {
                     .uri(TOKENINFO_URL, idToken)
                     .retrieve()
                     .body(GoogleTokenInfo.class);
+        } catch (HttpStatusCodeException ex) {
+            if (ex.getStatusCode().is5xxServerError()) {
+                throw new ServiceUnavailableException("Google sign-in is temporarily unavailable. Please try again.");
+            }
+            throw new BadRequestException("Invalid Google token");
+        } catch (ResourceAccessException ex) {
+            throw new ServiceUnavailableException("Google sign-in is temporarily unavailable. Please try again.");
         } catch (Exception ex) {
             throw new BadRequestException("Invalid Google token");
         }

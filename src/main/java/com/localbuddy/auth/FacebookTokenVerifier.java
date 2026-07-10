@@ -2,7 +2,10 @@ package com.localbuddy.auth;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.localbuddy.common.exception.BadRequestException;
+import com.localbuddy.common.exception.ServiceUnavailableException;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpStatusCodeException;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 
 @Component
@@ -26,6 +29,13 @@ public class FacebookTokenVerifier implements SocialTokenVerifier {
                     .uri(GRAPH_ME_URL, accessToken)
                     .retrieve()
                     .body(FacebookUser.class);
+        } catch (HttpStatusCodeException ex) {
+            if (ex.getStatusCode().is5xxServerError()) {
+                throw new ServiceUnavailableException("Facebook sign-in is temporarily unavailable. Please try again.");
+            }
+            throw new BadRequestException("Invalid Facebook token");
+        } catch (ResourceAccessException ex) {
+            throw new ServiceUnavailableException("Facebook sign-in is temporarily unavailable. Please try again.");
         } catch (Exception ex) {
             throw new BadRequestException("Invalid Facebook token");
         }
