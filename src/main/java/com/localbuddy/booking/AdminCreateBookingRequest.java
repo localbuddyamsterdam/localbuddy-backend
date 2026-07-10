@@ -25,6 +25,7 @@ public record AdminCreateBookingRequest(
         @Size(max = 255, message = "Guest email cannot exceed 255 characters")
         String guestEmail,
 
+        @NotBlank(message = "Guest phone is required")
         @Size(max = 30, message = "Guest phone cannot exceed 30 characters")
         String guestPhone,
 
