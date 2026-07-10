@@ -66,17 +66,22 @@ amount. Cosmetic, but it skews refund reporting/ops dashboards.
 **Recommended fix:** decide status from the reconciled total (`refundedAmount >= amount` →
 `REFUNDED`), not from the Stripe leg alone.
 
-### 4. 🟡 Two webhook entry points with divergent finalize logic
-`PaymentService.handleStripeWebhookEvent` (live, ~line 432) vs `handleStripeWebhook(StripeWebhookRequest)` (~line 376).
+### 4. ✅ Two webhook entry points with divergent finalize logic — *routed through the same finalize*
+`PaymentService.handleStripeWebhookEvent` (live) vs `handleStripeWebhook(StripeWebhookRequest)` (unwired).
 
 The live controller (`StripeWebhookController`) uses `handleStripeWebhookEvent` →
 `markPaymentPaidFromStripeSession` → `finalizePaidBooking` (records gift redemption + promo
 redemption + invoice). A second path, `handleStripeWebhook(StripeWebhookRequest)` →
-`markPaymentPaidFromCheckoutSession`, marks the payment paid but **skips** `finalizePaidBooking`
-(no gift-redemption audit row, no promo redemption). It appears unused by any controller.
+`markPaymentPaidFromCheckoutSession`, previously marked the payment paid but **skipped**
+`finalizePaidBooking` (no gift-redemption audit row, no promo redemption). It is unused by any
+controller.
 
-**Recommended fix:** confirm it is dead and remove it, or route it through the same finalize, to
-prevent drift.
+**Resolved:** `markPaymentPaidFromCheckoutSession` now calls `finalizePaidBooking` too, so both
+webhook paths share one finalisation. That finalisation was also hardened — its best-effort steps
+(promo/referral redemption, host-ledger earning, gift-card redemption, invoices, confirmation
+notification) now run after the confirming transaction commits, each isolated in its own
+`REQUIRES_NEW` transaction (`PaidBookingFinalizer`), so a downstream failure can no longer roll back
+or 500 an already-paid, confirmed booking. (The legacy DTO path is still otherwise unwired.)
 
 ### 5. 🟡 giftcard↔payment package cycle (cosmetic)
 `GiftCardService` → `PaymentCheckoutProvider`, and `PaymentService`/`PaymentTransactionService` →

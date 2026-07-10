@@ -5,16 +5,17 @@ import com.localbuddy.common.exception.BadRequestException;
 import com.localbuddy.common.exception.ResourceNotFoundException;
 import com.localbuddy.giftcard.GiftCardApplication;
 import com.localbuddy.giftcard.GiftCardService;
-import com.localbuddy.invoice.InvoiceService;
 import com.localbuddy.payout.HostLedgerService;
 import com.localbuddy.pricing.PricingEngine;
-import com.localbuddy.promo.PromoCodeService;
-import com.localbuddy.referral.ReferralService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import com.stripe.model.Event;
 import com.stripe.model.StripeObject;
 import com.stripe.model.checkout.Session;
@@ -28,21 +29,20 @@ import java.util.UUID;
 @Service
 public class PaymentService {
 
+    private static final Logger log = LoggerFactory.getLogger(PaymentService.class);
+
     private final PaymentRepository paymentRepository;
     private final BookingRepository bookingRepository;
     private final BigDecimal commissionPercentage;
     private final PaymentCheckoutProvider paymentCheckoutProvider;
     private final PaymentWebhookEventRepository paymentWebhookEventRepository;
-    private final PromoCodeService promoCodeService;
-    private final ReferralService referralService;
     private final CancellationRefundPolicyService cancellationRefundPolicyService;
     private final PaymentTransactionService paymentTransactionService;
     private final BookingExpiryService bookingExpiryService;
     private final PricingEngine pricingEngine;
     private final HostLedgerService hostLedgerService;
-    private final InvoiceService invoiceService;
-    private final BookingConfirmationNotifier bookingConfirmationNotifier;
     private final GiftCardService giftCardService;
+    private final PaidBookingFinalizer paidBookingFinalizer;
     private final BigDecimal stripeMinimumCharge;
 
     // Self-reference (lazy, to break the construction cycle). createCheckout is deliberately NOT
@@ -56,22 +56,19 @@ public class PaymentService {
 
     public PaymentService(PaymentRepository paymentRepository,
                           BookingRepository bookingRepository,
-                          @Value("${app.platform.commission-percentage:20}") BigDecimal commissionPercentage, PaymentCheckoutProvider paymentCheckoutProvider, PaymentWebhookEventRepository paymentWebhookEventRepository, PromoCodeService promoCodeService, ReferralService referralService, CancellationRefundPolicyService cancellationRefundPolicyService, PaymentTransactionService paymentTransactionService, BookingExpiryService bookingExpiryService, PricingEngine pricingEngine, HostLedgerService hostLedgerService, InvoiceService invoiceService, BookingConfirmationNotifier bookingConfirmationNotifier, GiftCardService giftCardService, @Value("${app.payments.stripe.minimum-charge:0.50}") BigDecimal stripeMinimumCharge) {
+                          @Value("${app.platform.commission-percentage:20}") BigDecimal commissionPercentage, PaymentCheckoutProvider paymentCheckoutProvider, PaymentWebhookEventRepository paymentWebhookEventRepository, CancellationRefundPolicyService cancellationRefundPolicyService, PaymentTransactionService paymentTransactionService, BookingExpiryService bookingExpiryService, PricingEngine pricingEngine, HostLedgerService hostLedgerService, GiftCardService giftCardService, PaidBookingFinalizer paidBookingFinalizer, @Value("${app.payments.stripe.minimum-charge:0.50}") BigDecimal stripeMinimumCharge) {
         this.paymentRepository = paymentRepository;
         this.bookingRepository = bookingRepository;
         this.commissionPercentage = commissionPercentage;
         this.paymentCheckoutProvider = paymentCheckoutProvider;
         this.paymentWebhookEventRepository = paymentWebhookEventRepository;
-        this.promoCodeService = promoCodeService;
-        this.referralService = referralService;
         this.cancellationRefundPolicyService = cancellationRefundPolicyService;
         this.paymentTransactionService = paymentTransactionService;
         this.bookingExpiryService = bookingExpiryService;
         this.pricingEngine = pricingEngine;
         this.hostLedgerService = hostLedgerService;
-        this.invoiceService = invoiceService;
-        this.bookingConfirmationNotifier = bookingConfirmationNotifier;
         this.giftCardService = giftCardService;
+        this.paidBookingFinalizer = paidBookingFinalizer;
         this.stripeMinimumCharge = stripeMinimumCharge;
     }
 
@@ -348,20 +345,69 @@ public class PaymentService {
         return toCheckoutResponse(payment);
     }
 
-    /** Shared post-payment finalisation: redeem codes, confirm, record host earning + gift redemption, invoice. */
+    /**
+     * Shared post-payment finalisation. The customer's money is already captured before this runs, so
+     * nothing here may fail the request or undo the payment.
+     *
+     * <p>Only confirming the booking is critical, and it happens in the caller's transaction —
+     * atomically with the PAID payment — via {@link #confirmBookingAfterPayment}. Everything else
+     * (promo/referral redemption, host-ledger earning, gift-card redemption, invoices, and the
+     * confirmation notification) is best-effort and reconcilable, so it runs after that transaction
+     * commits, each step isolated in its own transaction. See {@link #runBestEffortFinalization} and
+     * {@link PaidBookingFinalizer} for why isolation (not just a try/catch) is required.
+     */
     private void finalizePaidBooking(Payment payment, Booking booking) {
-        promoCodeService.redeemPromoCodeForPaidBooking(booking);
-        referralService.redeemReferralCodeForPaidBooking(booking);
         confirmBookingAfterPayment(booking);
-        hostLedgerService.recordEarning(booking, payment);
-        if (payment.getGiftCardId() != null) {
-            giftCardService.recordBookingRedemption(
-                    payment.getGiftCardId(),
-                    booking.getId(),
-                    booking.getLoggedInUser() != null ? booking.getLoggedInUser().getId() : null,
-                    payment.getGiftCardAmount());
+        runBestEffortFinalization(payment.getId(), booking.getId());
+    }
+
+    /**
+     * Schedules the reconcilable post-payment side-effects to run once the confirming transaction
+     * commits. Each step runs in its own {@code REQUIRES_NEW} transaction inside {@link #safely}, so a
+     * failure — or the rollback Spring forces when a participating {@code @Transactional} downstream
+     * call throws — is contained to that step and can never turn the already-paid, already-confirmed
+     * booking into a rollback or an HTTP 500. Failures are logged with the id needed to reconcile.
+     */
+    private void runBestEffortFinalization(UUID paymentId, UUID bookingId) {
+        afterCommit(() -> {
+            safely("promo-code redemption", bookingId, () -> paidBookingFinalizer.redeemPromoCode(bookingId));
+            safely("referral redemption", bookingId, () -> paidBookingFinalizer.redeemReferralCode(bookingId));
+            safely("host-ledger earning", paymentId, () -> paidBookingFinalizer.recordHostEarning(paymentId));
+            safely("gift-card redemption", paymentId, () -> paidBookingFinalizer.recordGiftCardRedemption(paymentId));
+            safely("invoice generation", paymentId, () -> paidBookingFinalizer.generateInvoice(paymentId));
+        });
+    }
+
+    /**
+     * Runs {@code action} after the current transaction commits, so post-payment side-effects only
+     * fire once the PAID payment and CONFIRMED booking are durable. If no transaction is active
+     * (defensive — every caller is transactional today), runs it immediately.
+     */
+    private void afterCommit(Runnable action) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    action.run();
+                }
+            });
+        } else {
+            action.run();
         }
-        invoiceService.generateForConfirmedPayment(booking, payment);
+    }
+
+    /**
+     * Runs a single best-effort finalisation step, swallowing and logging any failure so a captured,
+     * confirmed booking is never rolled back or surfaced to the customer as a 500. {@code contextId}
+     * is the booking/payment id carried into the log so the missed step can be reconciled later.
+     */
+    private void safely(String step, UUID contextId, Runnable action) {
+        try {
+            action.run();
+        } catch (Exception ex) {
+            log.error("Best-effort post-payment step '{}' failed for id={}; the payment stays captured "
+                    + "and the booking confirmed, so this step needs manual reconciliation.", step, contextId, ex);
+        }
     }
 
     private void releaseGiftCardIfAny(Payment payment) {
@@ -556,10 +602,9 @@ public class PaymentService {
         payment.setPaidAt(java.time.Instant.now());
         paymentRepository.save(payment);
 
-        Booking booking = payment.getBooking();
-        confirmBookingAfterPayment(booking);
-        hostLedgerService.recordEarning(booking, payment);
-        invoiceService.generateForConfirmedPayment(booking, payment);
+        // Route this (currently unwired, legacy) DTO webhook through the same hardened finalisation as
+        // the live paths, so a downstream failure can't 500 it and it stays consistent with them.
+        finalizePaidBooking(payment, payment.getBooking());
     }
 
 
@@ -855,8 +900,13 @@ public class PaymentService {
                 booking.getStatus() == BookingStatus.ACCEPTED) {
             booking.setStatus(BookingStatus.CONFIRMED);
             bookingRepository.save(booking);
-            // Send the customer their confirmation with one-tap wallet + calendar links.
-            bookingConfirmationNotifier.sendConfirmation(booking);
+            // The confirmation notification (email/WhatsApp/in-app, with one-tap wallet + calendar links)
+            // is best-effort: a notifier failure must never roll back the confirmation. Send it after
+            // this transaction commits, isolated, and only when we actually transitioned the booking
+            // (so a duplicate webhook delivery doesn't re-notify).
+            UUID bookingId = booking.getId();
+            afterCommit(() -> safely("confirmation notification", bookingId,
+                    () -> paidBookingFinalizer.sendConfirmationNotification(bookingId)));
         }
     }
 
