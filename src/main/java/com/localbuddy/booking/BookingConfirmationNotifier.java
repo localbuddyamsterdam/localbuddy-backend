@@ -92,7 +92,14 @@ public class BookingConfirmationNotifier {
         String subject = "Your booking is confirmed";
         String dedupe = "BOOKING_CONFIRMED:" + booking.getId();
         String message = body.toString();
-        String html = emailTemplateService.renderBookingConfirmation(buildModel(booking, experience, ref, title));
+        // HTML is best-effort: a rendering issue must never roll back the booking or block the
+        // (plain-text) confirmation. If it fails, html stays null and the email goes as plain text.
+        String html = null;
+        try {
+            html = emailTemplateService.renderBookingConfirmation(buildModel(booking, experience, ref, title));
+        } catch (Exception ex) {
+            html = null;
+        }
 
         User traveler = booking.getLoggedInUser();
         if (traveler != null) {
@@ -185,8 +192,14 @@ public class BookingConfirmationNotifier {
         if (photo != null) {
             return photo;
         }
-        String slug = experience != null && experience.getCategory() != null
-                ? experience.getCategory().getSlug() : null;
+        String slug = null;
+        try {
+            if (experience != null && experience.getCategory() != null) {
+                slug = experience.getCategory().getSlug();
+            }
+        } catch (Exception ignored) {
+            // category not loadable in this context — fall back to the default illustration
+        }
         String name = slug != null && ILLUSTRATED_CATEGORIES.contains(slug) ? slug : "default";
         return publicBaseUrl + "/illustrations/" + name + ".png";
     }
