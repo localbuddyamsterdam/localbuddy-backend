@@ -20,6 +20,7 @@ import java.math.RoundingMode;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Sends the customer-facing "booking confirmed" notification as branded HTML (with a plain-text
@@ -37,6 +38,11 @@ public class BookingConfirmationNotifier {
     private static final DateTimeFormatter WHEN_TIME =
             DateTimeFormatter.ofPattern("HH:mm 'UTC'").withZone(ZoneOffset.UTC);
 
+    /** Category slugs that have a bespoke illustration served at /illustrations/&lt;slug&gt;.png. */
+    private static final Set<String> ILLUSTRATED_CATEGORIES = Set.of(
+            "food", "photo-walk", "hidden-gems", "local-markets",
+            "cafe-hopping", "student-life", "nightlife", "custom");
+
     private final NotificationService notificationService;
     private final GoogleWalletService googleWalletService;
     private final AppleWalletService appleWalletService;
@@ -44,6 +50,7 @@ public class BookingConfirmationNotifier {
     private final EmailTemplateService emailTemplateService;
     private final ExperiencePhotoRepository experiencePhotoRepository;
     private final String frontendBaseUrl;
+    private final String publicBaseUrl;
 
     public BookingConfirmationNotifier(NotificationService notificationService,
                                        GoogleWalletService googleWalletService,
@@ -51,7 +58,8 @@ public class BookingConfirmationNotifier {
                                        CalendarService calendarService,
                                        EmailTemplateService emailTemplateService,
                                        ExperiencePhotoRepository experiencePhotoRepository,
-                                       @Value("${app.frontend.base-url:http://localhost:3000}") String frontendBaseUrl) {
+                                       @Value("${app.frontend.base-url:http://localhost:3000}") String frontendBaseUrl,
+                                       @Value("${app.public-base-url:https://localbuddy-backend-b4exhkbjgahme6ge.francecentral-01.azurewebsites.net}") String publicBaseUrl) {
         this.notificationService = notificationService;
         this.googleWalletService = googleWalletService;
         this.appleWalletService = appleWalletService;
@@ -59,6 +67,7 @@ public class BookingConfirmationNotifier {
         this.emailTemplateService = emailTemplateService;
         this.experiencePhotoRepository = experiencePhotoRepository;
         this.frontendBaseUrl = frontendBaseUrl;
+        this.publicBaseUrl = publicBaseUrl;
     }
 
     @Transactional
@@ -157,7 +166,7 @@ public class BookingConfirmationNotifier {
                 ref,
                 manageUrl,
                 calendarUrl,
-                coverPhotoUrl(experience));
+                heroUrl(experience));
     }
 
     /** The experience's first photo (its cover) or null when it has none. */
@@ -168,6 +177,18 @@ public class BookingConfirmationNotifier {
         List<ExperiencePhoto> photos =
                 experiencePhotoRepository.findByExperienceIdOrderBySortOrderAscCreatedAtAsc(experience.getId());
         return photos.isEmpty() ? null : photos.get(0).getUrl();
+    }
+
+    /** Email hero: the experience's real cover photo, else its category illustration (else default). */
+    private String heroUrl(Experience experience) {
+        String photo = coverPhotoUrl(experience);
+        if (photo != null) {
+            return photo;
+        }
+        String slug = experience != null && experience.getCategory() != null
+                ? experience.getCategory().getSlug() : null;
+        String name = slug != null && ILLUSTRATED_CATEGORIES.contains(slug) ? slug : "default";
+        return publicBaseUrl + "/illustrations/" + name + ".png";
     }
 
     private String firstName(String fullName) {

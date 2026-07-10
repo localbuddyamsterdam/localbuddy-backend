@@ -47,7 +47,8 @@ public class SecurityConfig {
                                 "/api/auth/**",
                                 "/api/public/**",
                                 "/api/experience-categories/**",
-                                "/api/cities/**"
+                                "/api/cities/**",
+                                "/illustrations/**"
                         ).permitAll()
                         .requestMatchers("/api/users/**").hasRole("ADMIN")
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
