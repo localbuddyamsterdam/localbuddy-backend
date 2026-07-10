@@ -1,6 +1,7 @@
 package com.localbuddy.notification;
 
 import com.localbuddy.common.exception.ResourceNotFoundException;
+import com.localbuddy.notification.email.EmailTemplateService;
 import com.localbuddy.user.User;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -14,9 +15,12 @@ import java.util.UUID;
 public class NotificationService {
 
     private final NotificationRepository notificationRepository;
+    private final EmailTemplateService emailTemplateService;
 
-    public NotificationService(NotificationRepository notificationRepository) {
+    public NotificationService(NotificationRepository notificationRepository,
+                               EmailTemplateService emailTemplateService) {
         this.notificationRepository = notificationRepository;
+        this.emailTemplateService = emailTemplateService;
     }
 
     @Transactional
@@ -285,6 +289,19 @@ public class NotificationService {
             return;
         }
 
+        // Auto-brand: any EMAIL without a bespoke html body gets the branded generic wrapper.
+        // Best-effort — a rendering failure falls back to sending the plain-text message.
+        String effectiveHtml = htmlBody;
+        if (channel == NotificationChannel.EMAIL
+                && (effectiveHtml == null || effectiveHtml.isBlank())
+                && message != null && !message.isBlank()) {
+            try {
+                effectiveHtml = emailTemplateService.renderGeneric(subject, message);
+            } catch (Exception ignored) {
+                effectiveHtml = null;
+            }
+        }
+
         Notification notification = new Notification();
         notification.setRecipientUser(recipientUser);
         notification.setRecipientEmail(optionalTrim(recipientEmail));
@@ -293,7 +310,7 @@ public class NotificationService {
         notification.setNotificationType(notificationType);
         notification.setSubject(optionalTrim(subject));
         notification.setMessage(message.trim());
-        notification.setHtmlBody(htmlBody);
+        notification.setHtmlBody(effectiveHtml);
         notification.setStatus(NotificationStatus.PENDING);
         notification.setDedupeKey(dedupeKey);
         notification.setRelatedEntityType(relatedEntityType);

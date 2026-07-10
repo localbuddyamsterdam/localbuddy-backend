@@ -211,4 +211,97 @@ public class EmailTemplateService {
             </body>
             </html>
             """;
+
+    /**
+     * Wraps a plain-text notification (subject + message) in the branded LocalBuddy shell:
+     * yellow header, a headline, the message as escaped paragraphs with any URLs turned into
+     * links, and the navy footer. Used to auto-brand every email that has no bespoke template.
+     */
+    public String renderGeneric(String subject, String message) {
+        String headline = esc(subject == null ? "LocalBuddy" : subject);
+        String content = "<h1 style=\"margin:0 0 16px; font-size:26px; line-height:1.25; font-weight:600; letter-spacing:-0.01em; color:#111114;\">"
+                + headline + "</h1>"
+                + "<div style=\"font-size:16px; line-height:1.6; color:#3a3a3f;\">" + formatMessage(message) + "</div>";
+        String preheader = message == null ? "" : message.replace("\n", " ").trim();
+        if (preheader.length() > 140) {
+            preheader = preheader.substring(0, 140);
+        }
+        return GENERIC_SHELL
+                .replace("{{title}}", headline)
+                .replace("{{preheader}}", esc(preheader))
+                .replace("{{content}}", content);
+    }
+
+    /** Escapes text and turns bare http(s) URLs into styled links; newlines become &lt;br&gt;. */
+    private String formatMessage(String message) {
+        if (message == null || message.isBlank()) {
+            return "";
+        }
+        String[] lines = message.split("\n", -1);
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < lines.length; i++) {
+            String[] tokens = lines[i].split(" ");
+            for (int j = 0; j < tokens.length; j++) {
+                String t = tokens[j];
+                if (t.startsWith("http://") || t.startsWith("https://")) {
+                    sb.append("<a href=\"").append(esc(t))
+                            .append("\" style=\"color:#d62f2a; font-weight:600; word-break:break-all;\">")
+                            .append(esc(t)).append("</a>");
+                } else {
+                    sb.append(esc(t));
+                }
+                if (j < tokens.length - 1) {
+                    sb.append(" ");
+                }
+            }
+            if (i < lines.length - 1) {
+                sb.append("<br>");
+            }
+        }
+        return sb.toString();
+    }
+
+    private static final String GENERIC_SHELL = """
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+            <meta charset="utf-8" />
+            <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+            <meta name="color-scheme" content="light only" />
+            <title>{{title}}</title>
+            <style>
+              body { margin:0; padding:0; background:#e9eaed; }
+              a { text-decoration:none; }
+              .lb-body { font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; -webkit-font-smoothing:antialiased; }
+              @media (max-width:620px) {
+                .lb-container { width:100% !important; border-radius:0 !important; }
+                .lb-pad { padding-left:22px !important; padding-right:22px !important; }
+              }
+            </style>
+            </head>
+            <body>
+            <div class="lb-body" style="background:#e9eaed; padding:26px 12px;">
+              <div style="display:none; max-height:0; overflow:hidden; opacity:0; color:#e9eaed; font-size:1px; line-height:1px;">{{preheader}}</div>
+              <table role="presentation" class="lb-container" width="600" align="center" cellpadding="0" cellspacing="0" style="width:600px; max-width:600px; margin:0 auto; background:#ffffff; border-radius:18px; overflow:hidden; box-shadow:0 14px 40px rgba(12,19,32,0.14);">
+                <tr>
+                  <td style="background:#ffde5d; padding:18px 32px; text-align:center;">
+                    <span style="font-size:20px; font-weight:600; letter-spacing:-0.01em; color:#0c1320;"><span style="display:inline-block; width:9px; height:9px; border-radius:50%; background:#d62f2a; vertical-align:middle; margin-right:8px;"></span>LocalBuddy</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="lb-pad" style="padding:32px;">{{content}}</td>
+                </tr>
+                <tr>
+                  <td style="background:#0c1320; padding:32px; text-align:center;">
+                    <span style="font-size:20px; font-weight:600; letter-spacing:-0.01em; color:#ffffff;"><span style="display:inline-block; width:9px; height:9px; border-radius:50%; background:#d62f2a; vertical-align:middle; margin-right:8px;"></span>LocalBuddy</span>
+                    <p style="margin:12px auto 0; max-width:340px; font-size:13px; line-height:1.6; color:rgba(255,255,255,0.55);">Real experiences with the locals who actually live here. Amsterdam born, Europe bound.</p>
+                    <div style="height:1px; background:rgba(255,255,255,0.12); margin:18px 0 14px;"></div>
+                    <p style="margin:0; font-size:12px; color:rgba(255,255,255,0.42);">&copy; LocalBuddy B.V. &nbsp;&middot;&nbsp; Amsterdam, The Netherlands</p>
+                  </td>
+                </tr>
+              </table>
+            </div>
+            </body>
+            </html>
+            """;
 }
