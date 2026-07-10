@@ -18,12 +18,40 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    /**
+     * Friendly, user-facing messages for the DB constraints most likely to be hit by input,
+     * keyed by the DB constraint name. Anything not listed still gets a correct status (409/400)
+     * with a safe generic message. Status is inferred from the name prefix (chk_ → 400, else 409).
+     */
+    private static final Map<String, String> CONSTRAINT_MESSAGES = Map.ofEntries(
+            Map.entry("ux_bookings_active_guest_slot", "You already have a booking for this time slot."),
+            Map.entry("ux_bookings_active_traveler_slot", "You already have a booking for this time slot."),
+            Map.entry("ux_waitlist_active_guest_slot", "You're already on the waitlist for this slot."),
+            Map.entry("ux_waitlist_active_user_slot", "You're already on the waitlist for this slot."),
+            Map.entry("ux_payments_booking_active", "A payment is already being processed for this booking."),
+            Map.entry("uk_newsletter_email", "This email is already subscribed to our newsletter."),
+            Map.entry("uk_host_follow", "You're already following this host."),
+            Map.entry("uk_wishlist_user_experience", "This experience is already in your wishlist."),
+            Map.entry("users_email_key", "An account with this email already exists."),
+            Map.entry("experiences_slug_key", "An experience with this name already exists."),
+            Map.entry("chk_bookings_traveler_or_guest", "A booking needs either a signed-in traveler or full guest details (name, email, and phone)."),
+            Map.entry("chk_waitlist_user_or_guest", "A waitlist entry needs either a signed-in user or full guest details."),
+            Map.entry("chk_reviews_rating_range", "Rating must be between 1 and 5 stars."),
+            Map.entry("chk_availability_time_valid", "The end time must be after the start time."),
+            Map.entry("chk_bookings_guests_count_positive", "Number of guests must be at least 1."),
+            Map.entry("chk_experiences_duration_positive", "Experience duration must be greater than 0 minutes."),
+            Map.entry("chk_experiences_price_non_negative", "Experience price can't be negative."),
+            Map.entry("chk_experiences_max_guests_positive", "Maximum guests must be at least 1."),
+            Map.entry("chk_availability_capacity_positive", "Slot capacity must be greater than 0.")
+    );
 
     @ExceptionHandler(BadRequestException.class)
     public ResponseEntity<ErrorResponse> handleBadRequest(
@@ -140,27 +168,65 @@ public class GlobalExceptionHandler {
             DataIntegrityViolationException ex,
             HttpServletRequest request
     ) {
+        String constraint = extractConstraintName(ex);
         Throwable root = ex.getMostSpecificCause();
         String detail = root != null ? root.getMessage() : ex.getMessage();
-        log.warn("Data integrity violation on {} {}: {}",
-                request.getMethod(), request.getRequestURI(), detail);
+        log.warn("Data integrity violation on {} {} (constraint={}): {}",
+                request.getMethod(), request.getRequestURI(), constraint, detail);
 
+        HttpStatus status = statusForConstraint(constraint, detail);
+        String mapped = constraint != null ? CONSTRAINT_MESSAGES.get(constraint) : null;
+        String message = mapped != null ? mapped : defaultIntegrityMessage(status);
+        return buildErrorResponse(status, message, request);
+    }
+
+    /** Walks the cause chain for Hibernate's constraint name (best-effort; null if unavailable). */
+    private String extractConstraintName(Throwable ex) {
+        for (Throwable t = ex; t != null; t = t.getCause()) {
+            if (t instanceof org.hibernate.exception.ConstraintViolationException hce) {
+                return hce.getConstraintName();
+            }
+        }
+        return null;
+    }
+
+    private HttpStatus statusForConstraint(String constraint, String detail) {
+        if (constraint != null) {
+            if (constraint.startsWith("chk_")) {
+                return HttpStatus.BAD_REQUEST;
+            }
+            if (constraint.startsWith("ux_") || constraint.startsWith("uq_")
+                    || constraint.startsWith("uk_") || constraint.endsWith("_key")) {
+                return HttpStatus.CONFLICT;
+            }
+        }
         String lower = detail == null ? "" : detail.toLowerCase();
-        HttpStatus status;
-        String message;
         if (lower.contains("duplicate key") || lower.contains("unique constraint")
                 || lower.contains("already exists")) {
-            status = HttpStatus.CONFLICT;
-            message = "This conflicts with a record that already exists.";
-        } else if (lower.contains("foreign key")) {
-            status = HttpStatus.BAD_REQUEST;
-            message = "The request refers to something that doesn't exist.";
-        } else {
-            // check constraints, not-null, and other integrity rules
-            status = HttpStatus.BAD_REQUEST;
-            message = "The request couldn't be completed because some information is missing or invalid.";
+            return HttpStatus.CONFLICT;
         }
-        return buildErrorResponse(status, message, request);
+        return HttpStatus.BAD_REQUEST;
+    }
+
+    private String defaultIntegrityMessage(HttpStatus status) {
+        return status == HttpStatus.CONFLICT
+                ? "This conflicts with a record that already exists."
+                : "The request couldn't be completed because some information is missing or invalid.";
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ErrorResponse> handleIllegalArgument(
+            IllegalArgumentException ex,
+            HttpServletRequest request
+    ) {
+        // A bad argument reaching a service (e.g. a malformed id parsed with UUID.fromString) is a
+        // client error, not a 500. Logged at WARN so genuine bugs stay visible; client gets a safe message.
+        log.warn("Illegal argument on {} {}: {}", request.getMethod(), request.getRequestURI(), ex.getMessage());
+        return buildErrorResponse(
+                HttpStatus.BAD_REQUEST,
+                "The request contained an invalid value.",
+                request
+        );
     }
 
     @ExceptionHandler(Exception.class)
