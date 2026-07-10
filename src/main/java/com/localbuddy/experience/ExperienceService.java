@@ -157,6 +157,50 @@ public class ExperienceService {
         return toResponse(experienceRepository.save(experience));
     }
 
+    /** Unpublish (pause) a live experience so it no longer appears in the catalog. Reversible. */
+    @Transactional
+    public ExperienceResponse unpublishMyExperience(UUID userId, UUID experienceId) {
+        Experience experience = requireOwnedExperience(userId, experienceId);
+        if (experience.getStatus() != ExperienceStatus.APPROVED) {
+            throw new BadRequestException("Only a published (approved) experience can be unpublished");
+        }
+        experience.setStatus(ExperienceStatus.PAUSED);
+        return toResponse(experienceRepository.save(experience));
+    }
+
+    /** Re-publish a paused experience so it appears in the catalog again. */
+    @Transactional
+    public ExperienceResponse publishMyExperience(UUID userId, UUID experienceId) {
+        Experience experience = requireOwnedExperience(userId, experienceId);
+        if (experience.getStatus() != ExperienceStatus.PAUSED) {
+            throw new BadRequestException("Only a paused experience can be re-published");
+        }
+        experience.setStatus(ExperienceStatus.APPROVED);
+        return toResponse(experienceRepository.save(experience));
+    }
+
+    /** Soft-delete (archive) an experience. Existing bookings keep referencing it; it's hidden everywhere. */
+    @Transactional
+    public void deleteMyExperience(UUID userId, UUID experienceId) {
+        Experience experience = requireOwnedExperience(userId, experienceId);
+        if (experience.getStatus() == ExperienceStatus.BLOCKED) {
+            throw new BadRequestException("A blocked experience cannot be deleted");
+        }
+        experience.setStatus(ExperienceStatus.ARCHIVED);
+        experienceRepository.save(experience);
+    }
+
+    /** Loads an experience and asserts the authenticated user owns it (404 otherwise). */
+    private Experience requireOwnedExperience(UUID userId, UUID experienceId) {
+        LocalProfile localProfile = getLocalProfileByUserId(userId);
+        Experience experience = experienceRepository.findById(experienceId)
+                .orElseThrow(() -> new ResourceNotFoundException("Experience not found"));
+        if (!experience.getLocalProfile().getId().equals(localProfile.getId())) {
+            throw new ResourceNotFoundException("Experience not found");
+        }
+        return experience;
+    }
+
     private LocalProfile getApprovedLocalProfileByUserId(UUID userId) {
         LocalProfile localProfile = getLocalProfileByUserId(userId);
 

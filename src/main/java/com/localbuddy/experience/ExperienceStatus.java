@@ -6,5 +6,6 @@ public enum ExperienceStatus {
     APPROVED,
     REJECTED,
     PAUSED,
-    BLOCKED
+    BLOCKED,
+    ARCHIVED
 }

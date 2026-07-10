@@ -114,4 +114,62 @@ public class ExperienceController {
         UUID userId = UUID.fromString(authentication.getName());
         return ResponseEntity.ok(experienceService.submitMyExperience(userId, experienceId));
     }
+
+    @Operation(
+            summary = "Unpublish my experience",
+            description = "Hides a published (approved) experience from the catalog by pausing it. Reversible via publish."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Experience unpublished"),
+            @ApiResponse(responseCode = "400", description = "Experience is not currently published"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "404", description = "Experience not found")
+    })
+    @PostMapping("/{experienceId}/unpublish")
+    public ResponseEntity<ExperienceResponse> unpublishMyExperience(
+            Authentication authentication,
+            @PathVariable UUID experienceId
+    ) {
+        UUID userId = UUID.fromString(authentication.getName());
+        return ResponseEntity.ok(experienceService.unpublishMyExperience(userId, experienceId));
+    }
+
+    @Operation(
+            summary = "Re-publish my experience",
+            description = "Re-lists a paused experience so it appears in the catalog again."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Experience re-published"),
+            @ApiResponse(responseCode = "400", description = "Experience is not paused"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "404", description = "Experience not found")
+    })
+    @PostMapping("/{experienceId}/publish")
+    public ResponseEntity<ExperienceResponse> publishMyExperience(
+            Authentication authentication,
+            @PathVariable UUID experienceId
+    ) {
+        UUID userId = UUID.fromString(authentication.getName());
+        return ResponseEntity.ok(experienceService.publishMyExperience(userId, experienceId));
+    }
+
+    @Operation(
+            summary = "Delete my experience",
+            description = "Soft-deletes (archives) an experience owned by the authenticated user. Existing bookings are preserved."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Experience deleted"),
+            @ApiResponse(responseCode = "400", description = "Experience cannot be deleted"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "404", description = "Experience not found")
+    })
+    @DeleteMapping("/{experienceId}")
+    public ResponseEntity<Void> deleteMyExperience(
+            Authentication authentication,
+            @PathVariable UUID experienceId
+    ) {
+        UUID userId = UUID.fromString(authentication.getName());
+        experienceService.deleteMyExperience(userId, experienceId);
+        return ResponseEntity.noContent().build();
+    }
 }
