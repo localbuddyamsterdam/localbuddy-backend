@@ -3,7 +3,9 @@ package com.localbuddy.notification.email;
 import com.azure.communication.email.EmailClient;
 import com.azure.communication.email.EmailClientBuilder;
 import com.azure.communication.email.models.EmailAddress;
+import com.azure.communication.email.models.EmailAttachment;
 import com.azure.communication.email.models.EmailMessage;
+import com.azure.core.util.BinaryData;
 import com.azure.core.util.polling.SyncPoller;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
@@ -50,6 +52,13 @@ public class AzureEmailProviderService implements EmailProviderService {
 
             if (request.htmlBody() != null && !request.htmlBody().isBlank()) {
                 message.setBodyHtml(request.htmlBody());
+            }
+
+            if (request.icsContent() != null && !request.icsContent().isBlank()) {
+                message.setAttachments(List.of(new EmailAttachment(
+                        "invite.ics",
+                        "text/calendar; method=REQUEST; charset=utf-8",
+                        BinaryData.fromString(request.icsContent()))));
             }
 
             SyncPoller<com.azure.communication.email.models.EmailSendResult,

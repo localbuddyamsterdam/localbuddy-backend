@@ -4,6 +4,7 @@ public record EmailSendRequest(
         String toEmail,
         String subject,
         String message,
-        String htmlBody
+        String htmlBody,
+        String icsContent
 ) {
 }

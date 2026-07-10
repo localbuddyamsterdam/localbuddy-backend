@@ -1,5 +1,6 @@
 package com.localbuddy.notification;
 
+import com.localbuddy.calendar.CalendarService;
 import com.localbuddy.notification.email.EmailProviderService;
 import com.localbuddy.notification.email.EmailSendRequest;
 import com.localbuddy.notification.email.EmailSendResult;
@@ -17,13 +18,16 @@ public class NotificationProcessingService {
     private final NotificationRepository notificationRepository;
     private final EmailProviderService emailProviderService;
     private final WhatsAppService whatsAppService;
+    private final CalendarService calendarService;
 
     public NotificationProcessingService(NotificationRepository notificationRepository,
                                          EmailProviderService emailProviderService,
-                                         WhatsAppService whatsAppService) {
+                                         WhatsAppService whatsAppService,
+                                         CalendarService calendarService) {
         this.notificationRepository = notificationRepository;
         this.emailProviderService = emailProviderService;
         this.whatsAppService = whatsAppService;
+        this.calendarService = calendarService;
     }
 
     @Transactional
@@ -83,12 +87,25 @@ public class NotificationProcessingService {
             return;
         }
 
+        // Attach a calendar invite (.ics) to booking confirmations so Gmail/Outlook show an
+        // event card at the top of the email. Best-effort — never blocks the send.
+        String icsContent = null;
+        if (notification.getNotificationType() == NotificationType.BOOKING_CONFIRMED
+                && notification.getRelatedEntityId() != null) {
+            try {
+                icsContent = calendarService.buildInviteIcs(notification.getRelatedEntityId());
+            } catch (Exception ignored) {
+                icsContent = null;
+            }
+        }
+
         EmailSendResult result = emailProviderService.sendEmail(
                 new EmailSendRequest(
                         notification.getRecipientEmail(),
                         notification.getSubject(),
                         notification.getMessage(),
-                        notification.getHtmlBody()
+                        notification.getHtmlBody(),
+                        icsContent
                 )
         );
 

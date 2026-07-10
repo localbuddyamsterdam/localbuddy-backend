@@ -89,7 +89,10 @@ public class BookingConfirmationNotifier {
         }
         appendCustomerLinks(body, booking, ref);
 
-        String subject = "Your booking is confirmed";
+        String subject = "Booking confirmed — " + title;
+        if (booking.getAvailabilitySlot() != null && booking.getAvailabilitySlot().getStartTime() != null) {
+            subject = subject + " · " + WHEN.format(booking.getAvailabilitySlot().getStartTime());
+        }
         String dedupe = "BOOKING_CONFIRMED:" + booking.getId();
         String message = body.toString();
         // HTML is best-effort: a rendering issue must never roll back the booking or block the

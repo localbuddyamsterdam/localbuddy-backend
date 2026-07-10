@@ -29,8 +29,21 @@ public class CalendarService {
 
     @Transactional(readOnly = true)
     public String buildIcs(UUID userId, UUID bookingId) {
-        Booking booking = requireParticipant(userId, bookingId);
+        return buildIcs(requireParticipant(userId, bookingId), false);
+    }
 
+    /**
+     * System-built calendar INVITE (.ics, METHOD:REQUEST) for a confirmed booking — attached to the
+     * confirmation email so Gmail/Outlook render an event card. No participant check (system-triggered).
+     */
+    @Transactional(readOnly = true)
+    public String buildInviteIcs(UUID bookingId) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
+        return buildIcs(booking, true);
+    }
+
+    private String buildIcs(Booking booking, boolean asInvite) {
         Instant start = slotStart(booking);
         Instant end = slotEnd(booking);
         String title = experienceTitle(booking);
@@ -42,7 +55,7 @@ public class CalendarService {
         line(sb, "VERSION:2.0");
         line(sb, "PRODID:-//LocalBuddy//Booking//EN");
         line(sb, "CALSCALE:GREGORIAN");
-        line(sb, "METHOD:PUBLISH");
+        line(sb, "METHOD:" + (asInvite ? "REQUEST" : "PUBLISH"));
         line(sb, "BEGIN:VEVENT");
         line(sb, "UID:" + booking.getId() + "@localbuddy");
         line(sb, "DTSTAMP:" + ICS_UTC.format(Instant.now()));
@@ -53,10 +66,32 @@ public class CalendarService {
         if (location != null) {
             line(sb, "LOCATION:" + escape(location));
         }
+        if (asInvite) {
+            line(sb, "ORGANIZER;CN=LocalBuddy:mailto:bookings@localbuddy.app");
+            String attendee = attendeeEmail(booking);
+            if (attendee != null && !attendee.isBlank()) {
+                line(sb, "ATTENDEE;CN=" + escape(attendeeName(booking))
+                        + ";ROLE=REQ-PARTICIPANT;PARTSTAT=ACCEPTED;RSVP=FALSE:mailto:" + attendee);
+            }
+            line(sb, "SEQUENCE:0");
+        }
         line(sb, "STATUS:CONFIRMED");
         line(sb, "END:VEVENT");
         line(sb, "END:VCALENDAR");
         return sb.toString();
+    }
+
+    private String attendeeEmail(Booking booking) {
+        if (booking.getLoggedInUser() != null && booking.getLoggedInUser().getEmail() != null) {
+            return booking.getLoggedInUser().getEmail();
+        }
+        return booking.getGuestEmail();
+    }
+
+    private String attendeeName(Booking booking) {
+        String name = booking.getLoggedInUser() != null
+                ? booking.getLoggedInUser().getFullName() : booking.getGuestName();
+        return name == null || name.isBlank() ? "Guest" : name;
     }
 
     @Transactional(readOnly = true)
