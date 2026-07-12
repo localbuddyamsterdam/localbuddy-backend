@@ -182,8 +182,10 @@ public class LocalProfileService {
 
 
     private void validateLocalUser(User user) {
-        if (user.getRole() != UserRole.LOCAL) {
-            throw new BadRequestException("Only LOCAL users can create a local profile");
+        // Travellers may apply to become hosts (one account covers both journeys);
+        // approval upgrades their role to LOCAL. Only admins are excluded.
+        if (user.getRole() != UserRole.LOCAL && user.getRole() != UserRole.LOGGED_IN_USER) {
+            throw new BadRequestException("This account type cannot create a host profile");
         }
     }
 
@@ -448,6 +450,15 @@ public class LocalProfileService {
         profile.setAdminReviewNote(null);
         profile.setRejectionReason(null);
         profile.setChangesRequestedReason(null);
+
+        // Approval is what makes someone a host: travellers who applied are
+        // upgraded to LOCAL here (the frontend re-reads the session user after
+        // approval, so host navigation/permissions appear without re-login).
+        User applicant = profile.getUser();
+        if (applicant != null && applicant.getRole() == UserRole.LOGGED_IN_USER) {
+            applicant.setRole(UserRole.LOCAL);
+            userRepository.save(applicant);
+        }
 
         LocalProfile savedProfile = localProfileRepository.save(profile);
         createLocalProfileApprovedNotification(savedProfile);
