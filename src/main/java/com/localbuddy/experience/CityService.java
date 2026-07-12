@@ -48,6 +48,8 @@ public class CityService {
         city.setName(name);
         city.setSlug(generateUniqueSlug(name));
         city.setCountry(country);
+        city.setLatitude(request.latitude());
+        city.setLongitude(request.longitude());
         city.setActive(true);
         city.setDisplayOrder(request.displayOrder() != null ? request.displayOrder() : 0);
 
@@ -70,6 +72,8 @@ public class CityService {
                 city.getName(),
                 city.getSlug(),
                 city.getCountry(),
+                city.getLatitude(),
+                city.getLongitude(),
                 city.isActive(),
                 city.getDisplayOrder()
         );

@@ -196,6 +196,8 @@ public class AdminOpsService {
                 city.getName(),
                 city.getSlug(),
                 city.getCountry(),
+                city.getLatitude(),
+                city.getLongitude(),
                 city.isActive(),
                 city.getDisplayOrder()
         );

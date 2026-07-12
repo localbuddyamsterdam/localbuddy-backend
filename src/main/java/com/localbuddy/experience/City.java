@@ -5,6 +5,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -28,6 +29,13 @@ public class City {
 
     @Column(name = "country", nullable = false, length = 100)
     private String country;
+
+    /** City-centre coordinates for map centring + weather (nullable until set). */
+    @Column(name = "latitude", precision = 9, scale = 6)
+    private BigDecimal latitude;
+
+    @Column(name = "longitude", precision = 9, scale = 6)
+    private BigDecimal longitude;
 
     @Column(name = "active", nullable = false)
     private boolean active = true;
