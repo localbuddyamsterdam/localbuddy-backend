@@ -39,6 +39,16 @@ public class User {
     @Column(name = "phone", length = 30)
     private String phone;
 
+    @Column(name = "avatar_url", length = 500)
+    private String avatarUrl;
+
+    @Column(name = "avatar_storage_key", length = 300)
+    private String avatarStorageKey;
+
+    /** Comma-separated language names the user speaks (self-reported). */
+    @Column(name = "languages", length = 300)
+    private String languages;
+
     @Column(name = "password_hash", length = 255)
     private String passwordHash;
 

@@ -1,10 +1,14 @@
 package com.localbuddy.user;
 
+import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.UUID;
 
 /**
@@ -34,5 +38,26 @@ public class AccountController {
     ) {
         UUID userId = UUID.fromString(authentication.getName());
         return ResponseEntity.ok(userService.updateOwnProfile(userId, request));
+    }
+
+    @Operation(summary = "Upload my avatar",
+            description = "Uploads an image (JPEG/PNG/WebP/GIF, max 5 MB) to blob storage and sets it as the "
+                    + "account avatar. Requires Azure Blob storage to be configured.")
+    @PostMapping(value = "/me/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<UserResponse> uploadMyAvatar(
+            Authentication authentication,
+            @RequestParam("file") MultipartFile file
+    ) throws IOException {
+        UUID userId = UUID.fromString(authentication.getName());
+        return ResponseEntity.ok(userService.uploadMyAvatar(
+                userId, file.getBytes(), file.getContentType(), file.getOriginalFilename()));
+    }
+
+    @Operation(summary = "Delete my avatar",
+            description = "Removes the account avatar: deletes the stored blob and clears the URL.")
+    @DeleteMapping("/me/avatar")
+    public ResponseEntity<UserResponse> deleteMyAvatar(Authentication authentication) {
+        UUID userId = UUID.fromString(authentication.getName());
+        return ResponseEntity.ok(userService.deleteMyAvatar(userId));
     }
 }

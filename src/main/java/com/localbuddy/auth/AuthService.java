@@ -4,6 +4,7 @@ import com.localbuddy.common.exception.BadRequestException;
 import com.localbuddy.user.User;
 import com.localbuddy.user.UserRepository;
 import com.localbuddy.user.UserRole;
+import com.localbuddy.user.UserService;
 import com.localbuddy.user.UserStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -99,6 +100,8 @@ public class AuthService {
                 user.getFullName(),
                 user.getEmail(),
                 user.getPhone(),
+                user.getAvatarUrl(),
+                UserService.languagesToList(user.getLanguages()),
                 user.getRole(),
                 user.getStatus(),
                 user.isEmailVerified(),

@@ -3,6 +3,7 @@ package com.localbuddy.admin;
 import com.localbuddy.experience.CreateExperienceCategoryRequest;
 import com.localbuddy.experience.ExperienceCategoryResponse;
 import com.localbuddy.experience.ExperienceCategoryService;
+import com.localbuddy.experience.UpdateExperienceCategoryRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -57,6 +58,25 @@ public class AdminExperienceCategoryController {
             @Valid @RequestBody CreateExperienceCategoryRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(experienceCategoryService.createCategory(request));
+    }
+
+    @Operation(
+            summary = "Update an experience category",
+            description = "Partial update of name, description, image URL, or display order. "
+                    + "Null fields are left unchanged; an empty string clears description/imageUrl. Admin only."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Category updated successfully"),
+            @ApiResponse(responseCode = "400", description = "Invalid request or duplicate category name"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "403", description = "Not authorized (admin only)"),
+            @ApiResponse(responseCode = "404", description = "Category not found")
+    })
+    @PutMapping("/{categoryId}")
+    public ResponseEntity<ExperienceCategoryResponse> updateCategory(
+            @PathVariable UUID categoryId,
+            @Valid @RequestBody UpdateExperienceCategoryRequest request) {
+        return ResponseEntity.ok(experienceCategoryService.updateCategory(categoryId, request));
     }
 
     @Operation(

@@ -84,7 +84,7 @@ public class ReminderService {
             }
             String subject = "Still interested in " + exp.getTitle() + "?";
             String body = "You saved \"" + exp.getTitle() + "\" to your wishlist.\n\nReady to book? "
-                    + frontendBaseUrl + "/experiences/" + exp.getSlug();
+                    + frontendBaseUrl + "/experience/" + exp.getSlug();
             String base = "wishlist-reminder:" + item.getId() + ":" + stage + "h";
 
             notificationService.createInAppNotificationForUser(user, NotificationType.WISHLIST_REMINDER,
@@ -117,7 +117,7 @@ public class ReminderService {
             }
             Experience exp = booking.getExperience();
             String title = exp != null ? exp.getTitle() : "your experience";
-            String link = frontendBaseUrl + "/experiences/" + (exp != null ? exp.getSlug() : "");
+            String link = frontendBaseUrl + "/experience/" + (exp != null ? exp.getSlug() : "");
             String subject = "Finish booking " + title;
             String body = "You started booking \"" + title + "\" but didn't complete payment in time.\n\n"
                     + "Pick up where you left off: " + link;

@@ -7,6 +7,7 @@ public record ExperienceCategoryResponse(
         String name,
         String slug,
         String description,
+        String imageUrl,
         boolean active,
         Integer displayOrder
 ) {

@@ -104,11 +104,22 @@ public class BookingConfirmationNotifier {
             html = null;
         }
 
+        // In-app feed gets a concise, URL-free message — the app links to the
+        // booking itself (raw URLs render as noise in the notification list).
+        StringBuilder inApp = new StringBuilder();
+        inApp.append("Your booking for \"").append(title).append("\" is confirmed. Reference: ").append(ref).append(".");
+        if (booking.getAvailabilitySlot() != null && booking.getAvailabilitySlot().getStartTime() != null) {
+            inApp.append("\nWhen: ").append(WHEN.format(booking.getAvailabilitySlot().getStartTime())).append(".");
+        }
+
         User traveler = booking.getLoggedInUser();
         if (traveler != null) {
-            notificationService.createEmailAndInAppNotificationForUser(
+            notificationService.createEmailNotificationForUser(
                     traveler, NotificationType.BOOKING_CONFIRMED, subject, message, html,
-                    "BOOKING", booking.getId(), dedupe);
+                    "BOOKING", booking.getId(), dedupe + ":EMAIL");
+            notificationService.createInAppNotificationForUser(
+                    traveler, NotificationType.BOOKING_CONFIRMED, subject, inApp.toString(),
+                    "BOOKING", booking.getId(), dedupe + ":INAPP");
             notificationService.createWhatsAppNotificationForUser(
                     traveler, NotificationType.BOOKING_CONFIRMED, subject, message,
                     "BOOKING", booking.getId(), dedupe + ":WHATSAPP");
@@ -153,7 +164,7 @@ public class BookingConfirmationNotifier {
         String currency = booking.getCurrency() == null ? "EUR" : booking.getCurrency();
         String total = currencySymbol(currency) + formatAmount(booking.getTotalAmount());
 
-        String manageUrl = frontendBaseUrl + "/bookings/" + ref;
+        String manageUrl = frontendBaseUrl + "/booking/" + ref;
         String calendarUrl = null;
         try {
             calendarUrl = calendarService.googleCalendarLink(booking);
@@ -231,7 +242,7 @@ public class BookingConfirmationNotifier {
     }
 
     private void appendCustomerLinks(StringBuilder body, Booking booking, String ref) {
-        String bookingPage = frontendBaseUrl + "/bookings/" + ref;
+        String bookingPage = frontendBaseUrl + "/booking/" + ref;
         body.append("\n\nManage your booking: ").append(bookingPage);
 
         try {

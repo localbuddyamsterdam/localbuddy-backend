@@ -47,10 +47,45 @@ public class ExperienceCategoryService {
         category.setName(name);
         category.setSlug(generateUniqueSlug(name));
         category.setDescription(request.description() != null ? request.description().trim() : null);
+        category.setImageUrl(normalizeBlankToNull(request.imageUrl()));
         category.setActive(true);
         category.setDisplayOrder(request.displayOrder() != null ? request.displayOrder() : 0);
 
         return toResponse(experienceCategoryRepository.save(category));
+    }
+
+    @Transactional
+    public ExperienceCategoryResponse updateCategory(UUID categoryId, UpdateExperienceCategoryRequest request) {
+        ExperienceCategory category = experienceCategoryRepository.findById(categoryId)
+                .orElseThrow(() -> new ResourceNotFoundException("Experience category not found"));
+
+        if (request.name() != null && !request.name().isBlank()) {
+            String name = request.name().trim();
+            if (!name.equalsIgnoreCase(category.getName())
+                    && experienceCategoryRepository.existsByNameIgnoreCase(name)) {
+                throw new BadRequestException("A category with this name already exists");
+            }
+            category.setName(name);
+        }
+        if (request.description() != null) {
+            category.setDescription(normalizeBlankToNull(request.description()));
+        }
+        if (request.imageUrl() != null) {
+            category.setImageUrl(normalizeBlankToNull(request.imageUrl()));
+        }
+        if (request.displayOrder() != null) {
+            category.setDisplayOrder(request.displayOrder());
+        }
+
+        return toResponse(experienceCategoryRepository.save(category));
+    }
+
+    private static String normalizeBlankToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     @Transactional
@@ -69,6 +104,7 @@ public class ExperienceCategoryService {
                 category.getName(),
                 category.getSlug(),
                 category.getDescription(),
+                category.getImageUrl(),
                 category.isActive(),
                 category.getDisplayOrder()
         );

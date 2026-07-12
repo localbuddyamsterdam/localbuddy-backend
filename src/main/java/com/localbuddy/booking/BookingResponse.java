@@ -47,6 +47,11 @@ public record BookingResponse(
         BigDecimal privateDiscountAmount,
         Integer seatsBlocked,
         UUID dealId,
-        BigDecimal dealDiscountAmount
+        BigDecimal dealDiscountAmount,
+        // Denormalized slot/experience context so clients can render a booking
+        // without extra lookups (a bare id-only response displays as empty).
+        Instant slotStartTime,
+        Instant slotEndTime,
+        String experienceTitle
 ) {
 }

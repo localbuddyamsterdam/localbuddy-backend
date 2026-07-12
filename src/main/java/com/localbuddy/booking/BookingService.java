@@ -459,7 +459,10 @@ public class BookingService {
                 booking.getPrivateDiscountAmount(),
                 booking.getSeatsBlocked(),
                 booking.getDealId(),
-                booking.getDealDiscountAmount()
+                booking.getDealDiscountAmount(),
+                booking.getAvailabilitySlot().getStartTime(),
+                booking.getAvailabilitySlot().getEndTime(),
+                booking.getExperience().getTitle()
         );
     }
 

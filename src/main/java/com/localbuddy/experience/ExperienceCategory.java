@@ -29,6 +29,10 @@ public class ExperienceCategory {
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
+    /** Tile/illustration image for catalog UIs; relative (/illustrations/…) or absolute URL. */
+    @Column(name = "image_url", length = 500)
+    private String imageUrl;
+
     @Column(name = "active", nullable = false)
     private boolean active = true;
 

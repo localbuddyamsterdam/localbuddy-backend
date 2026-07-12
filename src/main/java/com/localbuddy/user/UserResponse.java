@@ -8,6 +8,8 @@ public record UserResponse(
         String fullName,
         String email,
         String phone,
+        String avatarUrl,
+        java.util.List<String> languages,
         UserRole role,
         UserStatus status,
         boolean emailVerified,
