@@ -30,6 +30,9 @@ public interface AvailabilitySlotRepository extends JpaRepository<AvailabilitySl
     @Query("select slot from AvailabilitySlot slot where slot.id = :slotId")
     Optional<AvailabilitySlot> findByIdForUpdate(@Param("slotId") UUID slotId);
 
+    /** Existing slots in a window — used by bulk generation to skip duplicates. */
+    List<AvailabilitySlot> findByExperienceIdAndStartTimeBetween(UUID experienceId, Instant from, Instant to);
+
     @Query("""
             select slot from AvailabilitySlot slot
             where slot.startTime > :windowStart

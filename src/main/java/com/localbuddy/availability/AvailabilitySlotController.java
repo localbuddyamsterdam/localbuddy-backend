@@ -46,6 +46,27 @@ public class AvailabilitySlotController {
     }
 
     @Operation(
+            summary = "Generate availability slots from a weekly schedule",
+            description = "Bulk-creates slots from weekly rules (e.g. Mon + Sat at 10:00 and 14:00) over a date "
+                    + "range (max 120 days, max 300 slots per call). Times are wall-clock in the given timezone "
+                    + "(default Europe/Amsterdam). Existing slots at the same start time and past times are skipped."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Slots generated (see created/skipped counts)"),
+            @ApiResponse(responseCode = "400", description = "Invalid schedule, range too large, or too many slots"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated")
+    })
+    @PostMapping("/generate")
+    public ResponseEntity<GenerateAvailabilityResponse> generateMyAvailabilitySlots(
+            Authentication authentication,
+            @Valid @RequestBody GenerateAvailabilityRequest request
+    ) {
+        UUID userId = UUID.fromString(authentication.getName());
+        GenerateAvailabilityResponse response = availabilitySlotService.generateMyAvailabilitySlots(userId, request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @Operation(
             summary = "Get my availability slots",
             description = "Returns all availability slots belonging to the currently authenticated user (local)."
     )

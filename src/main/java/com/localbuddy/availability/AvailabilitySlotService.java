@@ -13,9 +13,19 @@ import com.localbuddy.localprofile.LocalProfileRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.DayOfWeek;
+import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class AvailabilitySlotService {
@@ -62,6 +72,106 @@ public class AvailabilitySlotService {
         slot.setStatus(AvailabilityStatus.AVAILABLE);
 
         return toResponse(availabilitySlotRepository.save(slot));
+    }
+
+    private static final ZoneId DEFAULT_ZONE = ZoneId.of("Europe/Amsterdam");
+    private static final int MAX_RANGE_DAYS = 120;
+    private static final int MAX_SLOTS_PER_CALL = 300;
+
+    /**
+     * Bulk-creates slots from a weekly schedule over a date range. Wall-clock
+     * times in the requested zone (DST-safe); duplicates (same experience +
+     * start) and past times are skipped, and the whole call is atomic.
+     */
+    @Transactional
+    public GenerateAvailabilityResponse generateMyAvailabilitySlots(UUID userId, GenerateAvailabilityRequest request) {
+        LocalProfile localProfile = getApprovedLocalProfile(userId);
+        Experience experience = experienceRepository.findById(request.experienceId())
+                .orElseThrow(() -> new BadRequestException("Invalid experience"));
+        if (!experience.getLocalProfile().getId().equals(localProfile.getId())) {
+            throw new BadRequestException("You can create availability only for your own experience");
+        }
+        if (experience.getStatus() != ExperienceStatus.APPROVED) {
+            throw new BadRequestException("Experience must be approved before adding availability");
+        }
+
+        if (request.endDate().isBefore(request.startDate())) {
+            throw new BadRequestException("End date must be on or after the start date");
+        }
+        if (Duration.between(request.startDate().atStartOfDay(), request.endDate().atStartOfDay())
+                .toDays() > MAX_RANGE_DAYS) {
+            throw new BadRequestException("Date range cannot exceed " + MAX_RANGE_DAYS + " days per generation");
+        }
+
+        ZoneId zone;
+        try {
+            zone = request.timezone() == null || request.timezone().isBlank()
+                    ? DEFAULT_ZONE : ZoneId.of(request.timezone());
+        } catch (Exception ex) {
+            throw new BadRequestException("Unknown timezone: " + request.timezone());
+        }
+
+        int durationMinutes = request.durationMinutes() != null
+                ? request.durationMinutes()
+                : experience.getDurationMinutes();
+        if (durationMinutes == 0) {
+            throw new BadRequestException("Duration is required");
+        }
+
+        Map<DayOfWeek, List<LocalTime>> schedule = request.weekly().stream().collect(Collectors.toMap(
+                GenerateAvailabilityRequest.WeeklyRule::dayOfWeek,
+                rule -> rule.times().stream().distinct().map(LocalTime::parse).sorted().toList(),
+                (a, b) -> {
+                    throw new BadRequestException("Each day of the week may appear only once");
+                }));
+
+        // One query for existing starts in the window, to skip duplicates cheaply.
+        Instant windowFrom = request.startDate().atStartOfDay(zone).toInstant();
+        Instant windowTo = request.endDate().plusDays(1).atStartOfDay(zone).toInstant();
+        Set<Instant> existingStarts = availabilitySlotRepository
+                .findByExperienceIdAndStartTimeBetween(experience.getId(), windowFrom, windowTo)
+                .stream().map(AvailabilitySlot::getStartTime).collect(Collectors.toCollection(HashSet::new));
+
+        Instant now = Instant.now();
+        List<AvailabilitySlot> toCreate = new ArrayList<>();
+        int skippedExisting = 0;
+        int skippedPast = 0;
+        for (LocalDate date = request.startDate(); !date.isAfter(request.endDate()); date = date.plusDays(1)) {
+            List<LocalTime> times = schedule.get(date.getDayOfWeek());
+            if (times == null) {
+                continue;
+            }
+            for (LocalTime time : times) {
+                Instant start = date.atTime(time).atZone(zone).toInstant();
+                if (!start.isAfter(now)) {
+                    skippedPast++;
+                    continue;
+                }
+                if (existingStarts.contains(start)) {
+                    skippedExisting++;
+                    continue;
+                }
+                AvailabilitySlot slot = new AvailabilitySlot();
+                slot.setExperience(experience);
+                slot.setLocalProfile(localProfile);
+                slot.setStartTime(start);
+                slot.setEndTime(start.plus(Duration.ofMinutes(durationMinutes)));
+                slot.setCapacity(request.capacity());
+                slot.setBookedCount(0);
+                slot.setStatus(AvailabilityStatus.AVAILABLE);
+                toCreate.add(slot);
+                existingStarts.add(start);
+                if (toCreate.size() > MAX_SLOTS_PER_CALL) {
+                    throw new BadRequestException(
+                            "This schedule would create more than " + MAX_SLOTS_PER_CALL
+                            + " slots — narrow the date range and generate in batches");
+                }
+            }
+        }
+
+        List<AvailabilitySlotResponse> created = availabilitySlotRepository.saveAll(toCreate)
+                .stream().map(this::toResponse).toList();
+        return new GenerateAvailabilityResponse(created.size(), skippedExisting, skippedPast, created);
     }
 
     /**
