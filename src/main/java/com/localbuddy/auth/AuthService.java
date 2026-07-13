@@ -90,6 +90,35 @@ public class AuthService {
         );
     }
 
+    /**
+     * Sliding-session refresh: re-issue a fresh access token for a still-valid,
+     * still-active session. The endpoint is authenticated, so only a caller with
+     * a currently-valid token can renew — an expired token can't be refreshed
+     * (they must log in again). Keeps active users signed in without a separate
+     * long-lived refresh token.
+     */
+    @Transactional(readOnly = true)
+    public LoginResponse refreshToken(UUID userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BadRequestException("Invalid user"));
+
+        if (user.getStatus() == UserStatus.SUSPENDED || user.getStatus() == UserStatus.DELETED) {
+            throw new BadRequestException("Account is not active");
+        }
+
+        String accessToken = jwtService.generateAccessToken(user);
+
+        return new LoginResponse(
+                accessToken,
+                "Bearer",
+                user.getId(),
+                user.getFullName(),
+                user.getEmail(),
+                user.getRole(),
+                user.getStatus()
+        );
+    }
+
     @Transactional(readOnly = true)
     public CurrentUserResponse getCurrentUser(UUID userId) {
         User user = userRepository.findById(userId)

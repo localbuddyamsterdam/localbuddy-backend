@@ -69,6 +69,20 @@ public class AuthController {
     }
 
     @Operation(
+            summary = "Refresh the access token",
+            description = "Authenticated user. Re-issues a fresh access token for a still-valid session (sliding session)."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Token refreshed"),
+            @ApiResponse(responseCode = "401", description = "Session expired or invalid — sign in again")
+    })
+    @PostMapping("/refresh")
+    public ResponseEntity<LoginResponse> refresh(Authentication authentication) {
+        UUID userId = UUID.fromString(authentication.getName());
+        return ResponseEntity.ok(authService.refreshToken(userId));
+    }
+
+    @Operation(
             summary = "Get the current user",
             description = "Authenticated user. Returns the profile of the currently authenticated user."
     )
