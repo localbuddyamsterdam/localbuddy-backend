@@ -508,6 +508,35 @@ public class LocalProfileService {
                 .toList();
     }
 
+    /**
+     * Paginated public browse of approved locals (optionally by city). Newest first;
+     * page is zero-based and size is clamped to a sane range.
+     */
+    @Transactional(readOnly = true)
+    public LocalProfilePageResponse getApprovedLocalProfilesPaged(String city, int page, int size) {
+        int safePage = Math.max(0, page);
+        int safeSize = Math.min(60, Math.max(1, size));
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(
+                safePage, safeSize,
+                org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "createdAt"));
+
+        org.springframework.data.domain.Page<LocalProfile> result =
+                (city == null || city.trim().isEmpty())
+                        ? localProfileRepository.findByApprovalStatus(LocalApprovalStatus.APPROVED, pageable)
+                        : localProfileRepository.findByHostCityIgnoreCaseAndApprovalStatus(
+                                city.trim(), LocalApprovalStatus.APPROVED, pageable);
+
+        return new LocalProfilePageResponse(
+                result.getContent().stream().map(this::toResponse).toList(),
+                result.getNumber(),
+                result.getSize(),
+                result.getTotalElements(),
+                result.getTotalPages(),
+                result.hasNext(),
+                result.hasPrevious()
+        );
+    }
+
     @Transactional(readOnly = true)
     public LocalProfileResponse getApprovedLocalProfileById(UUID profileId) {
         LocalProfile profile = localProfileRepository.findById(profileId)
