@@ -3,6 +3,7 @@ package com.localbuddy.admin;
 import com.localbuddy.localprofile.AdminLocalProfileReviewRequest;
 import com.localbuddy.localprofile.LocalProfileResponse;
 import com.localbuddy.localprofile.LocalProfileService;
+import com.localbuddy.localprofile.SetHostCommissionRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -90,5 +91,26 @@ public class AdminLocalProfileController {
             @Valid @RequestBody AdminLocalProfileReviewRequest request
     ) {
         return ResponseEntity.ok(localProfileService.requestChangesForLocalProfile(profileId, request));
+    }
+
+    @Operation(
+            summary = "Set or clear a host's commission override",
+            description = "Sets the per-host commission rate (fraction, e.g. 0.15 = 15%), which "
+                    + "supersedes category/city/platform rules for this host's experiences. Send a null "
+                    + "commissionRate to clear the override. Admin only."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Commission override updated"),
+            @ApiResponse(responseCode = "400", description = "Rate out of range (0..max-commission-rate)"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "403", description = "Not authorized (admin only)"),
+            @ApiResponse(responseCode = "404", description = "Local profile not found")
+    })
+    @PutMapping("/{profileId}/commission")
+    public ResponseEntity<LocalProfileResponse> setHostCommission(
+            @PathVariable UUID profileId,
+            @RequestBody SetHostCommissionRequest request
+    ) {
+        return ResponseEntity.ok(localProfileService.setCommissionOverride(profileId, request.commissionRate()));
     }
 }

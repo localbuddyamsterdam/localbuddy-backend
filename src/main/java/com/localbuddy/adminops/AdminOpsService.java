@@ -190,7 +190,9 @@ public class AdminOpsService {
                 profile.getTotalReviews(),
 
                 profile.getCreatedAt(),
-                profile.getUpdatedAt()
+                profile.getUpdatedAt(),
+
+                profile.getCommissionRate()
         );
     }
 
@@ -293,6 +295,7 @@ public class AdminOpsService {
                 experience.getUpdatedAt(),
                 experience.getExternalListingType(),
                 experience.getExternalListingDetails(),
+                experience.getCommissionRate(),
                 coverImage
         );
     }

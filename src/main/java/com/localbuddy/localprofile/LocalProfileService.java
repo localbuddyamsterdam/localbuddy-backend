@@ -16,9 +16,11 @@ import com.localbuddy.notification.NotificationType;
 import com.localbuddy.user.User;
 import com.localbuddy.user.UserRepository;
 import com.localbuddy.user.UserRole;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -35,19 +37,23 @@ public class LocalProfileService {
     private final CityRepository cityRepository;
     private final ExperienceCategoryRepository categoryRepository;
     private final MediaStorageProvider storageProvider;
+    /** Hard cap admins can assign (app.platform.max-commission-rate); guards host payouts. */
+    private final BigDecimal maxCommissionRate;
 
     public LocalProfileService(LocalProfileRepository localProfileRepository,
                                UserRepository userRepository,
                                NotificationService notificationService,
                                CityRepository cityRepository,
                                ExperienceCategoryRepository categoryRepository,
-                               MediaStorageProvider storageProvider) {
+                               MediaStorageProvider storageProvider,
+                               @Value("${app.platform.max-commission-rate:0.50}") BigDecimal maxCommissionRate) {
         this.localProfileRepository = localProfileRepository;
         this.userRepository = userRepository;
         this.notificationService = notificationService;
         this.cityRepository = cityRepository;
         this.categoryRepository = categoryRepository;
         this.storageProvider = storageProvider;
+        this.maxCommissionRate = maxCommissionRate;
     }
 
     @Transactional
@@ -396,7 +402,9 @@ public class LocalProfileService {
                 profile.getTotalReviews(),
 
                 profile.getCreatedAt(),
-                profile.getUpdatedAt()
+                profile.getUpdatedAt(),
+
+                profile.getCommissionRate()
         );
     }
 
@@ -465,6 +473,29 @@ public class LocalProfileService {
         LocalProfile savedProfile = localProfileRepository.save(profile);
         createLocalProfileApprovedNotification(savedProfile);
         return toResponse(savedProfile);
+    }
+
+    /**
+     * Set or clear a host's per-host commission override (admin only).
+     * {@code commissionRate == null} clears it. The override supersedes host/
+     * category/city/platform commission rules, so it is capped at
+     * {@code app.platform.max-commission-rate}.
+     */
+    @Transactional
+    public LocalProfileResponse setCommissionOverride(UUID profileId, BigDecimal commissionRate) {
+        if (commissionRate != null) {
+            if (commissionRate.signum() < 0) {
+                throw new BadRequestException("Commission rate must be zero or positive");
+            }
+            if (commissionRate.compareTo(maxCommissionRate) > 0) {
+                throw new BadRequestException("Commission rate " + commissionRate
+                        + " exceeds the maximum allowed (" + maxCommissionRate + ")");
+            }
+        }
+        LocalProfile profile = localProfileRepository.findById(profileId)
+                .orElseThrow(() -> new ResourceNotFoundException("Local profile not found"));
+        profile.setCommissionRate(commissionRate);
+        return toResponse(localProfileRepository.save(profile));
     }
 
 

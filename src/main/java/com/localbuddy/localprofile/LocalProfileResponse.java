@@ -65,6 +65,9 @@ public record LocalProfileResponse(
         Integer totalReviews,
 
         Instant createdAt,
-        Instant updatedAt
+        Instant updatedAt,
+
+        /** Per-host commission override (fraction); null = use rule/default. */
+        BigDecimal commissionRate
 ) {
 }

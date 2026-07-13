@@ -43,6 +43,7 @@ public record ExperienceResponse(
         Instant updatedAt,
         ExternalListingType externalListingType,
         String externalListingDetails,
+        BigDecimal commissionRate,
         CoverImage coverImage
 ) {
     public record CoverImage(UUID id, String url, String caption) {}

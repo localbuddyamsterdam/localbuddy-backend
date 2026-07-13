@@ -2,6 +2,7 @@ package com.localbuddy.admin;
 
 import com.localbuddy.experience.ExperienceResponse;
 import com.localbuddy.experience.ExperienceService;
+import com.localbuddy.experience.SetExperienceCommissionRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -65,5 +66,26 @@ public class AdminExperienceController {
     @PostMapping("/{experienceId}/reject")
     public ResponseEntity<ExperienceResponse> rejectExperience(@PathVariable UUID experienceId) {
         return ResponseEntity.ok(experienceService.rejectExperience(experienceId));
+    }
+
+    @Operation(
+            summary = "Set or clear an experience's commission override",
+            description = "Sets the per-experience commission rate (fraction, e.g. 0.15 = 15%), which "
+                    + "supersedes host/category/city/platform rules for this experience. Send a null "
+                    + "commissionRate to clear the override. Admin only."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Commission override updated"),
+            @ApiResponse(responseCode = "400", description = "Rate out of range (0..max-commission-rate)"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "403", description = "Not authorized (admin only)"),
+            @ApiResponse(responseCode = "404", description = "Experience not found")
+    })
+    @PutMapping("/{experienceId}/commission")
+    public ResponseEntity<ExperienceResponse> setCommissionOverride(
+            @PathVariable UUID experienceId,
+            @RequestBody SetExperienceCommissionRequest request) {
+        return ResponseEntity.ok(
+                experienceService.setCommissionOverride(experienceId, request.commissionRate()));
     }
 }

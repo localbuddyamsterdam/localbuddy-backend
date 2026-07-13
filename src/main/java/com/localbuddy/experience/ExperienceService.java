@@ -12,6 +12,7 @@ import com.localbuddy.media.ExperiencePhoto;
 import com.localbuddy.media.ExperiencePhotoRepository;
 import com.localbuddy.pricing.VatService;
 import com.localbuddy.trustsafety.TrustSafetyService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -47,6 +48,8 @@ public class ExperienceService {
     private final VatService vatService;
     private final BookingRepository bookingRepository;
     private final ExperiencePhotoRepository experiencePhotoRepository;
+    /** Hard cap admins can assign (app.platform.max-commission-rate); guards host payouts. */
+    private final BigDecimal maxCommissionRate;
 
     public ExperienceService(ExperienceRepository experienceRepository,
                              ExperienceCategoryRepository categoryRepository,
@@ -56,7 +59,8 @@ public class ExperienceService {
                              TrustSafetyService trustSafetyService,
                              VatService vatService,
                              BookingRepository bookingRepository,
-                             ExperiencePhotoRepository experiencePhotoRepository) {
+                             ExperiencePhotoRepository experiencePhotoRepository,
+                             @Value("${app.platform.max-commission-rate:0.50}") BigDecimal maxCommissionRate) {
         this.experienceRepository = experienceRepository;
         this.categoryRepository = categoryRepository;
         this.cityRepository = cityRepository;
@@ -66,6 +70,7 @@ public class ExperienceService {
         this.vatService = vatService;
         this.bookingRepository = bookingRepository;
         this.experiencePhotoRepository = experiencePhotoRepository;
+        this.maxCommissionRate = maxCommissionRate;
     }
 
     @Transactional
@@ -644,6 +649,7 @@ public class ExperienceService {
                 experience.getUpdatedAt(),
                 experience.getExternalListingType(),
                 experience.getExternalListingDetails(),
+                experience.getCommissionRate(),
                 coverImage
         );
     }
@@ -668,6 +674,29 @@ public class ExperienceService {
 
         experience.setStatus(ExperienceStatus.APPROVED);
 
+        return toResponse(experienceRepository.save(experience));
+    }
+
+    /**
+     * Set or clear an experience's per-experience commission override (admin only).
+     * {@code commissionRate == null} clears the override so the host/rule/default
+     * rate applies again. The override supersedes every commission rule for this
+     * experience, so it is capped at {@code app.platform.max-commission-rate}.
+     */
+    @Transactional
+    public ExperienceResponse setCommissionOverride(UUID experienceId, BigDecimal commissionRate) {
+        if (commissionRate != null) {
+            if (commissionRate.signum() < 0) {
+                throw new BadRequestException("Commission rate must be zero or positive");
+            }
+            if (commissionRate.compareTo(maxCommissionRate) > 0) {
+                throw new BadRequestException("Commission rate " + commissionRate
+                        + " exceeds the maximum allowed (" + maxCommissionRate + ")");
+            }
+        }
+        Experience experience = experienceRepository.findById(experienceId)
+                .orElseThrow(() -> new ResourceNotFoundException("Experience not found"));
+        experience.setCommissionRate(commissionRate);
         return toResponse(experienceRepository.save(experience));
     }
 
