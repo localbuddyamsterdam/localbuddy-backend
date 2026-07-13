@@ -7,6 +7,8 @@ import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 
 @Entity
@@ -84,6 +86,15 @@ public class PromoCode {
      */
     @Column(name = "combinable", nullable = false)
     private boolean combinable = false;
+
+    /**
+     * Experiences this code applies to. Empty = valid on every experience (platform-wide,
+     * the default). Non-empty = valid only on these experiences.
+     */
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "promo_code_experiences", joinColumns = @JoinColumn(name = "promo_code_id"))
+    @Column(name = "experience_id", nullable = false)
+    private Set<UUID> experienceIds = new HashSet<>();
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

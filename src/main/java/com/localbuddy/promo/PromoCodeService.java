@@ -57,6 +57,9 @@ public class PromoCodeService {
         promoCode.setIssuedToUserId(request.issuedToUserId());
         promoCode.setIssuedToEmail(optionalTrim(request.issuedToEmail()));
         promoCode.setCombinable(request.combinable() != null && request.combinable());
+        promoCode.setExperienceIds(request.experienceIds() == null
+                ? new java.util.HashSet<>()
+                : new java.util.HashSet<>(request.experienceIds()));
 
         return toResponse(promoCodeRepository.save(promoCode));
     }
@@ -90,7 +93,7 @@ public class PromoCodeService {
             return invalid(normalizedCode, bookingAmount, "Promo code not found");
         }
 
-        String validationError = getValidationError(promoCode, userId, optionalTrim(request.guestEmail()), bookingAmount, requestCurrency);
+        String validationError = getValidationError(promoCode, userId, optionalTrim(request.guestEmail()), bookingAmount, requestCurrency, request.experienceId());
 
         if (validationError != null) {
             return invalid(normalizedCode, bookingAmount, validationError);
@@ -115,11 +118,19 @@ public class PromoCodeService {
                                       UUID userId,
                                       String guestEmail,
                                       BigDecimal bookingAmount,
-                                      String currency) {
+                                      String currency,
+                                      UUID experienceId) {
         Instant now = Instant.now();
 
         if (!promoCode.isActive()) {
             return "Promo code is inactive";
+        }
+
+        // Experience scoping: a code limited to specific experiences is valid only on those.
+        if (promoCode.getExperienceIds() != null && !promoCode.getExperienceIds().isEmpty()) {
+            if (experienceId == null || !promoCode.getExperienceIds().contains(experienceId)) {
+                return "This promo code isn't valid for this experience";
+            }
         }
 
         if (promoCode.getStartsAt() != null && now.isBefore(promoCode.getStartsAt())) {
@@ -199,14 +210,16 @@ public class PromoCodeService {
             String promoCodeText,
             String guestEmail,
             BigDecimal bookingAmount,
-            String currency
+            String currency,
+            UUID experienceId
     ) {
         AppliedPromoCodes applied = applyPromoCodesForBooking(
                 userId,
                 promoCodeText == null ? List.of() : List.of(promoCodeText),
                 guestEmail,
                 bookingAmount,
-                currency
+                currency,
+                experienceId
         );
 
         if (applied.codes().isEmpty()) {
@@ -232,7 +245,8 @@ public class PromoCodeService {
             List<String> promoCodeTexts,
             String guestEmail,
             BigDecimal bookingAmount,
-            String currency
+            String currency,
+            UUID experienceId
     ) {
         BigDecimal base = bookingAmount.setScale(2, RoundingMode.HALF_UP);
 
@@ -254,7 +268,7 @@ public class PromoCodeService {
             PromoCode promoCode = promoCodeRepository.findByCodeIgnoreCase(code)
                     .orElseThrow(() -> new BadRequestException("Promo code not found: " + code));
 
-            String validationError = getValidationError(promoCode, userId, trimmedGuestEmail, base, requestCurrency);
+            String validationError = getValidationError(promoCode, userId, trimmedGuestEmail, base, requestCurrency, experienceId);
             if (validationError != null) {
                 throw new BadRequestException(validationError);
             }
@@ -381,7 +395,8 @@ public class PromoCodeService {
                 promoCode.getExpiresAt(),
                 promoCode.isActive(),
                 promoCode.getCreatedAt(),
-                promoCode.getUpdatedAt()
+                promoCode.getUpdatedAt(),
+                promoCode.getExperienceIds() == null ? List.of() : new ArrayList<>(promoCode.getExperienceIds())
         );
     }
 

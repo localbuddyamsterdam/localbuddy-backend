@@ -2,6 +2,7 @@ package com.localbuddy.promo;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 public record PromoCodeResponse(
@@ -20,6 +21,7 @@ public record PromoCodeResponse(
         Instant expiresAt,
         boolean active,
         Instant createdAt,
-        Instant updatedAt
+        Instant updatedAt,
+        List<UUID> experienceIds
 ) {
 }

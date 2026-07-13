@@ -194,7 +194,8 @@ public class BookingService {
                 mergePromoCodes(request.promoCode(), request.promoCodes()),
                 null,
                 baseAfterDeal,
-                currency
+                currency,
+                experience.getId()
         );
         log.info("LOGGED_IN_BOOKING_TIMING applyPromoMs={}", System.currentTimeMillis() - stepStart);
 
@@ -754,7 +755,8 @@ public class BookingService {
                 mergePromoCodes(request.promoCode(), request.promoCodes()),
                 normalizedGuestEmail,
                 baseAfterDeal,
-                currency
+                currency,
+                experience.getId()
         );
         log.info("GUEST_BOOKING_TIMING applyPromoMs={}", System.currentTimeMillis() - stepStart);
 
@@ -1003,6 +1005,70 @@ public class BookingService {
         createBookingCancelledNotification(savedBooking);
 
         return toResponse(savedBooking);
+    }
+
+    /**
+     * Admin removes guests / reduces a booking's party size. Recomputes the base amount from
+     * the new age bands and scales the existing discount proportionally (exact for percentage
+     * promos, never over-charges for fixed ones), then frees the released seats on the slot.
+     * Only reductions are allowed — adding guests must go through a fresh, payable booking.
+     */
+    @Transactional
+    public BookingResponse updateBookingPartyByAdmin(UUID bookingId, AdminUpdateBookingPartyRequest request) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
+
+        if (booking.getStatus() != BookingStatus.PENDING_PAYMENT &&
+                booking.getStatus() != BookingStatus.CONFIRMED) {
+            throw new BadRequestException("Only pending payment or confirmed bookings can be edited");
+        }
+        if (booking.isPrivateBooking()) {
+            throw new BadRequestException("Party size is fixed for a private (whole-slot) booking");
+        }
+
+        AgeBandPricing.AgeBands bands = ageBandPricing.resolve(
+                request.adults(), request.teens(), request.children(), request.infants(), null);
+        ageBandPricing.validateAgeGate(booking.getExperience().getMinimumAge(), bands);
+
+        int oldTotal = booking.getGuestsCount();
+        int newTotal = bands.totalGuests();
+        if (newTotal < 1) {
+            throw new BadRequestException("A booking must keep at least one guest");
+        }
+        if (newTotal > oldTotal) {
+            throw new BadRequestException("Admin can only reduce party size; create a new booking to add guests");
+        }
+
+        BigDecimal newOriginal = booking.getPricePerGuest()
+                .multiply(ageBandPricing.billableUnits(bands))
+                .setScale(2, RoundingMode.HALF_UP);
+        BigDecimal oldOriginal = booking.getOriginalAmount() != null
+                ? booking.getOriginalAmount()
+                : booking.getTotalAmount().add(booking.getDiscountAmount());
+        BigDecimal newDiscount = (oldOriginal != null && oldOriginal.signum() > 0)
+                ? booking.getDiscountAmount().multiply(newOriginal).divide(oldOriginal, 2, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        newDiscount = newDiscount.min(newOriginal);
+        BigDecimal newTotalAmount = newOriginal.subtract(newDiscount)
+                .max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
+
+        int seatsToRelease = seatsConsumed(booking) - newTotal;
+        if (seatsToRelease > 0) {
+            AvailabilitySlot slot = availabilitySlotRepository
+                    .findByIdForUpdate(booking.getAvailabilitySlot().getId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Availability slot not found"));
+            releaseAvailabilityCapacityFromSlot(slot, seatsToRelease);
+            availabilitySlotRepository.save(slot);
+        }
+
+        applyBands(booking, bands);
+        booking.setGuestsCount(newTotal);
+        booking.setSeatsBlocked(newTotal);
+        booking.setOriginalAmount(newOriginal);
+        booking.setDiscountAmount(newDiscount);
+        booking.setTotalAmount(newTotalAmount);
+
+        return toResponse(bookingRepository.save(booking));
     }
 
 

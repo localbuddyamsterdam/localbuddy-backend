@@ -6,6 +6,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
+import java.util.UUID;
 
 public record ValidatePromoCodeRequest(
 
@@ -21,6 +22,9 @@ public record ValidatePromoCodeRequest(
         @Size(max = 10, message = "Currency cannot exceed 10 characters")
         String currency,
 
-        String guestEmail
+        String guestEmail,
+
+        /** The experience being booked — required to honour codes scoped to specific experiences. */
+        UUID experienceId
 ) {
 }

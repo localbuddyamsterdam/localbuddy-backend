@@ -59,4 +59,14 @@ public class AdminBookingController {
                 bookingService.rescheduleBookingByAdmin(bookingId, request)
         );
     }
+
+    @PostMapping("/{bookingId}/party")
+    public ResponseEntity<BookingResponse> updateBookingParty(
+            @PathVariable UUID bookingId,
+            @Valid @RequestBody AdminUpdateBookingPartyRequest request
+    ) {
+        return ResponseEntity.ok(
+                bookingService.updateBookingPartyByAdmin(bookingId, request)
+        );
+    }
 }
