@@ -1,7 +1,12 @@
 package com.localbuddy.user;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -17,6 +22,8 @@ import java.util.UUID;
  */
 @RestController
 @RequestMapping("/api/account")
+@Tag(name = "Account", description = "Self-service account management for authenticated users")
+@SecurityRequirement(name = "bearerAuth")
 public class AccountController {
 
     private final UserService userService;
@@ -59,5 +66,23 @@ public class AccountController {
     public ResponseEntity<UserResponse> deleteMyAvatar(Authentication authentication) {
         UUID userId = UUID.fromString(authentication.getName());
         return ResponseEntity.ok(userService.deleteMyAvatar(userId));
+    }
+
+    @Operation(summary = "Change password",
+            description = "Changes the password for the authenticated user. Requires the current password for verification.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Password changed successfully"),
+            @ApiResponse(responseCode = "400", description = "Invalid request or current password is incorrect"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "404", description = "User not found")
+    })
+    @PutMapping("/me/password")
+    public ResponseEntity<Void> changePassword(
+            Authentication authentication,
+            @Valid @RequestBody ChangePasswordRequest request
+    ) {
+        UUID userId = UUID.fromString(authentication.getName());
+        userService.changePassword(userId, request);
+        return ResponseEntity.noContent().build();
     }
 }

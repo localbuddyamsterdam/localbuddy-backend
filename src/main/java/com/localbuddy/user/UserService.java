@@ -5,6 +5,7 @@ import com.localbuddy.common.exception.ResourceNotFoundException;
 import com.localbuddy.media.ImageUploadValidator;
 import com.localbuddy.media.MediaStorageProvider;
 import com.localbuddy.media.StoredObject;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,10 +18,12 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final MediaStorageProvider storageProvider;
+    private final PasswordEncoder passwordEncoder;
 
-    public UserService(UserRepository userRepository, MediaStorageProvider storageProvider) {
+    public UserService(UserRepository userRepository, MediaStorageProvider storageProvider, PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.storageProvider = storageProvider;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @Transactional
@@ -143,5 +146,26 @@ public class UserService {
             storageProvider.delete(key);
         }
         return toResponse(saved);
+    }
+
+    @Transactional
+    public void changePassword(UUID userId, ChangePasswordRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        if (user.getPasswordHash() == null || user.getPasswordHash().isBlank()) {
+            throw new BadRequestException("Password change not supported for this account");
+        }
+
+        if (!passwordEncoder.matches(request.currentPassword(), user.getPasswordHash())) {
+            throw new BadRequestException("Current password is incorrect");
+        }
+
+        if (request.currentPassword().equals(request.newPassword())) {
+            throw new BadRequestException("New password must be different from current password");
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
+        userRepository.save(user);
     }
 }
