@@ -7,6 +7,7 @@ import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 public record CreatePromoCodeRequest(
@@ -53,6 +54,9 @@ public record CreatePromoCodeRequest(
         String issuedToEmail,
 
         /** Whether this code may be stacked with other combinable codes on one booking. Defaults to false. */
-        Boolean combinable
+        Boolean combinable,
+
+        /** Experiences this code is limited to. Null/empty = valid on every experience. */
+        List<UUID> experienceIds
 ) {
 }
