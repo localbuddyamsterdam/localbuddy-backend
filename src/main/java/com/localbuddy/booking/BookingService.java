@@ -463,7 +463,16 @@ public class BookingService {
                 booking.getDealDiscountAmount(),
                 booking.getAvailabilitySlot().getStartTime(),
                 booking.getAvailabilitySlot().getEndTime(),
-                booking.getExperience().getTitle()
+                booking.getExperience().getTitle(),
+                booking.getLocalProfile().getDisplayName(),
+                booking.getExperience().getCity() != null ? booking.getExperience().getCity().getName() : null,
+                booking.getAttendanceOutcome(),
+                booking.getNoShowMarkedAt(),
+                booking.getGuestShowStatus(),
+                booking.getAdultsCount(),
+                booking.getTeensCount(),
+                booking.getChildrenCount(),
+                booking.getInfantsCount()
         );
     }
 
@@ -663,15 +672,10 @@ public class BookingService {
 
     @Transactional(readOnly = true)
     public List<BookingResponse> getAdminBookings(BookingStatus status) {
-        if (status != null) {
-            return bookingRepository.findByStatusOrderByRequestedAtDesc(status)
-                    .stream()
-                    .map(this::toResponse)
-                    .toList();
-        }
-
-        return bookingRepository.findAll()
-                .stream()
+        List<Booking> bookings = status != null
+                ? bookingRepository.findAllForAdminByStatus(status)
+                : bookingRepository.findAllForAdmin();
+        return bookings.stream()
                 .map(this::toResponse)
                 .toList();
     }
@@ -986,7 +990,7 @@ public class BookingService {
     }
 
     @Transactional
-    public BookingResponse cancelBookingByAdmin(UUID bookingId, CancelBookingRequest request) {
+    public BookingResponse cancelBookingByAdmin(UUID bookingId, AdminCancelBookingRequest request) {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
 
@@ -995,7 +999,12 @@ public class BookingService {
         }
 
         releaseAvailabilityCapacity(booking);
-        handleCancellationPayment(booking, BookingCancellationActor.ADMIN, request.reason());
+
+        // Default: refund per the active cancellation-refund policy. An admin may override with an
+        // explicit percentage or amount (amount wins when both are supplied).
+        BigDecimal overridePercentage = resolveAdminRefundOverridePercentage(booking, request);
+        paymentService.handleBookingCancellationPayment(
+                booking, BookingCancellationActor.ADMIN, request.reason(), overridePercentage);
 
         booking.setStatus(BookingStatus.CANCELLED_BY_ADMIN);
         booking.setCancelledAt(Instant.now());
@@ -1003,6 +1012,106 @@ public class BookingService {
 
         Booking savedBooking = bookingRepository.save(booking);
         createBookingCancelledNotification(savedBooking);
+
+        return toResponse(savedBooking);
+    }
+
+    /** Translates an admin refund override (percentage or explicit amount) into a 0–100 percentage, or null for policy. */
+    private BigDecimal resolveAdminRefundOverridePercentage(Booking booking, AdminCancelBookingRequest request) {
+        if (request.refundAmount() != null) {
+            BigDecimal total = booking.getTotalAmount();
+            if (total == null || total.signum() <= 0) {
+                return BigDecimal.ZERO;
+            }
+            return request.refundAmount()
+                    .max(BigDecimal.ZERO)
+                    .min(total)
+                    .multiply(BigDecimal.valueOf(100))
+                    .divide(total, 4, RoundingMode.HALF_UP);
+        }
+        if (request.refundPercentage() != null) {
+            return request.refundPercentage()
+                    .max(BigDecimal.ZERO)
+                    .min(BigDecimal.valueOf(100));
+        }
+        return null;
+    }
+
+    /**
+     * Admin edit of a booking's guest contact + notes (partial update). Null fields are unchanged;
+     * contact fields only apply when non-blank (they can be corrected, never cleared, so the DB
+     * guest-contact constraints hold); a blank note clears that note. Allowed on any booking so
+     * records can be corrected after the fact.
+     */
+    @Transactional
+    public BookingResponse updateBookingDetailsByAdmin(UUID bookingId, AdminUpdateBookingRequest request) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
+
+        if (request.guestName() != null && !request.guestName().isBlank()) {
+            booking.setGuestName(requiredTrim(request.guestName()));
+        }
+        if (request.guestEmail() != null && !request.guestEmail().isBlank()) {
+            booking.setGuestEmail(requiredTrim(request.guestEmail()).toLowerCase(Locale.ROOT));
+        }
+        if (request.guestPhone() != null && !request.guestPhone().isBlank()) {
+            booking.setGuestPhone(requiredTrim(request.guestPhone()));
+        }
+        if (request.travelerNote() != null) {
+            booking.setTravelerNote(optionalTrim(request.travelerNote()));
+        }
+        if (request.localResponseNote() != null) {
+            booking.setLocalResponseNote(optionalTrim(request.localResponseNote()));
+        }
+
+        return toResponse(bookingRepository.save(booking));
+    }
+
+    /** Admin sets/clears the booking's attendance (no-show) verdict. {@code NONE} clears it. */
+    @Transactional
+    public BookingResponse setBookingAttendanceByAdmin(UUID bookingId, AdminSetAttendanceRequest request) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
+
+        AttendanceOutcome outcome = request.outcome();
+        booking.setAttendanceOutcome(outcome);
+        booking.setNoShowMarkedAt(outcome == AttendanceOutcome.NONE ? null : Instant.now());
+
+        return toResponse(bookingRepository.save(booking));
+    }
+
+    /** Admin re-sends the traveller-facing booking confirmation (email/in-app/WhatsApp). */
+    @Transactional
+    public BookingResponse resendBookingConfirmationByAdmin(UUID bookingId) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
+
+        if (booking.getStatus() != BookingStatus.CONFIRMED) {
+            throw new BadRequestException("Only confirmed bookings have a confirmation to resend");
+        }
+
+        bookingConfirmationNotifier.sendConfirmation(booking);
+        return toResponse(booking);
+    }
+
+    /**
+     * Admin marks a confirmed booking as completed (e.g. the experience took place). Unlike the
+     * host completion flow this does not require the safety checklist, since it is an admin override.
+     */
+    @Transactional
+    public BookingResponse completeBookingByAdmin(UUID bookingId) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
+
+        if (booking.getStatus() != BookingStatus.CONFIRMED) {
+            throw new BadRequestException("Only confirmed bookings can be completed");
+        }
+
+        booking.setStatus(BookingStatus.COMPLETED);
+        booking.setCompletedAt(Instant.now());
+
+        Booking savedBooking = bookingRepository.save(booking);
+        createBookingCompletedNotification(savedBooking);
 
         return toResponse(savedBooking);
     }

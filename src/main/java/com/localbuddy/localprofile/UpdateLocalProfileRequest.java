@@ -69,6 +69,9 @@ public record UpdateLocalProfileRequest(
         @Size(max = 2000, message = "Current address cannot exceed 2000 characters")
         String currentAddress,
 
+        /** Optional host-declared gender. */
+        Gender gender,
+
         @Size(max = 64, message = "Account number cannot exceed 64 characters")
         String accountNumber,
 

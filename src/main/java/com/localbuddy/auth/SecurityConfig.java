@@ -42,9 +42,6 @@ public class SecurityConfig {
                 .httpBasic(httpBasic -> httpBasic.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        // Token refresh must carry a valid (non-expired) token — matched before
-                        // the broad /api/auth/** permitAll below (first match wins).
-                        .requestMatchers("/api/auth/refresh").authenticated()
                         .requestMatchers(
                                 "/api/health",
                                 "/actuator/health",

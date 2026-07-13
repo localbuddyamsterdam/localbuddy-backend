@@ -68,6 +68,9 @@ public record LocalProfileResponse(
         Instant updatedAt,
 
         /** Per-host commission override (fraction); null = use rule/default. */
-        BigDecimal commissionRate
+        BigDecimal commissionRate,
+
+        /** Optional host-declared gender; null = not specified. */
+        Gender gender
 ) {
 }

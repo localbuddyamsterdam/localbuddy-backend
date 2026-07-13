@@ -56,4 +56,23 @@ public class AdminPaymentController {
     ) {
         return ResponseEntity.ok(paymentService.getAdminPaymentById(paymentId));
     }
+
+    @Operation(
+            summary = "Get the payment for a booking",
+            description = "Returns the payment record linked to a booking, or 204 No Content when the "
+                    + "booking has no payment (e.g. an offline admin-created booking). Admin only."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Payment retrieved successfully"),
+            @ApiResponse(responseCode = "204", description = "Booking has no payment"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "403", description = "Not authorized (admin only)")
+    })
+    @GetMapping("/by-booking/{bookingId}")
+    public ResponseEntity<PaymentResponse> getAdminPaymentByBookingId(
+            @PathVariable UUID bookingId
+    ) {
+        PaymentResponse payment = paymentService.getAdminPaymentByBookingId(bookingId);
+        return payment != null ? ResponseEntity.ok(payment) : ResponseEntity.noContent().build();
+    }
 }

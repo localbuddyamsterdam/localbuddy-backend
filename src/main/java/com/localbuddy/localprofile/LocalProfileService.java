@@ -231,6 +231,7 @@ public class LocalProfileService {
         profile.setLegalLastName(requiredTrim(request.legalLastName()));
         profile.setPreferredName(requiredTrim(request.preferredName()));
         profile.setCurrentAddress(requiredTrim(request.currentAddress()));
+        profile.setGender(request.gender());
 
         profile.setAccountNumber(optionalTrim(request.accountNumber()));
         profile.setAccountName(optionalTrim(request.accountName()));
@@ -267,6 +268,7 @@ public class LocalProfileService {
         profile.setLegalLastName(requiredTrim(request.legalLastName()));
         profile.setPreferredName(requiredTrim(request.preferredName()));
         profile.setCurrentAddress(requiredTrim(request.currentAddress()));
+        profile.setGender(request.gender());
 
         profile.setAccountNumber(optionalTrim(request.accountNumber()));
         profile.setAccountName(optionalTrim(request.accountName()));
@@ -404,7 +406,41 @@ public class LocalProfileService {
                 profile.getCreatedAt(),
                 profile.getUpdatedAt(),
 
-                profile.getCommissionRate()
+                profile.getCommissionRate(),
+                profile.getGender()
+        );
+    }
+
+    /**
+     * PII-free projection served to anonymous callers via the public endpoints.
+     * Keeps only public browse/search fields; never expose contact, address,
+     * bank, tax, verification-internal, or commission data here.
+     */
+    private PublicLocalProfileResponse toPublicResponse(LocalProfile profile) {
+        return new PublicLocalProfileResponse(
+                profile.getId(),
+                profile.getUser().getId(),
+
+                profile.getDisplayName(),
+                profile.getPreferredName(),
+                profile.getLegalFirstName(),
+                profile.getLegalLastName(),
+
+                profile.getProfilePhotoUrl(),
+                profile.getHostCity(),
+                profile.getCountry(),
+                profile.getBio(),
+
+                profile.getExperienceLanguages(),
+                profile.getExperienceCategories().stream().map(this::toCategoryResponse).toList(),
+
+                profile.getGender(),
+                profile.getVerificationStatus(),
+
+                profile.getRatingAvg(),
+                profile.getTotalReviews(),
+
+                profile.getCreatedAt()
         );
     }
 
@@ -524,18 +560,18 @@ public class LocalProfileService {
     }
 
     @Transactional(readOnly = true)
-    public List<LocalProfileResponse> getApprovedLocalProfiles(String city) {
+    public List<PublicLocalProfileResponse> getApprovedLocalProfiles(String city) {
         if (city == null || city.trim().isEmpty()) {
             return localProfileRepository.findByApprovalStatus(LocalApprovalStatus.APPROVED)
                     .stream()
-                    .map(this::toResponse)
+                    .map(this::toPublicResponse)
                     .toList();
         }
 
         return localProfileRepository
                 .findByHostCityIgnoreCaseAndApprovalStatus(city.trim(), LocalApprovalStatus.APPROVED)
                 .stream()
-                .map(this::toResponse)
+                .map(this::toPublicResponse)
                 .toList();
     }
 
@@ -558,7 +594,7 @@ public class LocalProfileService {
                                 city.trim(), LocalApprovalStatus.APPROVED, pageable);
 
         return new LocalProfilePageResponse(
-                result.getContent().stream().map(this::toResponse).toList(),
+                result.getContent().stream().map(this::toPublicResponse).toList(),
                 result.getNumber(),
                 result.getSize(),
                 result.getTotalElements(),
@@ -569,7 +605,7 @@ public class LocalProfileService {
     }
 
     @Transactional(readOnly = true)
-    public LocalProfileResponse getApprovedLocalProfileById(UUID profileId) {
+    public PublicLocalProfileResponse getApprovedLocalProfileById(UUID profileId) {
         LocalProfile profile = localProfileRepository.findById(profileId)
                 .orElseThrow(() -> new ResourceNotFoundException("Local profile not found"));
 
@@ -577,7 +613,7 @@ public class LocalProfileService {
             throw new ResourceNotFoundException("Local profile not found");
         }
 
-        return toResponse(profile);
+        return toPublicResponse(profile);
     }
 
     @Transactional

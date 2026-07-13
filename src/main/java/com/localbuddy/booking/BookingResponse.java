@@ -52,6 +52,17 @@ public record BookingResponse(
         // without extra lookups (a bare id-only response displays as empty).
         Instant slotStartTime,
         Instant slotEndTime,
-        String experienceTitle
+        String experienceTitle,
+        // Denormalized host/city + attendance + age bands for the admin console, so it can
+        // list, filter and manage bookings without per-row experience/host lookups.
+        String hostName,
+        String cityName,
+        AttendanceOutcome attendanceOutcome,
+        Instant noShowMarkedAt,
+        GuestShowStatus guestShowStatus,
+        Integer adultsCount,
+        Integer teensCount,
+        Integer childrenCount,
+        Integer infantsCount
 ) {
 }

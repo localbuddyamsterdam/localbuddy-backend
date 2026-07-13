@@ -22,6 +22,9 @@ public record PaymentResponse(
         Instant cancelledAt,
         Instant refundedAt,
         Instant createdAt,
-        Instant updatedAt
+        Instant updatedAt,
+        // Refund detail so the admin console can show how much was returned and why.
+        BigDecimal refundedAmount,
+        String refundReason
 ) {
 }

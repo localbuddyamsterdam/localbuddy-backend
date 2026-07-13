@@ -2,6 +2,8 @@ package com.localbuddy.payment;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -44,4 +46,14 @@ public interface PaymentRepository extends JpaRepository<Payment, UUID> {
             UUID localProfileId,
             PaymentStatus paymentStatus
     );
+
+    /** Payments in a given status whose paidAt falls in [from, to] — admin dashboard money/series windows. */
+    List<Payment> findByPaymentStatusAndPaidAtBetween(
+            PaymentStatus paymentStatus,
+            Instant from,
+            Instant to
+    );
+
+    /** Count of payments across several statuses — admin dashboard queues (e.g. FAILED + REFUND_PENDING). */
+    long countByPaymentStatusIn(Collection<PaymentStatus> statuses);
 }

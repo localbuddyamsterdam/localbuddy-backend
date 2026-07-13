@@ -21,4 +21,7 @@ public interface NoShowReportRepository extends JpaRepository<NoShowReport, UUID
 
     /** True if any unresolved (REQUESTED) report exists for a booking — used to pause auto-completion. */
     boolean existsByBookingIdAndStatus(UUID bookingId, NoShowReportStatus status);
+
+    /** Count of reports in a given status — admin dashboard no-show queue. */
+    long countByStatus(NoShowReportStatus status);
 }

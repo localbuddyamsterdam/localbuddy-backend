@@ -20,14 +20,17 @@ public class SocialAuthService {
     private final Map<SocialProvider, SocialTokenVerifier> verifiers;
     private final UserRepository userRepository;
     private final JwtService jwtService;
+    private final RefreshTokenService refreshTokenService;
 
     public SocialAuthService(List<SocialTokenVerifier> verifierList,
                              UserRepository userRepository,
-                             JwtService jwtService) {
+                             JwtService jwtService,
+                             RefreshTokenService refreshTokenService) {
         this.verifiers = verifierList.stream()
                 .collect(Collectors.toMap(SocialTokenVerifier::provider, Function.identity()));
         this.userRepository = userRepository;
         this.jwtService = jwtService;
+        this.refreshTokenService = refreshTokenService;
     }
 
     @Transactional
@@ -52,9 +55,11 @@ public class SocialAuthService {
         }
 
         String accessToken = jwtService.generateAccessToken(user);
+        String refreshToken = refreshTokenService.issue(user);
 
         return new LoginResponse(
                 accessToken,
+                refreshToken,
                 "Bearer",
                 user.getId(),
                 user.getFullName(),

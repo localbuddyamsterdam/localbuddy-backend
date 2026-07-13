@@ -20,6 +20,21 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
 
     List<Booking> findByStatusOrderByRequestedAtDesc(BookingStatus status);
 
+    /**
+     * Admin console listing — eager-fetches the ToOne associations the admin response denormalizes
+     * (experience + its city, host profile, slot, traveller) so the list is a single query, not N+1.
+     */
+    @org.springframework.data.jpa.repository.Query("SELECT b FROM Booking b ORDER BY b.requestedAt DESC")
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {
+            "experience", "experience.city", "localProfile", "availabilitySlot", "loggedInUser"})
+    List<Booking> findAllForAdmin();
+
+    @org.springframework.data.jpa.repository.Query(
+            "SELECT b FROM Booking b WHERE b.status = :status ORDER BY b.requestedAt DESC")
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {
+            "experience", "experience.city", "localProfile", "availabilitySlot", "loggedInUser"})
+    List<Booking> findAllForAdminByStatus(BookingStatus status);
+
     List<Booking> findByLoggedInUserIdAndStatusOrderByRequestedAtDesc(
             UUID loggedInUserId,
             BookingStatus status

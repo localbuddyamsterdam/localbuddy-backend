@@ -92,6 +92,9 @@ app:
     jwt:
       secret: ${JWT_SECRET}
       access-token-expiration-minutes: ${JWT_ACCESS_TOKEN_EXPIRATION_MINUTES:60}
+      refresh-token-expiration-days: ${JWT_REFRESH_TOKEN_EXPIRATION_DAYS:30}
+    reset-token-expiration-minutes: ${RESET_TOKEN_EXPIRATION_MINUTES:30}
+    verification-token-expiration-hours: ${VERIFICATION_TOKEN_EXPIRATION_HOURS:48}
 
   frontend:
     base-url: ${FRONTEND_BASE_URL:http://localhost:3000}

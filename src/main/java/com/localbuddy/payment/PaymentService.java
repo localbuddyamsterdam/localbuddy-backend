@@ -137,7 +137,9 @@ public class PaymentService {
                 payment.getCancelledAt(),
                 payment.getRefundedAt(),
                 payment.getCreatedAt(),
-                payment.getUpdatedAt()
+                payment.getUpdatedAt(),
+                payment.getRefundedAmount(),
+                payment.getRefundReason()
         );
     }
 
@@ -702,6 +704,22 @@ public class PaymentService {
             BookingCancellationActor cancelledBy,
             String reason
     ) {
+        handleBookingCancellationPayment(booking, cancelledBy, reason, null);
+    }
+
+    /**
+     * Cancellation refund with an optional admin override. When {@code overrideRefundPercentage}
+     * is null the refund is computed from the active cancellation-refund policy (the normal path);
+     * when non-null it is used directly (0–100% of the booking total), still routed through the
+     * same host-ledger clawback + gift/Stripe split so partial refunds stay reconciled.
+     */
+    @Transactional
+    public void handleBookingCancellationPayment(
+            Booking booking,
+            BookingCancellationActor cancelledBy,
+            String reason,
+            BigDecimal overrideRefundPercentage
+    ) {
         Payment payment = paymentRepository.findByBookingId(booking.getId())
                 .orElse(null);
 
@@ -728,8 +746,9 @@ public class PaymentService {
             return;
         }
 
-        RefundCalculationResult refundCalculation =
-                cancellationRefundPolicyService.calculateRefund(booking, cancelledBy);
+        RefundCalculationResult refundCalculation = overrideRefundPercentage != null
+                ? buildOverrideRefund(booking, cancelledBy, overrideRefundPercentage)
+                : cancellationRefundPolicyService.calculateRefund(booking, cancelledBy);
 
         BigDecimal refundAmount = refundCalculation.refundAmount();
 
@@ -889,6 +908,36 @@ public class PaymentService {
                 .orElseThrow(() -> new ResourceNotFoundException("Payment not found"));
 
         return toResponse(payment);
+    }
+
+    /** Payment for a booking, or null when the booking has no payment (e.g. an offline admin booking). */
+    @Transactional(readOnly = true)
+    public PaymentResponse getAdminPaymentByBookingId(UUID bookingId) {
+        return paymentRepository.findByBookingId(bookingId)
+                .map(this::toResponse)
+                .orElse(null);
+    }
+
+    /** Builds a refund result from an admin-chosen percentage of the booking total (0–100), capped. */
+    private RefundCalculationResult buildOverrideRefund(
+            Booking booking,
+            BookingCancellationActor cancelledBy,
+            BigDecimal overridePercentage
+    ) {
+        BigDecimal pct = overridePercentage
+                .max(BigDecimal.ZERO)
+                .min(BigDecimal.valueOf(100))
+                .setScale(2, RoundingMode.HALF_UP);
+        BigDecimal bookingAmount = booking.getTotalAmount() != null
+                ? booking.getTotalAmount().setScale(2, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal refundAmount = bookingAmount
+                .multiply(pct)
+                .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP)
+                .min(bookingAmount)
+                .max(BigDecimal.ZERO)
+                .setScale(2, RoundingMode.HALF_UP);
+        return new RefundCalculationResult(cancelledBy, BigDecimal.ZERO, pct, refundAmount);
     }
 
 

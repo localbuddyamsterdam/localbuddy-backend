@@ -121,6 +121,11 @@ public class LocalProfile {
     @Column(name = "current_address", nullable = false, columnDefinition = "TEXT")
     private String currentAddress;
 
+    /** Optional host-declared gender; null = not specified. Powers the /locals gender filter. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "gender", length = 30)
+    private Gender gender;
+
     @Column(name = "account_number", length = 64)
     private String accountNumber;
 

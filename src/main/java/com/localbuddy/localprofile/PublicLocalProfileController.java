@@ -29,7 +29,7 @@ public class PublicLocalProfileController {
             @ApiResponse(responseCode = "200", description = "Approved local profiles retrieved successfully")
     })
     @GetMapping
-    public ResponseEntity<List<LocalProfileResponse>> getApprovedLocalProfiles(
+    public ResponseEntity<List<PublicLocalProfileResponse>> getApprovedLocalProfiles(
             @RequestParam(required = false) String city
     ) {
         return ResponseEntity.ok(localProfileService.getApprovedLocalProfiles(city));
@@ -60,7 +60,7 @@ public class PublicLocalProfileController {
             @ApiResponse(responseCode = "404", description = "Approved local profile not found")
     })
     @GetMapping("/{profileId}")
-    public ResponseEntity<LocalProfileResponse> getApprovedLocalProfileById(
+    public ResponseEntity<PublicLocalProfileResponse> getApprovedLocalProfileById(
             @PathVariable UUID profileId
     ) {
         return ResponseEntity.ok(localProfileService.getApprovedLocalProfileById(profileId));

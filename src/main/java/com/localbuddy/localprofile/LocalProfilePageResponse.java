@@ -4,10 +4,11 @@ import java.util.List;
 
 /**
  * A page of approved local (host) profiles for public browsing.
- * {@code page} is zero-based.
+ * {@code page} is zero-based. Carries the PII-free {@link PublicLocalProfileResponse}
+ * projection — this is served to anonymous callers.
  */
 public record LocalProfilePageResponse(
-        List<LocalProfileResponse> content,
+        List<PublicLocalProfileResponse> content,
         int page,
         int size,
         long totalElements,

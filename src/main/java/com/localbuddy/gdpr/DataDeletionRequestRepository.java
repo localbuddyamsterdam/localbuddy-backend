@@ -14,4 +14,7 @@ public interface DataDeletionRequestRepository extends JpaRepository<DataDeletio
     List<DataDeletionRequest> findAllByOrderByCreatedAtDesc();
 
     boolean existsByUserIdAndStatus(UUID userId, DataDeletionStatus status);
+
+    /** Count of deletion requests in a given status — admin dashboard GDPR queue. */
+    long countByStatus(DataDeletionStatus status);
 }

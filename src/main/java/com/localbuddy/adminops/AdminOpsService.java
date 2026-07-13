@@ -195,7 +195,8 @@ public class AdminOpsService {
                 profile.getCreatedAt(),
                 profile.getUpdatedAt(),
 
-                profile.getCommissionRate()
+                profile.getCommissionRate(),
+                profile.getGender()
         );
     }
 

@@ -14,4 +14,7 @@ public interface TrustSafetyReportRepository extends JpaRepository<TrustSafetyRe
     List<TrustSafetyReport> findByReporterUserIdOrderByCreatedAtDesc(UUID reporterUserId);
 
     List<TrustSafetyReport> findByReportedUserIdOrderByCreatedAtDesc(UUID reportedUserId);
+
+    /** Count of reports in a given status — admin dashboard trust & safety queue. */
+    long countByStatus(SafetyReportStatus status);
 }

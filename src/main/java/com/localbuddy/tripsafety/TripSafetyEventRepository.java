@@ -10,4 +10,7 @@ public interface TripSafetyEventRepository extends JpaRepository<TripSafetyEvent
     List<TripSafetyEvent> findByBookingIdOrderByCreatedAtDesc(UUID bookingId);
 
     List<TripSafetyEvent> findByEventTypeAndResolvedFalseOrderByCreatedAtAsc(TripSafetyEventType eventType);
+
+    /** Count of unresolved events of a given type — admin dashboard SOS queue. */
+    long countByEventTypeAndResolvedFalse(TripSafetyEventType eventType);
 }
