@@ -42,7 +42,7 @@ class PromoCodeStackingTest {
         code("PCT20", PromoDiscountType.PERCENTAGE, "20", true);
 
         AppliedPromoCodes r = service.applyPromoCodesForBooking(
-                UUID.randomUUID(), List.of("TEN", "PCT20"), null, new BigDecimal("100.00"), "EUR");
+                UUID.randomUUID(), List.of("TEN", "PCT20"), null, new BigDecimal("100.00"), "EUR", null);
 
         // 20% off 100 -> 80, then 10 off -> 70 (even though "TEN" was listed first)
         assertEquals(new BigDecimal("70.00"), r.finalAmount());
@@ -57,7 +57,7 @@ class PromoCodeStackingTest {
         code("B", PromoDiscountType.FIXED_AMOUNT, "5", false);
 
         assertThrows(BadRequestException.class, () -> service.applyPromoCodesForBooking(
-                UUID.randomUUID(), List.of("A", "B"), null, new BigDecimal("100.00"), "EUR"));
+                UUID.randomUUID(), List.of("A", "B"), null, new BigDecimal("100.00"), "EUR", null));
     }
 
     @Test
@@ -66,7 +66,7 @@ class PromoCodeStackingTest {
         code("SOLO", PromoDiscountType.PERCENTAGE, "25", false);
 
         AppliedPromoCodes r = service.applyPromoCodesForBooking(
-                UUID.randomUUID(), List.of("SOLO"), null, new BigDecimal("100.00"), "EUR");
+                UUID.randomUUID(), List.of("SOLO"), null, new BigDecimal("100.00"), "EUR", null);
 
         assertEquals(new BigDecimal("75.00"), r.finalAmount());
         assertEquals(1, r.codes().size());
@@ -76,7 +76,7 @@ class PromoCodeStackingTest {
     @DisplayName("no codes leaves the amount unchanged")
     void noCodes() {
         AppliedPromoCodes r = service.applyPromoCodesForBooking(
-                UUID.randomUUID(), List.of(), null, new BigDecimal("100.00"), "EUR");
+                UUID.randomUUID(), List.of(), null, new BigDecimal("100.00"), "EUR", null);
 
         assertEquals(new BigDecimal("100.00"), r.finalAmount());
         assertEquals(new BigDecimal("0.00"), r.totalDiscount());
