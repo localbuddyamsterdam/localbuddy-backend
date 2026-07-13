@@ -1,5 +1,6 @@
 package com.localbuddy.notification;
 
+import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -23,10 +24,7 @@ public class NotificationProcessor {
     @Scheduled(fixedDelayString = "${app.notifications.processor-delay-ms:10000}")
     public void processPendingNotifications() {
         List<UUID> notificationIds = notificationRepository
-                .findPendingNotificationIds(NotificationStatus.PENDING)
-                .stream()
-                .limit(BATCH_SIZE)
-                .toList();
+                .findPendingNotificationIds(NotificationStatus.PENDING, PageRequest.of(0, BATCH_SIZE));
 
         for (UUID notificationId : notificationIds) {
             notificationProcessingService.processOneNotification(notificationId);

@@ -1,6 +1,7 @@
 package com.localbuddy.notification;
 
 import jakarta.persistence.LockModeType;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -41,7 +42,7 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
             where n.status = :status
             order by n.createdAt asc
             """)
-    List<UUID> findPendingNotificationIds(@Param("status") NotificationStatus status);
+    List<UUID> findPendingNotificationIds(@Param("status") NotificationStatus status, Pageable pageable);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select n from Notification n where n.id = :id")
