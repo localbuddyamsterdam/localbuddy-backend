@@ -55,3 +55,13 @@ Spring Boot 4 / Java 21 **modular monolith**, **package-by-feature** under `com.
 - Business rules are overwhelmingly **config values in `application.yaml`** (fees, expiries, geofence, reminder offsets) — change config before adding code.
 - `logging.level.com.localbuddy=DEBUG` is on; use it, and the Azure Log stream, to diagnose.
 - Pre-launch hardening still open: set `SPRING_PROFILES_ACTIVE=prod` and rotate the seeded dev admin, add a verified email domain + DKIM.
+
+
+# Performance rules
+
+- Never optimize without measurements.
+- Check SQL execution plans before recommending indexes.
+- Avoid N+1 queries.
+- Do not introduce caching without defining TTL and invalidation.
+- Check timeout and retry multiplication across downstream calls.
+- Preserve API behavior while optimizing.
