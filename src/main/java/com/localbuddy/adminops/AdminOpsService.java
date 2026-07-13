@@ -4,6 +4,7 @@ import com.localbuddy.common.exception.BadRequestException;
 import com.localbuddy.common.exception.ResourceNotFoundException;
 import com.localbuddy.experience.*;
 import com.localbuddy.localprofile.*;
+import com.localbuddy.media.ExperiencePhotoRepository;
 import com.localbuddy.user.User;
 import com.localbuddy.user.UserRepository;
 import com.localbuddy.user.UserRole;
@@ -27,17 +28,20 @@ public class AdminOpsService {
     private final ExperienceRepository experienceRepository;
     private final ExperienceCategoryRepository experienceCategoryRepository;
     private final CityRepository cityRepository;
+    private final ExperiencePhotoRepository experiencePhotoRepository;
 
     public AdminOpsService(UserRepository userRepository,
                            LocalProfileRepository localProfileRepository,
                            ExperienceRepository experienceRepository,
                            ExperienceCategoryRepository experienceCategoryRepository,
-                           CityRepository cityRepository) {
+                           CityRepository cityRepository,
+                           ExperiencePhotoRepository experiencePhotoRepository) {
         this.userRepository = userRepository;
         this.localProfileRepository = localProfileRepository;
         this.experienceRepository = experienceRepository;
         this.experienceCategoryRepository = experienceCategoryRepository;
         this.cityRepository = cityRepository;
+        this.experiencePhotoRepository = experiencePhotoRepository;
     }
 
     @Transactional
@@ -246,6 +250,11 @@ public class AdminOpsService {
     }
 
     private ExperienceResponse toExperienceResponse(Experience experience) {
+        var coverPhoto = experiencePhotoRepository.findCoverPhotoByExperienceId(experience.getId());
+        var coverImage = coverPhoto.map(photo ->
+                new ExperienceResponse.CoverImage(photo.getId(), photo.getUrl(), photo.getCaption())
+        ).orElse(null);
+
         return new ExperienceResponse(
                 experience.getId(),
                 experience.getLocalProfile().getId(),
@@ -283,7 +292,8 @@ public class AdminOpsService {
                 experience.getCreatedAt(),
                 experience.getUpdatedAt(),
                 experience.getExternalListingType(),
-                experience.getExternalListingDetails()
+                experience.getExternalListingDetails(),
+                coverImage
         );
     }
 

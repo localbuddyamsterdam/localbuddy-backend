@@ -42,6 +42,8 @@ public record ExperienceResponse(
         Instant createdAt,
         Instant updatedAt,
         ExternalListingType externalListingType,
-        String externalListingDetails
+        String externalListingDetails,
+        CoverImage coverImage
 ) {
+    public record CoverImage(UUID id, String url, String caption) {}
 }

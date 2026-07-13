@@ -8,6 +8,8 @@ import com.localbuddy.consent.ConsentService;
 import com.localbuddy.localprofile.LocalApprovalStatus;
 import com.localbuddy.localprofile.LocalProfile;
 import com.localbuddy.localprofile.LocalProfileRepository;
+import com.localbuddy.media.ExperiencePhoto;
+import com.localbuddy.media.ExperiencePhotoRepository;
 import com.localbuddy.pricing.VatService;
 import com.localbuddy.trustsafety.TrustSafetyService;
 import org.springframework.data.domain.Page;
@@ -44,12 +46,17 @@ public class ExperienceService {
     private final TrustSafetyService trustSafetyService;
     private final VatService vatService;
     private final BookingRepository bookingRepository;
+    private final ExperiencePhotoRepository experiencePhotoRepository;
 
     public ExperienceService(ExperienceRepository experienceRepository,
                              ExperienceCategoryRepository categoryRepository,
                              CityRepository cityRepository,
-                             LocalProfileRepository localProfileRepository  , ConsentService consentService, TrustSafetyService trustSafetyService, VatService vatService,
-                             BookingRepository bookingRepository) {
+                             LocalProfileRepository localProfileRepository,
+                             ConsentService consentService,
+                             TrustSafetyService trustSafetyService,
+                             VatService vatService,
+                             BookingRepository bookingRepository,
+                             ExperiencePhotoRepository experiencePhotoRepository) {
         this.experienceRepository = experienceRepository;
         this.categoryRepository = categoryRepository;
         this.cityRepository = cityRepository;
@@ -58,6 +65,7 @@ public class ExperienceService {
         this.trustSafetyService = trustSafetyService;
         this.vatService = vatService;
         this.bookingRepository = bookingRepository;
+        this.experiencePhotoRepository = experiencePhotoRepository;
     }
 
     @Transactional
@@ -593,6 +601,11 @@ public class ExperienceService {
     }
 
     private ExperienceResponse toResponse(Experience experience) {
+        var coverPhoto = experiencePhotoRepository.findCoverPhotoByExperienceId(experience.getId());
+        var coverImage = coverPhoto.map(photo ->
+                new ExperienceResponse.CoverImage(photo.getId(), photo.getUrl(), photo.getCaption())
+        ).orElse(null);
+
         return new ExperienceResponse(
                 experience.getId(),
                 experience.getLocalProfile().getId(),
@@ -630,7 +643,8 @@ public class ExperienceService {
                 experience.getCreatedAt(),
                 experience.getUpdatedAt(),
                 experience.getExternalListingType(),
-                experience.getExternalListingDetails()
+                experience.getExternalListingDetails(),
+                coverImage
         );
     }
 
