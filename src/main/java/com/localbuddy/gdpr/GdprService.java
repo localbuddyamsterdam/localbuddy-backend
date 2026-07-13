@@ -4,6 +4,8 @@ import com.localbuddy.attendance.AttendanceCheckInRepository;
 import com.localbuddy.common.exception.BadRequestException;
 import com.localbuddy.common.exception.ResourceNotFoundException;
 import com.localbuddy.consent.UserConsentRepository;
+import com.localbuddy.localprofile.LocalProfile;
+import com.localbuddy.localprofile.LocalProfileRepository;
 import com.localbuddy.notification.NotificationPreferenceService;
 import com.localbuddy.user.User;
 import com.localbuddy.user.UserRepository;
@@ -26,6 +28,7 @@ public class GdprService {
     private final GdprReviewRepository reviewRepository;
     private final DataDeletionRequestRepository deletionRequestRepository;
     private final AttendanceCheckInRepository checkInRepository;
+    private final LocalProfileRepository localProfileRepository;
 
     public GdprService(UserRepository userRepository,
                        UserConsentRepository consentRepository,
@@ -34,7 +37,8 @@ public class GdprService {
                        GdprPaymentRepository paymentRepository,
                        GdprReviewRepository reviewRepository,
                        DataDeletionRequestRepository deletionRequestRepository,
-                       AttendanceCheckInRepository checkInRepository) {
+                       AttendanceCheckInRepository checkInRepository,
+                       LocalProfileRepository localProfileRepository) {
         this.userRepository = userRepository;
         this.consentRepository = consentRepository;
         this.preferenceService = preferenceService;
@@ -43,6 +47,7 @@ public class GdprService {
         this.reviewRepository = reviewRepository;
         this.deletionRequestRepository = deletionRequestRepository;
         this.checkInRepository = checkInRepository;
+        this.localProfileRepository = localProfileRepository;
     }
 
     @Transactional(readOnly = true)
@@ -198,6 +203,49 @@ public class GdprService {
         user.setPhoneVerified(false);
         user.setStatus(UserStatus.DELETED);
         userRepository.save(user);
+
+        // A host also has a LocalProfile holding personal + financial + tax data. Without this, a
+        // "deleted" host's legal name, address, DOB, VAT/tax IDs and bank details survive deletion.
+        localProfileRepository.findByUserId(user.getId()).ifPresent(this::anonymizeHostProfile);
+
+        // Free-text reviews authored by the user are their personal data; drop the comment bodies.
+        reviewRepository.findByReviewerUserIdOrderByCreatedAtDesc(user.getId()).forEach(review -> {
+            if (review.getComment() != null) {
+                review.setComment(null);
+                reviewRepository.save(review);
+            }
+        });
+    }
+
+    private void anonymizeHostProfile(LocalProfile profile) {
+        // NOT-NULL free-text columns → neutral placeholder; everything else (incl. bank + tax) → null.
+        profile.setDisplayName("Deleted Host");
+        profile.setBio("");
+        profile.setPhoneNumber("");
+        profile.setHostCity("");
+        profile.setZipCode("");
+        profile.setCountry("");
+        profile.setMotivation("");
+        profile.setExperienceInfo("");
+        profile.setProfilePhotoUrl("");
+        profile.setLegalFirstName("Deleted");
+        profile.setLegalLastName("Host");
+        profile.setPreferredName("Deleted");
+        profile.setCurrentAddress("REDACTED");
+        profile.setAccountNumber(null);
+        profile.setAccountName(null);
+        profile.setSwiftCode(null);
+        profile.setVatNumber(null);
+        profile.setTaxCountry(null);
+        profile.setLegalEntityType(null);
+        profile.setTaxIdentificationNumber(null);
+        profile.setBusinessRegistrationNumber(null);
+        profile.setDateOfBirth(null);
+        profile.setStripeConnectAccountId(null);
+        profile.setVerificationReferenceId(null);
+        profile.setVerificationFailureReason(null);
+        profile.setAdminReviewNote(null);
+        localProfileRepository.save(profile);
     }
 
     private DataDeletionRequest requireRequest(UUID requestId) {

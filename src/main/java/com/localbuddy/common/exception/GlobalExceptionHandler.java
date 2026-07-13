@@ -238,6 +238,15 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage(), request);
     }
 
+    @ExceptionHandler(RateLimitExceededException.class)
+    public ResponseEntity<ErrorResponse> handleRateLimit(
+            RateLimitExceededException ex,
+            HttpServletRequest request
+    ) {
+        // Rate limit exceeded → 429 (was surfacing as a 400 via BadRequestException before).
+        return buildErrorResponse(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage(), request);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGenericException(
             Exception ex,

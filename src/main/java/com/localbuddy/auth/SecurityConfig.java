@@ -7,6 +7,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.MediaType;
 import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -23,6 +24,7 @@ import java.util.Arrays;
 import java.util.List;
 
 @Configuration
+@EnableMethodSecurity
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
@@ -57,6 +59,9 @@ public class SecurityConfig {
                         ).permitAll()
                         .requestMatchers("/api/users/**").hasRole("ADMIN")
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        // Host-only surface — a positive role gate so it never depends solely on each
+                        // handler's own in-code check (defence in depth against an unguarded endpoint).
+                        .requestMatchers("/api/host/**").hasRole("LOCAL")
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(ex -> ex
@@ -99,6 +104,8 @@ public class SecurityConfig {
                 .toList());
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
+        // Headers the browser is allowed to read cross-origin (downloads, pagination, retry-after).
+        config.setExposedHeaders(List.of("Location", "Content-Disposition", "X-Total-Count", "Retry-After"));
         config.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

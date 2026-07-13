@@ -747,25 +747,36 @@ public class PaymentService {
             return;
         }
 
-        // Split the refund: the gift-card share returns to the card (gift cards are redeemable,
-        // never cashed out); only the cash share is refunded via Stripe.
+        applyRefundSplit(payment, refundFraction, refundAmount, reason);
+    }
+
+    /**
+     * Splits a refund between the gift card and Stripe. The cash leg is capped at the cash Stripe
+     * actually captured (amount − giftCardAmount) so we can never ask Stripe to over-refund, and it is
+     * refunded via Stripe FIRST — the gift share returns to the card only once the cash refund
+     * succeeds. That ordering means a Stripe failure leaves REFUND_FAILED with nothing credited to the
+     * card (safe to retry), instead of the old order which credited the gift card before a cash refund
+     * that could then fail and strand the customer's cash. Status is derived from the reconciled total
+     * (gift + cash), so a gift+cash booking refunded in full reads REFUNDED, not PARTIALLY_REFUNDED.
+     */
+    private void applyRefundSplit(Payment payment, BigDecimal refundFraction, BigDecimal refundAmount, String reason) {
         BigDecimal giftCardAmount = payment.getGiftCardAmount() != null ? payment.getGiftCardAmount() : BigDecimal.ZERO;
+        BigDecimal capturedCash = payment.getAmount().subtract(giftCardAmount).max(BigDecimal.ZERO);
+
         BigDecimal giftRefund = giftCardAmount.multiply(refundFraction)
                 .setScale(2, RoundingMode.HALF_UP)
-                .min(giftCardAmount);
-        if (giftRefund.signum() > 0) {
-            giftCardService.returnToCard(payment.getGiftCardId(), giftRefund);
-        }
+                .min(giftCardAmount)
+                .max(BigDecimal.ZERO);
         BigDecimal cashRefund = refundAmount.subtract(giftRefund).max(BigDecimal.ZERO)
+                .min(capturedCash)
                 .setScale(2, RoundingMode.HALF_UP);
 
-        if (cashRefund.compareTo(BigDecimal.ZERO) <= 0) {
-            // Fully covered by the gift-card return; no Stripe refund needed.
-            payment.setRefundedAmount(refundAmount);
-            payment.setRefundedAt(Instant.now());
-            payment.setPaymentStatus(refundAmount.compareTo(payment.getAmount()) >= 0
-                    ? PaymentStatus.REFUNDED : PaymentStatus.PARTIALLY_REFUNDED);
-            paymentRepository.save(payment);
+        // No cash leg — the gift-card return alone covers the refund.
+        if (cashRefund.signum() <= 0) {
+            if (giftRefund.signum() > 0) {
+                giftCardService.returnToCard(payment.getGiftCardId(), giftRefund);
+            }
+            finishRefund(payment, giftRefund, null);
             return;
         }
 
@@ -776,22 +787,30 @@ public class PaymentService {
             PaymentRefundResult refundResult =
                     paymentCheckoutProvider.refundPayment(payment, cashRefund, reason);
 
-            payment.setProviderRefundId(refundResult.providerRefundId());
-            payment.setRefundedAmount(refundResult.refundedAmount().add(giftRefund));
-            payment.setPaymentStatus(refundResult.paymentStatus());
-
-            if (refundResult.paymentStatus() == PaymentStatus.REFUNDED ||
-                    refundResult.paymentStatus() == PaymentStatus.PARTIALLY_REFUNDED) {
-                payment.setRefundedAt(Instant.now());
+            // Cash refunded — now (and only now) return the gift share to the card.
+            if (giftRefund.signum() > 0) {
+                giftCardService.returnToCard(payment.getGiftCardId(), giftRefund);
             }
-
-            paymentRepository.save(payment);
+            finishRefund(payment, refundResult.refundedAmount().add(giftRefund), refundResult.providerRefundId());
 
         } catch (Exception ex) {
+            // Stripe failed: nothing credited to the gift card, so no money is stranded. Safe to retry.
             payment.setPaymentStatus(PaymentStatus.REFUND_FAILED);
             payment.setFailureReason(ex.getMessage());
             paymentRepository.save(payment);
         }
+    }
+
+    /** Records a completed refund total and derives the status from the reconciled amount. */
+    private void finishRefund(Payment payment, BigDecimal totalRefunded, String providerRefundId) {
+        if (providerRefundId != null) {
+            payment.setProviderRefundId(providerRefundId);
+        }
+        payment.setRefundedAmount(totalRefunded);
+        payment.setRefundedAt(Instant.now());
+        payment.setPaymentStatus(totalRefunded.compareTo(payment.getAmount()) >= 0
+                ? PaymentStatus.REFUNDED : PaymentStatus.PARTIALLY_REFUNDED);
+        paymentRepository.save(payment);
     }
 
     private void handleFailedOrExpiredCheckoutSession(Session session) {
@@ -857,32 +876,11 @@ public class PaymentService {
     }
 
     private void refundFullPayment(Payment payment, String reason) {
-        BigDecimal refundAmount = payment.getAmount();
-
+        // A full refund is a 100% split: the gift share returns to the card and the captured cash is
+        // refunded via Stripe. Routing through applyRefundSplit makes it gift-aware — the old version
+        // asked Stripe to refund the whole amount, which Stripe rejects for a gift-part-paid booking.
         payment.setRefundReason(optionalTrim(reason));
-        payment.setPaymentStatus(PaymentStatus.REFUND_PENDING);
-        paymentRepository.save(payment);
-
-        try {
-            PaymentRefundResult refundResult =
-                    paymentCheckoutProvider.refundPayment(payment, refundAmount, reason);
-
-            payment.setProviderRefundId(refundResult.providerRefundId());
-            payment.setRefundedAmount(refundResult.refundedAmount());
-            payment.setPaymentStatus(refundResult.paymentStatus());
-
-            if (refundResult.paymentStatus() == PaymentStatus.REFUNDED ||
-                    refundResult.paymentStatus() == PaymentStatus.PARTIALLY_REFUNDED) {
-                payment.setRefundedAt(Instant.now());
-            }
-
-            paymentRepository.save(payment);
-
-        } catch (Exception ex) {
-            payment.setPaymentStatus(PaymentStatus.REFUND_FAILED);
-            payment.setFailureReason(ex.getMessage());
-            paymentRepository.save(payment);
-        }
+        applyRefundSplit(payment, BigDecimal.ONE, payment.getAmount(), reason);
     }
 
     @Transactional(readOnly = true)
