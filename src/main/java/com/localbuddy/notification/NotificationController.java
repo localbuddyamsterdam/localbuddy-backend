@@ -42,4 +42,14 @@ public class NotificationController {
         notificationService.markAllRead(userId);
         return ResponseEntity.noContent().build();
     }
+
+    @DeleteMapping("/{notificationId}")
+    public ResponseEntity<Void> delete(
+            Authentication authentication,
+            @PathVariable UUID notificationId
+    ) {
+        UUID userId = UUID.fromString(authentication.getName());
+        notificationService.delete(userId, notificationId);
+        return ResponseEntity.noContent().build();
+    }
 }

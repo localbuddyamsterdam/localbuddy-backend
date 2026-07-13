@@ -364,6 +364,20 @@ public class NotificationService {
         notificationRepository.saveAll(unread);
     }
 
+    /** Dismiss (delete) one of the user's own in-app notifications. */
+    @Transactional
+    public void delete(UUID userId, UUID notificationId) {
+        Notification notification = notificationRepository.findById(notificationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Notification not found"));
+
+        if (notification.getRecipientUser() == null ||
+                !notification.getRecipientUser().getId().equals(userId)) {
+            throw new ResourceNotFoundException("Notification not found");
+        }
+
+        notificationRepository.delete(notification);
+    }
+
     private NotificationResponse toResponse(Notification notification) {
         return new NotificationResponse(
                 notification.getId(),
