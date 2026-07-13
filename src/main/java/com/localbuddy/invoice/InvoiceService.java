@@ -202,6 +202,28 @@ public class InvoiceService {
         return pdfService.render(invoice, lines);
     }
 
+    @Transactional(readOnly = true)
+    public byte[] renderPdfByNumber(String invoiceNumber, UUID requesterUserId, boolean isAdmin) {
+        Invoice invoice = invoiceRepository.findByInvoiceNumber(invoiceNumber)
+                .orElseThrow(() -> new ResourceNotFoundException("Invoice not found"));
+        if (!isAdmin && !canAccess(invoice, requesterUserId)) {
+            throw new ResourceNotFoundException("Invoice not found");
+        }
+        List<InvoiceLine> lines = invoiceLineRepository.findByInvoiceIdOrderBySortOrderAsc(invoice.getId());
+        return pdfService.render(invoice, lines);
+    }
+
+    @Transactional(readOnly = true)
+    public byte[] renderPdfByBookingId(UUID bookingId, UUID requesterUserId, boolean isAdmin) {
+        Invoice invoice = invoiceRepository.findFirstByBookingIdOrderByIssuedAtDesc(bookingId)
+                .orElseThrow(() -> new ResourceNotFoundException("Invoice not found"));
+        if (!isAdmin && !canAccess(invoice, requesterUserId)) {
+            throw new ResourceNotFoundException("Invoice not found");
+        }
+        List<InvoiceLine> lines = invoiceLineRepository.findByInvoiceIdOrderBySortOrderAsc(invoice.getId());
+        return pdfService.render(invoice, lines);
+    }
+
     private boolean canAccess(Invoice invoice, UUID userId) {
         LocalProfile host = localProfileRepository.findByUserId(userId).orElse(null);
         if (host != null && host.getId().equals(invoice.getLocalProfileId())) {
