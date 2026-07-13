@@ -1,6 +1,7 @@
 package com.localbuddy.adminops;
 
 import com.localbuddy.common.exception.BadRequestException;
+import com.localbuddy.common.exception.ConflictException;
 import com.localbuddy.common.exception.ResourceNotFoundException;
 import com.localbuddy.experience.*;
 import com.localbuddy.localprofile.*;
@@ -55,12 +56,16 @@ public class AdminOpsService {
             throw new BadRequestException("User must have LOCAL role");
         }
 
-        LocalProfile profile = localProfileRepository.findByUserId(user.getId())
-                .orElseGet(() -> {
-                    LocalProfile newProfile = new LocalProfile();
-                    newProfile.setUser(user);
-                    return newProfile;
-                });
+        // Strict create: overwriting an existing profile here would silently wipe
+        // fields the host submitted themselves (bio, motivation, banking details, …).
+        if (localProfileRepository.existsByUserId(user.getId())) {
+            throw new ConflictException(
+                    "A host profile already exists for " + email
+                            + ". Use the Host Applications review actions (approve/reject) to manage it.");
+        }
+
+        LocalProfile profile = new LocalProfile();
+        profile.setUser(user);
 
         profile.setDisplayName(requiredTrim(request.displayName()));
         profile.setPhoneNumber(defaulted(request.phoneNumber()));
@@ -85,10 +90,8 @@ public class AdminOpsService {
         profile.setVerificationStatus(LocalVerificationStatus.MANUALLY_APPROVED);
         profile.setApprovalStatus(LocalApprovalStatus.APPROVED);
         profile.setReviewedAt(Instant.now());
-        profile.setSubmittedAt(profile.getSubmittedAt() == null ? Instant.now() : profile.getSubmittedAt());
+        profile.setSubmittedAt(Instant.now());
         profile.setAdminReviewNote(optionalTrim(request.adminNote()));
-        profile.setRejectionReason(null);
-        profile.setChangesRequestedReason(null);
 
         LocalProfile savedProfile = localProfileRepository.save(profile);
         return toLocalProfileResponse(savedProfile);

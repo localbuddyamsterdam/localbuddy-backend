@@ -23,14 +23,16 @@ public class AdminOpsController {
     }
 
     @Operation(
-            summary = "Create or approve a local profile",
-            description = "Admin only. Creates a new local profile or approves an existing one on behalf of a user."
+            summary = "Create an approved local profile",
+            description = "Admin only. Creates a new, immediately approved local profile on behalf of an existing LOCAL user. "
+                    + "Fails with 409 if the user already has a host profile — use the host-application review endpoints to manage it."
     )
     @ApiResponses({
-            @ApiResponse(responseCode = "201", description = "Local profile created or approved successfully"),
+            @ApiResponse(responseCode = "201", description = "Local profile created successfully"),
             @ApiResponse(responseCode = "400", description = "Invalid request body"),
             @ApiResponse(responseCode = "401", description = "Not authenticated"),
-            @ApiResponse(responseCode = "403", description = "Caller is not an admin")
+            @ApiResponse(responseCode = "403", description = "Caller is not an admin"),
+            @ApiResponse(responseCode = "409", description = "A host profile already exists for this user")
     })
     @PostMapping("/local-profiles")
     public ResponseEntity<LocalProfileResponse> createOrApproveLocalProfile(
