@@ -195,7 +195,9 @@ public class GdprService {
     }
 
     private void anonymize(User user) {
-        user.setFullName("Deleted User");
+        user.setFirstName("Deleted");
+        user.setLastName("User");
+        user.setPreferredName(null);
         user.setEmail("deleted+" + user.getId() + "@deleted.localbuddy.invalid");
         user.setPhone(null);
         user.setPasswordHash(null);

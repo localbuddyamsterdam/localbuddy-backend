@@ -105,16 +105,21 @@ public class PricingEngine {
      * HOST-borne discounts (and bookings with no promo) return zero, preserving legacy behaviour.
      */
     private BigDecimal platformBorneDiscount(Booking booking) {
+        // Referral discounts are always a platform marketing cost — the host earns on
+        // the pre-discount price, so add the referral discount back to the host base.
+        BigDecimal referral = booking.getReferralDiscountAmount() != null
+                ? booking.getReferralDiscountAmount() : BigDecimal.ZERO;
+
         List<BookingPromoCode> applied = booking.getAppliedPromoCodes();
         if (applied != null && !applied.isEmpty()) {
-            BigDecimal total = BigDecimal.ZERO;
+            BigDecimal total = referral;
             for (BookingPromoCode code : applied) {
                 total = total.add(platformShareOf(code.getPromoCode(), code.getDiscountAmount()));
             }
             return total;
         }
         // Fallback for bookings created before multi-code stacking (single promo + total discount).
-        return platformShareOf(booking.getPromoCode(), booking.getDiscountAmount());
+        return referral.add(platformShareOf(booking.getPromoCode(), booking.getDiscountAmount()));
     }
 
     private BigDecimal platformShareOf(PromoCode promo, BigDecimal discount) {

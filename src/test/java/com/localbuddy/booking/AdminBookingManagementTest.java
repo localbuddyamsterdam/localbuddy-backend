@@ -165,14 +165,16 @@ class AdminBookingManagementTest {
     @DisplayName("Editing details corrects contact + notes; blank contact is ignored, blank note clears")
     void updateDetails() {
         Booking booking = booking(UUID.randomUUID(), BookingStatus.CONFIRMED);
-        booking.setGuestName("Old Name");
+        booking.setGuestFirstName("Old");
+        booking.setGuestLastName("Name");
         booking.setLocalResponseNote("prior note");
         stubFound(booking);
 
         BookingResponse response = service.updateBookingDetailsByAdmin(booking.getId(),
-                new AdminUpdateBookingRequest("New Name", "NEW@Example.com", "  ", "traveller note", ""));
+                new AdminUpdateBookingRequest("New", "Name", "NEW@Example.com", "  ", "traveller note", ""));
 
-        assertEquals("New Name", response.guestName());
+        assertEquals("New", response.guestFirstName());
+        assertEquals("Name", response.guestLastName());
         assertEquals("new@example.com", response.guestEmail());   // normalised lower-case
         assertNull(booking.getGuestPhone());                      // "  " blank → contact left untouched
         assertEquals("traveller note", response.travelerNote());

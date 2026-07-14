@@ -35,8 +35,11 @@ public class WaitlistEntry {
     @JoinColumn(name = "user_id")
     private User user;
 
-    @Column(name = "guest_name", length = 150)
-    private String guestName;
+    @Column(name = "guest_first_name", length = 100)
+    private String guestFirstName;
+
+    @Column(name = "guest_last_name", length = 100)
+    private String guestLastName;
 
     @Column(name = "guest_email", length = 255)
     private String guestEmail;
@@ -80,5 +83,16 @@ public class WaitlistEntry {
     @PreUpdate
     protected void onUpdate() {
         updatedAt = Instant.now();
+    }
+
+    /** Combined guest name (first + last), or {@code null} for a logged-in entry. Not a mapped column. */
+    public String getGuestName() {
+        if (guestFirstName == null && guestLastName == null) {
+            return null;
+        }
+        String first = guestFirstName == null ? "" : guestFirstName;
+        String last = guestLastName == null ? "" : guestLastName;
+        String combined = (first + " " + last).trim();
+        return combined.isEmpty() ? null : combined;
     }
 }

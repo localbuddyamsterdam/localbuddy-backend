@@ -110,6 +110,18 @@ app:
   fees:
     service-fee-percentage: ${SERVICE_FEE_PERCENTAGE:2.5}
 
+  referral:
+    # Fallback reward/discount (same amount for the referred user's discount and the
+    # referrer's reward) used whenever no active admin config window applies.
+    default-reward-amount: ${REFERRAL_DEFAULT_REWARD_AMOUNT:20}
+    reward-currency: ${REFERRAL_REWARD_CURRENCY:EUR}
+    # Default per-referrer cap on redemptions within a calendar month.
+    default-max-monthly-redemptions: ${REFERRAL_MAX_MONTHLY_REDEMPTIONS:5}
+    # Validity of the personal promo voucher minted for the referrer on completion.
+    reward-voucher-expiry-days: ${REFERRAL_REWARD_VOUCHER_EXPIRY_DAYS:90}
+    # How often the scheduled processor settles eligible/cancelled referral rewards.
+    processor-delay-ms: ${REFERRAL_PROCESSOR_DELAY_MS:300000}
+
   pricing:
     age-band:
       adult-rate: ${AGE_BAND_ADULT_RATE:1.0}     # adults pay full price

@@ -1,5 +1,6 @@
 package com.localbuddy.adminops;
 
+import com.localbuddy.common.NameFormatter;
 import com.localbuddy.common.exception.BadRequestException;
 import com.localbuddy.common.exception.ConflictException;
 import com.localbuddy.common.exception.ResourceNotFoundException;
@@ -67,7 +68,7 @@ public class AdminOpsService {
         LocalProfile profile = new LocalProfile();
         profile.setUser(user);
 
-        profile.setDisplayName(requiredTrim(request.displayName()));
+        profile.setDisplayName(NameFormatter.titleCase(requiredTrim(request.displayName())));
         profile.setPhoneNumber(defaulted(request.phoneNumber()));
         profile.setBio(defaulted(request.bio()));
         profile.setProfilePhotoUrl(defaulted(request.profilePhotoUrl()));
@@ -79,9 +80,9 @@ public class AdminOpsService {
         profile.setExperienceCategories(resolveCategories(request.experienceCategoryIds()));
         profile.setMotivation(defaulted(request.motivation()));
         profile.setExperienceInfo(defaulted(request.experienceInfo()));
-        profile.setLegalFirstName(defaulted(request.legalFirstName()));
-        profile.setLegalLastName(defaulted(request.legalLastName()));
-        profile.setPreferredName(defaulted(request.preferredName()));
+        profile.setLegalFirstName(NameFormatter.titleCase(defaulted(request.legalFirstName())));
+        profile.setLegalLastName(NameFormatter.titleCase(defaulted(request.legalLastName())));
+        profile.setPreferredName(NameFormatter.titleCase(defaulted(request.preferredName())));
         profile.setCurrentAddress(defaulted(request.currentAddress()));
         profile.setAccountNumber(optionalTrim(request.accountNumber()));
         profile.setAccountName(optionalTrim(request.accountName()));
