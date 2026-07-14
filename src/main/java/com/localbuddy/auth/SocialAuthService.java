@@ -1,5 +1,6 @@
 package com.localbuddy.auth;
 
+import com.localbuddy.common.NameFormatter;
 import com.localbuddy.common.exception.BadRequestException;
 import com.localbuddy.user.User;
 import com.localbuddy.user.UserRepository;
@@ -62,16 +63,19 @@ public class SocialAuthService {
                 refreshToken,
                 "Bearer",
                 user.getId(),
-                user.getFullName(),
+                user.getFirstName(),
+                user.getLastName(),
+                user.getPreferredName(),
                 user.getEmail(),
                 user.getRole(),
-                user.getStatus()
+                user.getStatus(),
+                user.isMustChangePassword()
         );
     }
 
     private User createSocialUser(VerifiedSocialUser verified, String email) {
         User user = new User();
-        user.setFullName(verified.name() != null && !verified.name().isBlank() ? verified.name().trim() : email);
+        applyName(user, verified.name(), email);
         user.setEmail(email);
         user.setRole(UserRole.LOGGED_IN_USER);
         user.setStatus(UserStatus.ACTIVE);
@@ -79,6 +83,20 @@ public class SocialAuthService {
         user.setEmailVerified(true);
         user.setPhoneVerified(false);
         return userRepository.save(user);
+    }
+
+    /**
+     * Splits the provider's combined display name into first + last (title-cased). Falls back to
+     * the email local-part when no name is supplied; a single-token name seeds both fields so the
+     * required last name is always populated.
+     */
+    private static void applyName(User user, String rawName, String email) {
+        String base = rawName != null && !rawName.isBlank()
+                ? rawName.trim()
+                : email.substring(0, Math.max(1, email.indexOf('@')));
+        String[] split = NameFormatter.splitFullName(base);
+        user.setFirstName(split[0]);
+        user.setLastName(split[1]);
     }
 
     private String normalizeEmail(String email) {

@@ -1,5 +1,6 @@
 package com.localbuddy.localprofile;
 
+import com.localbuddy.common.NameFormatter;
 import com.localbuddy.common.exception.BadRequestException;
 import com.localbuddy.common.exception.ResourceNotFoundException;
 import com.localbuddy.experience.City;
@@ -212,7 +213,7 @@ public class LocalProfileService {
     }
 
     private void applyCreateRequest(LocalProfile profile, CreateLocalProfileRequest request) {
-        profile.setDisplayName(requiredTrim(request.displayName()));
+        profile.setDisplayName(NameFormatter.titleCase(requiredTrim(request.displayName())));
         profile.setPhoneNumber(requiredTrim(request.phoneNumber()));
         profile.setBio(requiredTrim(request.bio()));
         profile.setProfilePhotoUrl(optionalTrim(request.profilePhotoUrl()));
@@ -227,9 +228,9 @@ public class LocalProfileService {
         profile.setMotivation(requiredTrim(request.motivation()));
         profile.setExperienceInfo(requiredTrim(request.experienceInfo()));
 
-        profile.setLegalFirstName(requiredTrim(request.legalFirstName()));
-        profile.setLegalLastName(requiredTrim(request.legalLastName()));
-        profile.setPreferredName(requiredTrim(request.preferredName()));
+        profile.setLegalFirstName(NameFormatter.requiredName(request.legalFirstName(), "Legal first name", NameFormatter.FIRST_NAME_MIN));
+        profile.setLegalLastName(NameFormatter.requiredName(request.legalLastName(), "Legal last name", NameFormatter.LAST_NAME_MIN));
+        profile.setPreferredName(NameFormatter.titleCase(requiredTrim(request.preferredName())));
         profile.setCurrentAddress(requiredTrim(request.currentAddress()));
         profile.setGender(request.gender());
 
@@ -249,7 +250,7 @@ public class LocalProfileService {
     }
 
     private void applyUpdateRequest(LocalProfile profile, UpdateLocalProfileRequest request) {
-        profile.setDisplayName(requiredTrim(request.displayName()));
+        profile.setDisplayName(NameFormatter.titleCase(requiredTrim(request.displayName())));
         profile.setPhoneNumber(requiredTrim(request.phoneNumber()));
         profile.setBio(requiredTrim(request.bio()));
         profile.setProfilePhotoUrl(optionalTrim(request.profilePhotoUrl()));
@@ -264,9 +265,9 @@ public class LocalProfileService {
         profile.setMotivation(requiredTrim(request.motivation()));
         profile.setExperienceInfo(requiredTrim(request.experienceInfo()));
 
-        profile.setLegalFirstName(requiredTrim(request.legalFirstName()));
-        profile.setLegalLastName(requiredTrim(request.legalLastName()));
-        profile.setPreferredName(requiredTrim(request.preferredName()));
+        profile.setLegalFirstName(NameFormatter.requiredName(request.legalFirstName(), "Legal first name", NameFormatter.FIRST_NAME_MIN));
+        profile.setLegalLastName(NameFormatter.requiredName(request.legalLastName(), "Legal last name", NameFormatter.LAST_NAME_MIN));
+        profile.setPreferredName(NameFormatter.titleCase(requiredTrim(request.preferredName())));
         profile.setCurrentAddress(requiredTrim(request.currentAddress()));
         profile.setGender(request.gender());
 

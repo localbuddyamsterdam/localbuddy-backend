@@ -11,7 +11,9 @@ import jakarta.validation.constraints.Size;
  * those have dedicated endpoints.
  */
 public record AdminUpdateBookingRequest(
-        @Size(max = 150, message = "Guest name cannot exceed 150 characters") String guestName,
+        @Size(max = 100, message = "First name cannot exceed 100 characters") String guestFirstName,
+
+        @Size(min = 2, max = 100, message = "Last name must be between 2 and 100 characters") String guestLastName,
 
         @Email(message = "Guest email must be valid")
         @Size(max = 255, message = "Guest email cannot exceed 255 characters") String guestEmail,

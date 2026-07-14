@@ -1,5 +1,6 @@
 package com.localbuddy.config;
 
+import com.localbuddy.common.NameFormatter;
 import com.localbuddy.user.User;
 import com.localbuddy.user.UserRepository;
 import com.localbuddy.user.UserRole;
@@ -61,7 +62,9 @@ public class DevAdminBootstrap implements CommandLineRunner {
                         },
                         () -> {
                             User admin = new User();
-                            admin.setFullName(adminFullName);
+                            String[] name = NameFormatter.splitFullName(adminFullName);
+                            admin.setFirstName(name[0]);
+                            admin.setLastName(name[1]);
                             admin.setEmail(adminEmail.toLowerCase());
                             admin.setPhone(adminPhone);
                             admin.setPasswordHash(passwordEncoder.encode(adminPassword));

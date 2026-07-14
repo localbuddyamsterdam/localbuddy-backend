@@ -30,8 +30,15 @@ public class User {
     @Column(name = "id", updatable = false, nullable = false)
     private UUID id;
 
-    @Column(name = "full_name", nullable = false, length = 150)
-    private String fullName;
+    @Column(name = "first_name", nullable = false, length = 100)
+    private String firstName;
+
+    @Column(name = "last_name", nullable = false, length = 100)
+    private String lastName;
+
+    /** Optional "goes by" name; surfaced/collected in the UI for host and admin accounts. */
+    @Column(name = "preferred_name", length = 100)
+    private String preferredName;
 
     @Column(name = "email", nullable = false, unique = true, length = 255)
     private String email;
@@ -60,6 +67,14 @@ public class User {
     @Column(name = "status", nullable = false, length = 30)
     private UserStatus status;
 
+    /**
+     * When true, the user must set a new password before they can use the app —
+     * enforced server-side (see JwtAuthenticationFilter) and in the UI. Set when
+     * an admin issues a temporary password; cleared once the user picks their own.
+     */
+    @Column(name = "must_change_password", nullable = false)
+    private boolean mustChangePassword = false;
+
     @Column(name = "email_verified", nullable = false)
     private boolean emailVerified = false;
 
@@ -77,6 +92,22 @@ public class User {
 
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
+
+    /**
+     * Legal full name ({@code firstName + " " + lastName}) — use for records, invoices,
+     * notifications and anywhere the person's real name is required. Not a mapped column;
+     * with field-based JPA access this derived getter is ignored by Hibernate.
+     */
+    public String getFullName() {
+        String first = firstName == null ? "" : firstName;
+        String last = lastName == null ? "" : lastName;
+        return (first + " " + last).trim();
+    }
+
+    /** Preferred display name: the preferred name when set, otherwise the full name. */
+    public String getDisplayName() {
+        return preferredName != null && !preferredName.isBlank() ? preferredName : getFullName();
+    }
 
     @PrePersist
     protected void onCreate() {

@@ -20,6 +20,8 @@ import java.time.Instant;
 @Service
 public class PromoCodeService {
 
+    private static final java.security.SecureRandom VOUCHER_RANDOM = new java.security.SecureRandom();
+
     private final PromoCodeRepository promoCodeRepository;
     private final PromoCodeRedemptionRepository promoCodeRedemptionRepository;
 
@@ -62,6 +64,52 @@ public class PromoCodeService {
                 : new java.util.HashSet<>(request.experienceIds()));
 
         return toResponse(promoCodeRepository.save(promoCode));
+    }
+
+    /**
+     * Mints a personal reward voucher for a referrer once their referral completes:
+     * a combinable, platform-funded, single-use fixed-amount code only that user can
+     * redeem (it stacks with other codes at checkout). Returns the generated code.
+     */
+    @Transactional
+    public String mintReferralRewardVoucher(UUID ownerUserId, BigDecimal amount, String currency, int expiryDays) {
+        PromoCode voucher = new PromoCode();
+        voucher.setCode(generateUniqueVoucherCode("LB-RF"));
+        voucher.setDescription("Referral reward");
+        voucher.setDiscountType(PromoDiscountType.FIXED_AMOUNT);
+        voucher.setDiscountValue(amount.setScale(2, RoundingMode.HALF_UP));
+        voucher.setCurrency(currency != null ? currency.trim().toUpperCase(Locale.ROOT) : "EUR");
+        voucher.setMaxTotalRedemptions(1);
+        voucher.setMaxRedemptionsPerUser(1);
+        voucher.setActive(true);
+        // Platform-funded: the host is never charged for a referral reward.
+        voucher.setDiscountBearer(DiscountBearer.PLATFORM);
+        voucher.setIssuedToUserId(ownerUserId);
+        voucher.setCombinable(true);
+        if (expiryDays > 0) {
+            voucher.setExpiresAt(Instant.now().plus(java.time.Duration.ofDays(expiryDays)));
+        }
+        voucher.setExperienceIds(new java.util.HashSet<>());
+        return promoCodeRepository.save(voucher).getCode();
+    }
+
+    private String generateUniqueVoucherCode(String prefix) {
+        for (int attempt = 0; attempt < 12; attempt++) {
+            String code = prefix + "-" + randomVoucherSuffix();
+            if (!promoCodeRepository.existsByCodeIgnoreCase(code)) {
+                return code;
+            }
+        }
+        throw new BadRequestException("Unable to generate a unique voucher code");
+    }
+
+    private String randomVoucherSuffix() {
+        String chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+        StringBuilder sb = new StringBuilder(8);
+        for (int i = 0; i < 8; i++) {
+            sb.append(chars.charAt(VOUCHER_RANDOM.nextInt(chars.length())));
+        }
+        return sb.toString();
     }
 
     @Transactional(readOnly = true)

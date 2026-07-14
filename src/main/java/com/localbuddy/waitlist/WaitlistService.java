@@ -3,6 +3,7 @@ package com.localbuddy.waitlist;
 import com.localbuddy.availability.AvailabilitySlot;
 import com.localbuddy.availability.AvailabilitySlotRepository;
 import com.localbuddy.availability.AvailabilityStatus;
+import com.localbuddy.common.NameFormatter;
 import com.localbuddy.common.exception.BadRequestException;
 import com.localbuddy.common.exception.ResourceNotFoundException;
 import com.localbuddy.notification.NotificationService;
@@ -66,7 +67,8 @@ public class WaitlistService {
         WaitlistEntry entry = new WaitlistEntry();
         entry.setAvailabilitySlot(slot);
         entry.setExperience(slot.getExperience());
-        entry.setGuestName(request.guestName().trim());
+        entry.setGuestFirstName(NameFormatter.requiredName(request.guestFirstName(), "First name", NameFormatter.FIRST_NAME_MIN));
+        entry.setGuestLastName(NameFormatter.requiredName(request.guestLastName(), "Last name", NameFormatter.LAST_NAME_MIN));
         entry.setGuestEmail(request.guestEmail().trim().toLowerCase(Locale.ROOT));
         entry.setGuestPhone(request.guestPhone().trim());
         entry.setGuestsCount(request.guestsCount());

@@ -2,6 +2,9 @@ package com.localbuddy.experience;
 
 import com.localbuddy.common.exception.BadRequestException;
 import com.localbuddy.common.exception.ResourceNotFoundException;
+import com.localbuddy.media.ImageUploadValidator;
+import com.localbuddy.media.MediaStorageProvider;
+import com.localbuddy.media.StoredObject;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,9 +17,29 @@ import java.util.UUID;
 public class ExperienceCategoryService {
 
     private final ExperienceCategoryRepository experienceCategoryRepository;
+    private final MediaStorageProvider storageProvider;
 
-    public ExperienceCategoryService(ExperienceCategoryRepository experienceCategoryRepository) {
+    public ExperienceCategoryService(ExperienceCategoryRepository experienceCategoryRepository,
+                                     MediaStorageProvider storageProvider) {
         this.experienceCategoryRepository = experienceCategoryRepository;
+        this.storageProvider = storageProvider;
+    }
+
+    /**
+     * Store an uploaded icon in blob storage and return its public URL, for the
+     * admin to save as a category's imageUrl. Kept separate from create/update so
+     * the icon can be uploaded before the category exists (create flow).
+     */
+    public String uploadIcon(byte[] data, String contentType, String filename) {
+        ImageUploadValidator.validate(data, contentType);
+
+        if (!storageProvider.isConfigured()) {
+            throw new BadRequestException(
+                    "Image uploads aren't configured on this environment — paste an image URL instead.");
+        }
+
+        StoredObject stored = storageProvider.upload("category-icons", data, contentType, filename);
+        return stored.url();
     }
 
     @Transactional(readOnly = true)

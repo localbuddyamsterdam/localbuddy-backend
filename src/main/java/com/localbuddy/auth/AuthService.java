@@ -1,5 +1,6 @@
 package com.localbuddy.auth;
 
+import com.localbuddy.common.NameFormatter;
 import com.localbuddy.common.exception.BadRequestException;
 import com.localbuddy.common.exception.UnauthorizedException;
 import com.localbuddy.notification.NotificationService;
@@ -64,7 +65,8 @@ public class AuthService {
         }
 
         User user = new User();
-        user.setFullName(request.fullName().trim());
+        user.setFirstName(NameFormatter.requiredName(request.firstName(), "First name", NameFormatter.FIRST_NAME_MIN));
+        user.setLastName(NameFormatter.requiredName(request.lastName(), "Last name", NameFormatter.LAST_NAME_MIN));
         user.setEmail(normalizedEmail);
         user.setPhone(request.phone());
         user.setRole(request.role());
@@ -79,7 +81,8 @@ public class AuthService {
 
         return new AuthResponse(
                 savedUser.getId(),
-                savedUser.getFullName(),
+                savedUser.getFirstName(),
+                savedUser.getLastName(),
                 savedUser.getEmail(),
                 savedUser.getRole(),
                 savedUser.getStatus(),
@@ -134,7 +137,9 @@ public class AuthService {
 
         return new CurrentUserResponse(
                 user.getId(),
-                user.getFullName(),
+                user.getFirstName(),
+                user.getLastName(),
+                user.getPreferredName(),
                 user.getEmail(),
                 user.getPhone(),
                 user.getAvatarUrl(),
@@ -142,8 +147,36 @@ public class AuthService {
                 user.getRole(),
                 user.getStatus(),
                 user.isEmailVerified(),
-                user.isPhoneVerified()
+                user.isPhoneVerified(),
+                user.isMustChangePassword()
         );
+    }
+
+    /**
+     * Forced first-login password change: the authenticated user (who logged in
+     * with a temporary password) sets their own. Clears the must-change flag,
+     * revokes every existing session (including the temporary-password one), and
+     * issues a fresh session so the caller continues seamlessly on a clean token.
+     */
+    @Transactional
+    public LoginResponse setInitialPassword(UUID userId, String newPassword) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BadRequestException("Invalid user"));
+
+        if (!user.isMustChangePassword()) {
+            throw new BadRequestException("No password change is required for this account");
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
+        user.setMustChangePassword(false);
+        userRepository.save(user);
+
+        // Kill the temporary-password session everywhere, then mint a clean one.
+        refreshTokenService.revokeAllForUser(user.getId());
+        String accessToken = jwtService.generateAccessToken(user);
+        String refreshToken = refreshTokenService.issue(user);
+
+        return buildLoginResponse(user, accessToken, refreshToken);
     }
 
     // ------------------------------------------------------------------ password reset
@@ -179,6 +212,8 @@ public class AuthService {
                 .orElseThrow(() -> new BadRequestException("This link is invalid or has expired"));
 
         user.setPasswordHash(passwordEncoder.encode(newPassword));
+        // A completed reset also satisfies any outstanding admin-forced change.
+        user.setMustChangePassword(false);
         userRepository.save(user);
 
         refreshTokenService.revokeAllForUser(user.getId());
@@ -236,10 +271,13 @@ public class AuthService {
                 refreshToken,
                 "Bearer",
                 user.getId(),
-                user.getFullName(),
+                user.getFirstName(),
+                user.getLastName(),
+                user.getPreferredName(),
                 user.getEmail(),
                 user.getRole(),
-                user.getStatus()
+                user.getStatus(),
+                user.isMustChangePassword()
         );
     }
 

@@ -1,12 +1,13 @@
 package com.localbuddy.user;
 
+import com.localbuddy.auth.AuthService;
+import com.localbuddy.auth.LoginResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -27,9 +28,11 @@ import java.util.UUID;
 public class AccountController {
 
     private final UserService userService;
+    private final AuthService authService;
 
-    public AccountController(UserService userService) {
+    public AccountController(UserService userService, AuthService authService) {
         this.userService = userService;
+        this.authService = authService;
     }
 
     @GetMapping("/me")
@@ -84,5 +87,24 @@ public class AccountController {
         UUID userId = UUID.fromString(authentication.getName());
         userService.changePassword(userId, request);
         return ResponseEntity.noContent().build();
+    }
+
+    @Operation(summary = "Set initial password (forced first-login change)",
+            description = "For a user who logged in with an admin-issued temporary password. Sets their "
+                    + "own password without re-collecting the temporary one, clears the must-change flag, "
+                    + "revokes existing sessions, and returns a fresh session. Only valid while the account "
+                    + "is flagged as must-change-password.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Password set; a fresh session is returned"),
+            @ApiResponse(responseCode = "400", description = "Weak password, or no password change is required"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated")
+    })
+    @PostMapping("/me/set-initial-password")
+    public ResponseEntity<LoginResponse> setInitialPassword(
+            Authentication authentication,
+            @Valid @RequestBody SetInitialPasswordRequest request
+    ) {
+        UUID userId = UUID.fromString(authentication.getName());
+        return ResponseEntity.ok(authService.setInitialPassword(userId, request.newPassword()));
     }
 }

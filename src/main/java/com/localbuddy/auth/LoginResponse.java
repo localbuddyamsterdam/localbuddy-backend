@@ -10,9 +10,13 @@ public record LoginResponse(
         String refreshToken,
         String tokenType,
         UUID userId,
-        String fullName,
+        String firstName,
+        String lastName,
+        String preferredName,
         String email,
         UserRole role,
-        UserStatus status
+        UserStatus status,
+        /** When true, the client must route the user through the forced "set your password" screen. */
+        boolean mustChangePassword
 ) {
 }
