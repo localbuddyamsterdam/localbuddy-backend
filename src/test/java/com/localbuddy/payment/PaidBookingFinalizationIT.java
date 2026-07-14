@@ -198,7 +198,8 @@ class PaidBookingFinalizationIT {
 
     private User saveUser(String email, UserRole role) {
         User u = new User();
-        u.setFullName("Test " + role);
+        u.setFirstName("Test");
+        u.setLastName(role.name());
         u.setEmail(email);
         u.setRole(role);
         u.setStatus(UserStatus.ACTIVE);

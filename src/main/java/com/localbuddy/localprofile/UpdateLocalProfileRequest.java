@@ -58,7 +58,7 @@ public record UpdateLocalProfileRequest(
         String legalFirstName,
 
         @NotBlank(message = "Legal last name is required")
-        @Size(max = 120, message = "Legal last name cannot exceed 120 characters")
+        @Size(min = 2, max = 120, message = "Legal last name must be between 2 and 120 characters")
         String legalLastName,
 
         @NotBlank(message = "Preferred name is required")

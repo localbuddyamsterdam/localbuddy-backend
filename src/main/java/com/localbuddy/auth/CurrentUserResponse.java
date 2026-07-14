@@ -8,7 +8,9 @@ import java.util.UUID;
 
 public record CurrentUserResponse(
         UUID userId,
-        String fullName,
+        String firstName,
+        String lastName,
+        String preferredName,
         String email,
         String phone,
         String avatarUrl,
@@ -16,6 +18,8 @@ public record CurrentUserResponse(
         UserRole role,
         UserStatus status,
         boolean emailVerified,
-        boolean phoneVerified
+        boolean phoneVerified,
+        /** When true, the client must route the user through the forced "set your password" screen. */
+        boolean mustChangePassword
 ) {
 }

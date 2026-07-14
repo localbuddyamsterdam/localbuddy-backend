@@ -45,6 +45,10 @@ public record CreateBookingRequest(
         @Size(max = 80, message = "Referral code cannot exceed 80 characters")
         String referralCode,
 
+        /** Optional gift card applied as a payment method at checkout (covers up to its balance, Stripe charges the rest). */
+        @Size(max = 80, message = "Gift card code cannot exceed 80 characters")
+        String giftCardCode,
+
         Boolean privateBooking
 ) {
 }

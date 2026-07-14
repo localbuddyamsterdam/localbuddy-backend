@@ -29,9 +29,13 @@ public record CreateGuestBookingRequest(
         @Min(value = 0, message = "Infants cannot be negative")
         Integer infants,
 
-        @NotBlank(message = "Guest name is required")
-        @Size(max = 150, message = "Guest name cannot exceed 150 characters")
-        String guestName,
+        @NotBlank(message = "First name is required")
+        @Size(max = 100, message = "First name cannot exceed 100 characters")
+        String guestFirstName,
+
+        @NotBlank(message = "Last name is required")
+        @Size(min = 2, max = 100, message = "Last name must be between 2 and 100 characters")
+        String guestLastName,
 
         @NotBlank(message = "Guest email is required")
         @Email(message = "Guest email must be valid")

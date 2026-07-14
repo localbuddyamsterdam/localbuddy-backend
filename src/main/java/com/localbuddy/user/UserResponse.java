@@ -5,7 +5,9 @@ import java.util.UUID;
 
 public record UserResponse(
         UUID id,
-        String fullName,
+        String firstName,
+        String lastName,
+        String preferredName,
         String email,
         String phone,
         String avatarUrl,
@@ -14,6 +16,7 @@ public record UserResponse(
         UserStatus status,
         boolean emailVerified,
         boolean phoneVerified,
+        boolean mustChangePassword,
         Instant createdAt,
         Instant updatedAt
 ) {

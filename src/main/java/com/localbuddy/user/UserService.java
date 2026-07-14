@@ -1,5 +1,6 @@
 package com.localbuddy.user;
 
+import com.localbuddy.common.NameFormatter;
 import com.localbuddy.common.exception.BadRequestException;
 import com.localbuddy.common.exception.ResourceNotFoundException;
 import com.localbuddy.media.ImageUploadValidator;
@@ -26,27 +27,6 @@ public class UserService {
         this.passwordEncoder = passwordEncoder;
     }
 
-    @Transactional
-    public UserResponse createUser(CreateUserRequest request) {
-        String normalizedEmail = request.email().trim().toLowerCase();
-
-        if (userRepository.existsByEmail(normalizedEmail)) {
-            throw new BadRequestException("Email already exists");
-        }
-
-        User user = new User();
-        user.setFullName(request.fullName().trim());
-        user.setEmail(normalizedEmail);
-        user.setPhone(request.phone());
-        user.setRole(request.role());
-        user.setStatus(UserStatus.PENDING_VERIFICATION);
-        user.setEmailVerified(false);
-        user.setPhoneVerified(false);
-
-        User savedUser = userRepository.save(user);
-        return toResponse(savedUser);
-    }
-
     @Transactional(readOnly = true)
     public List<UserResponse> getAllUsers() {
         return userRepository.findAll()
@@ -66,7 +46,9 @@ public class UserService {
     private UserResponse toResponse(User user) {
         return new UserResponse(
                 user.getId(),
-                user.getFullName(),
+                user.getFirstName(),
+                user.getLastName(),
+                user.getPreferredName(),
                 user.getEmail(),
                 user.getPhone(),
                 user.getAvatarUrl(),
@@ -75,6 +57,7 @@ public class UserService {
                 user.getStatus(),
                 user.isEmailVerified(),
                 user.isPhoneVerified(),
+                user.isMustChangePassword(),
                 user.getCreatedAt(),
                 user.getUpdatedAt()
         );
@@ -93,7 +76,9 @@ public class UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        user.setFullName(request.fullName().trim());
+        user.setFirstName(NameFormatter.requiredName(request.firstName(), "First name", NameFormatter.FIRST_NAME_MIN));
+        user.setLastName(NameFormatter.requiredName(request.lastName(), "Last name", NameFormatter.LAST_NAME_MIN));
+        user.setPreferredName(NameFormatter.optionalName(request.preferredName()));
 
         String phone = request.phone();
         user.setPhone(phone == null || phone.trim().isEmpty() ? null : phone.trim());
@@ -166,6 +151,8 @@ public class UserService {
         }
 
         user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
+        // A user who successfully sets their own password no longer owes one.
+        user.setMustChangePassword(false);
         userRepository.save(user);
     }
 }

@@ -1,5 +1,6 @@
 package com.localbuddy.admin;
 
+import com.localbuddy.experience.CategoryIconUploadResponse;
 import com.localbuddy.experience.CreateExperienceCategoryRequest;
 import com.localbuddy.experience.ExperienceCategoryResponse;
 import com.localbuddy.experience.ExperienceCategoryService;
@@ -11,9 +12,12 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
 
@@ -107,5 +111,25 @@ public class AdminExperienceCategoryController {
     @PostMapping("/{categoryId}/deactivate")
     public ResponseEntity<ExperienceCategoryResponse> deactivateCategory(@PathVariable UUID categoryId) {
         return ResponseEntity.ok(experienceCategoryService.setCategoryActive(categoryId, false));
+    }
+
+    @Operation(
+            summary = "Upload a category icon",
+            description = "Stores an uploaded image (multipart field 'file') in blob storage and returns its URL, "
+                    + "which the admin then saves as the category's imageUrl. Admin only."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Icon uploaded"),
+            @ApiResponse(responseCode = "400", description = "Empty/oversized/unsupported image, or storage not configured"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "403", description = "Not authorized (admin only)"),
+            @ApiResponse(responseCode = "413", description = "File exceeds the maximum upload size")
+    })
+    @PostMapping(value = "/upload-icon", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<CategoryIconUploadResponse> uploadIcon(@RequestParam("file") MultipartFile file)
+            throws IOException {
+        String url = experienceCategoryService.uploadIcon(
+                file.getBytes(), file.getContentType(), file.getOriginalFilename());
+        return ResponseEntity.status(HttpStatus.CREATED).body(new CategoryIconUploadResponse(url));
     }
 }

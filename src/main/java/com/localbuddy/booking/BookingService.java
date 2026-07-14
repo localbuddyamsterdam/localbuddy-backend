@@ -3,6 +3,7 @@ package com.localbuddy.booking;
 import com.localbuddy.availability.AvailabilitySlot;
 import com.localbuddy.availability.AvailabilitySlotRepository;
 import com.localbuddy.availability.AvailabilityStatus;
+import com.localbuddy.common.NameFormatter;
 import com.localbuddy.common.exception.BadRequestException;
 import com.localbuddy.common.exception.ResourceNotFoundException;
 import com.localbuddy.consent.ConsentService;
@@ -208,7 +209,8 @@ public class BookingService {
         log.info("LOGGED_IN_BOOKING_TIMING applyReferralMs={}", System.currentTimeMillis() - stepStart);
 
         stepStart = System.currentTimeMillis();
-        BigDecimal totalAmount = appliedPromos.finalAmount();
+        BigDecimal referralDiscount = referralDiscountFor(appliedReferral, appliedPromos.finalAmount());
+        BigDecimal totalAmount = appliedPromos.finalAmount().subtract(referralDiscount);
 
         Booking booking = new Booking();
         booking.setBookingReference(generateUniqueBookingReference());
@@ -236,6 +238,7 @@ public class BookingService {
 
         booking.setReferralCode(appliedReferral.referralCode());
         booking.setReferralCodeText(optionalUpper(request.referralCode()));
+        booking.setReferralDiscountAmount(referralDiscount);
 
         booking.setTravelerNote(optionalTrim(request.travelerNote()));
         booking.setRequestedAt(Instant.now());
@@ -421,7 +424,8 @@ public class BookingService {
                 booking.getId(),
                 booking.getBookingReference(),
                 booking.getLoggedInUser() != null ? booking.getLoggedInUser().getId() : null,
-                booking.getGuestName(),
+                booking.getGuestFirstName(),
+                booking.getGuestLastName(),
                 booking.getGuestEmail(),
                 booking.getGuestPhone(),
                 booking.isGuestEmailVerified(),
@@ -773,13 +777,15 @@ public class BookingService {
         log.info("GUEST_BOOKING_TIMING applyReferralMs={}", System.currentTimeMillis() - stepStart);
 
         stepStart = System.currentTimeMillis();
-        BigDecimal totalAmount = appliedPromos.finalAmount();
+        BigDecimal referralDiscount = referralDiscountFor(appliedReferral, appliedPromos.finalAmount());
+        BigDecimal totalAmount = appliedPromos.finalAmount().subtract(referralDiscount);
 
         Booking booking = new Booking();
         booking.setBookingReference(generateUniqueBookingReference());
         booking.setBookingSource(BookingSource.GUEST_USER);
 
-        booking.setGuestName(requiredTrim(request.guestName()));
+        booking.setGuestFirstName(NameFormatter.requiredName(request.guestFirstName(), "First name", NameFormatter.FIRST_NAME_MIN));
+        booking.setGuestLastName(NameFormatter.requiredName(request.guestLastName(), "Last name", NameFormatter.LAST_NAME_MIN));
         booking.setGuestEmail(normalizedGuestEmail);
         booking.setGuestPhone(requiredTrim(request.guestPhone()));
         booking.setGuestEmailVerified(false);
@@ -817,6 +823,7 @@ public class BookingService {
 
         booking.setReferralCode(appliedReferral.referralCode());
         booking.setReferralCodeText(optionalUpper(request.referralCode()));
+        booking.setReferralDiscountAmount(referralDiscount);
 
         booking.setTravelerNote(optionalTrim(request.travelerNote()));
         booking.setRequestedAt(Instant.now());
@@ -891,7 +898,8 @@ public class BookingService {
         Booking booking = new Booking();
         booking.setBookingReference(generateUniqueBookingReference());
         booking.setBookingSource(BookingSource.ADMIN);
-        booking.setGuestName(requiredTrim(request.guestName()));
+        booking.setGuestFirstName(NameFormatter.requiredName(request.guestFirstName(), "First name", NameFormatter.FIRST_NAME_MIN));
+        booking.setGuestLastName(NameFormatter.requiredName(request.guestLastName(), "Last name", NameFormatter.LAST_NAME_MIN));
         booking.setGuestEmail(requiredTrim(request.guestEmail()).toLowerCase(Locale.ROOT));
         booking.setGuestPhone(optionalTrim(request.guestPhone()));
         booking.setLoggedInUser(null);
@@ -1048,8 +1056,11 @@ public class BookingService {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
 
-        if (request.guestName() != null && !request.guestName().isBlank()) {
-            booking.setGuestName(requiredTrim(request.guestName()));
+        if (request.guestFirstName() != null && !request.guestFirstName().isBlank()) {
+            booking.setGuestFirstName(NameFormatter.requiredName(request.guestFirstName(), "First name", NameFormatter.FIRST_NAME_MIN));
+        }
+        if (request.guestLastName() != null && !request.guestLastName().isBlank()) {
+            booking.setGuestLastName(NameFormatter.requiredName(request.guestLastName(), "Last name", NameFormatter.LAST_NAME_MIN));
         }
         if (request.guestEmail() != null && !request.guestEmail().isBlank()) {
             booking.setGuestEmail(requiredTrim(request.guestEmail()).toLowerCase(Locale.ROOT));
@@ -1410,6 +1421,18 @@ public class BookingService {
             return null;
         }
         return value.trim().toUpperCase(Locale.ROOT);
+    }
+
+    /** The referral discount for the referred user, clamped so it never exceeds the amount owed. */
+    private BigDecimal referralDiscountFor(AppliedReferralCode appliedReferral, BigDecimal base) {
+        if (appliedReferral == null || appliedReferral.referralCode() == null
+                || appliedReferral.rewardAmount() == null) {
+            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        }
+        return appliedReferral.rewardAmount()
+                .min(base)
+                .max(BigDecimal.ZERO)
+                .setScale(2, RoundingMode.HALF_UP);
     }
 
     private List<String> mergePromoCodes(String single, List<String> multiple) {

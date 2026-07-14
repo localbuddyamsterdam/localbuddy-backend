@@ -36,8 +36,11 @@ public class Booking {
     @JoinColumn(name = "traveler_user_id")
     private User loggedInUser;
 
-    @Column(name = "guest_name", length = 150)
-    private String guestName;
+    @Column(name = "guest_first_name", length = 100)
+    private String guestFirstName;
+
+    @Column(name = "guest_last_name", length = 100)
+    private String guestLastName;
 
     @Column(name = "guest_email", length = 255)
     private String guestEmail;
@@ -191,6 +194,10 @@ public class Booking {
     @Column(name = "deal_discount_amount", nullable = false, precision = 10, scale = 2)
     private BigDecimal dealDiscountAmount = BigDecimal.ZERO;
 
+    /** Discount the referred user received from a referral code — platform-borne (host earns on the pre-discount price). */
+    @Column(name = "referral_discount_amount", nullable = false, precision = 10, scale = 2)
+    private BigDecimal referralDiscountAmount = BigDecimal.ZERO;
+
     @OneToMany(mappedBy = "booking", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<BookingPromoCode> appliedPromoCodes = new ArrayList<>();
 
@@ -263,6 +270,10 @@ public class Booking {
         if (dealDiscountAmount == null) {
             dealDiscountAmount = BigDecimal.ZERO;
         }
+
+        if (referralDiscountAmount == null) {
+            referralDiscountAmount = BigDecimal.ZERO;
+        }
     }
 
     @PreUpdate
@@ -270,5 +281,19 @@ public class Booking {
         updatedAt = Instant.now();
     }
 
-
+    /**
+     * Combined guest name ({@code guestFirstName + " " + guestLastName}), or {@code null} for a
+     * logged-in booking with no guest details. Not a mapped column; with field-based JPA access
+     * this derived getter is ignored by Hibernate. Kept so notification/calendar/attendance code
+     * can render a single guest name.
+     */
+    public String getGuestName() {
+        if (guestFirstName == null && guestLastName == null) {
+            return null;
+        }
+        String first = guestFirstName == null ? "" : guestFirstName;
+        String last = guestLastName == null ? "" : guestLastName;
+        String combined = (first + " " + last).trim();
+        return combined.isEmpty() ? null : combined;
+    }
 }

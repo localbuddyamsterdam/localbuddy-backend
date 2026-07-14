@@ -5,17 +5,19 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.Valid;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * Admin read endpoints for users. Creating a user (which also issues a temporary
+ * password) lives on {@code POST /api/admin/users} — see AdminUserController.
+ */
 @RestController
 @RequestMapping("/api/users")
-@Tag(name = "Users", description = "Admin endpoints for managing users")
+@Tag(name = "Users", description = "Admin endpoints for listing users")
 @SecurityRequirement(name = "bearerAuth")
 public class UserController {
 
@@ -23,22 +25,6 @@ public class UserController {
 
     public UserController(UserService userService) {
         this.userService = userService;
-    }
-
-    @Operation(
-            summary = "Create a user",
-            description = "Creates a new user. Admin only."
-    )
-    @ApiResponses({
-            @ApiResponse(responseCode = "201", description = "User created successfully"),
-            @ApiResponse(responseCode = "400", description = "Invalid request body"),
-            @ApiResponse(responseCode = "401", description = "Not authenticated"),
-            @ApiResponse(responseCode = "403", description = "Not authorized (admin only)")
-    })
-    @PostMapping
-    public ResponseEntity<UserResponse> createUser(@Valid @RequestBody CreateUserRequest request) {
-        UserResponse response = userService.createUser(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @Operation(
