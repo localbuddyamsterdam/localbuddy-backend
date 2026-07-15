@@ -15,6 +15,8 @@ package com.localbuddy.auth;
  */
 public record CheckEmailResponse(
         boolean registered,
-        boolean hasPassword
+        boolean hasPassword,
+        /** True when the account has at least one passkey — the client offers passkey sign-in. */
+        boolean hasPasskeys
 ) {
 }

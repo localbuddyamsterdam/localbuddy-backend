@@ -1,5 +1,6 @@
 package com.localbuddy.auth;
 
+import com.localbuddy.auth.webauthn.WebAuthnCredentialRepository;
 import com.localbuddy.common.NameFormatter;
 import com.localbuddy.common.exception.BadRequestException;
 import com.localbuddy.common.exception.UnauthorizedException;
@@ -28,6 +29,7 @@ public class AuthService {
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
     private final AuthTokenService authTokenService;
+    private final WebAuthnCredentialRepository webAuthnCredentialRepository;
     private final NotificationService notificationService;
     private final ApplicationEventPublisher eventPublisher;
     private final String frontendBaseUrl;
@@ -39,6 +41,7 @@ public class AuthService {
                        JwtService jwtService,
                        RefreshTokenService refreshTokenService,
                        AuthTokenService authTokenService,
+                       WebAuthnCredentialRepository webAuthnCredentialRepository,
                        NotificationService notificationService,
                        ApplicationEventPublisher eventPublisher,
                        @Value("${app.frontend.base-url:http://localhost:3000}") String frontendBaseUrl,
@@ -49,6 +52,7 @@ public class AuthService {
         this.jwtService = jwtService;
         this.refreshTokenService = refreshTokenService;
         this.authTokenService = authTokenService;
+        this.webAuthnCredentialRepository = webAuthnCredentialRepository;
         this.notificationService = notificationService;
         this.eventPublisher = eventPublisher;
         this.frontendBaseUrl = frontendBaseUrl;
@@ -138,6 +142,19 @@ public class AuthService {
         refreshTokenService.revoke(refreshToken);
     }
 
+    /**
+     * Mints a full session (access + refresh token) for an already-verified user — the shared
+     * tail of every login path. Used by passkey sign-in, which proves identity cryptographically
+     * instead of with a password.
+     */
+    @Transactional
+    public LoginResponse issueSessionFor(User user) {
+        String accessToken = jwtService.generateAccessToken(user);
+        String refreshToken = refreshTokenService.issue(user);
+        publishEmailConfirmedIfTraveller(user);
+        return buildLoginResponse(user, accessToken, refreshToken);
+    }
+
     @Transactional(readOnly = true)
     public CurrentUserResponse getCurrentUser(UUID userId) {
         User user = userRepository.findById(userId)
@@ -201,8 +218,11 @@ public class AuthService {
         String normalizedEmail = normalizeEmail(email);
         return userRepository.findByEmail(normalizedEmail)
                 .filter(user -> user.getStatus() != UserStatus.DELETED)
-                .map(user -> new CheckEmailResponse(true, user.getPasswordHash() != null))
-                .orElseGet(() -> new CheckEmailResponse(false, false));
+                .map(user -> new CheckEmailResponse(
+                        true,
+                        user.getPasswordHash() != null,
+                        webAuthnCredentialRepository.existsByUserId(user.getId())))
+                .orElseGet(() -> new CheckEmailResponse(false, false, false));
     }
 
     // ------------------------------------------------------------------ password reset

@@ -95,6 +95,13 @@ app:
       refresh-token-expiration-days: ${JWT_REFRESH_TOKEN_EXPIRATION_DAYS:30}
     reset-token-expiration-minutes: ${RESET_TOKEN_EXPIRATION_MINUTES:30}
     verification-token-expiration-hours: ${VERIFICATION_TOKEN_EXPIRATION_HOURS:48}
+    webauthn:
+      # Passkey relying-party id + browser origins. Blank = derived from app.frontend.base-url
+      # (its host / its origin), which is right for both local dev and the deployed site.
+      rp-id: ${WEBAUTHN_RP_ID:}
+      allowed-origins: ${WEBAUTHN_ALLOWED_ORIGINS:}
+      rp-name: ${WEBAUTHN_RP_NAME:LocalBuddy}
+      challenge-expiration-minutes: ${WEBAUTHN_CHALLENGE_EXPIRATION_MINUTES:5}
 
   frontend:
     base-url: ${FRONTEND_BASE_URL:http://localhost:3000}
