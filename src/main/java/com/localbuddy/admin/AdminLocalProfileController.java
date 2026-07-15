@@ -1,6 +1,7 @@
 package com.localbuddy.admin;
 
 import com.localbuddy.localprofile.AdminLocalProfileReviewRequest;
+import com.localbuddy.localprofile.BulkSetHostCommissionRequest;
 import com.localbuddy.localprofile.LocalProfileResponse;
 import com.localbuddy.localprofile.LocalProfileService;
 import com.localbuddy.localprofile.SetHostCommissionRequest;
@@ -112,5 +113,25 @@ public class AdminLocalProfileController {
             @RequestBody SetHostCommissionRequest request
     ) {
         return ResponseEntity.ok(localProfileService.setCommissionOverride(profileId, request.commissionRate()));
+    }
+
+    @Operation(
+            summary = "Bulk set or clear host commission overrides",
+            description = "Applies the same commission rate (fraction) to every listed host profile "
+                    + "in one atomic batch; null commissionRate clears the override on all. Admin only."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Commission overrides updated"),
+            @ApiResponse(responseCode = "400", description = "Rate out of range (0..max-commission-rate)"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "403", description = "Not authorized (admin only)"),
+            @ApiResponse(responseCode = "404", description = "One or more profiles not found")
+    })
+    @PutMapping("/commission")
+    public ResponseEntity<List<LocalProfileResponse>> setHostCommissionBulk(
+            @Valid @RequestBody BulkSetHostCommissionRequest request
+    ) {
+        return ResponseEntity.ok(
+                localProfileService.setCommissionOverrideBulk(request.profileIds(), request.commissionRate()));
     }
 }

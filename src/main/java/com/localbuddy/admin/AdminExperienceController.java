@@ -1,5 +1,6 @@
 package com.localbuddy.admin;
 
+import com.localbuddy.experience.BulkSetExperienceCommissionRequest;
 import com.localbuddy.experience.ExperienceResponse;
 import com.localbuddy.experience.ExperienceService;
 import com.localbuddy.experience.SetExperienceCommissionRequest;
@@ -7,6 +8,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -87,5 +89,24 @@ public class AdminExperienceController {
             @RequestBody SetExperienceCommissionRequest request) {
         return ResponseEntity.ok(
                 experienceService.setCommissionOverride(experienceId, request.commissionRate()));
+    }
+
+    @Operation(
+            summary = "Bulk set or clear commission overrides",
+            description = "Applies the same commission rate (fraction) to every listed experience "
+                    + "in one atomic batch; null commissionRate clears the override on all. Admin only."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Commission overrides updated"),
+            @ApiResponse(responseCode = "400", description = "Rate out of range (0..max-commission-rate)"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "403", description = "Not authorized (admin only)"),
+            @ApiResponse(responseCode = "404", description = "One or more experiences not found")
+    })
+    @PutMapping("/commission")
+    public ResponseEntity<List<ExperienceResponse>> setCommissionOverrideBulk(
+            @Valid @RequestBody BulkSetExperienceCommissionRequest request) {
+        return ResponseEntity.ok(
+                experienceService.setCommissionOverrideBulk(request.experienceIds(), request.commissionRate()));
     }
 }

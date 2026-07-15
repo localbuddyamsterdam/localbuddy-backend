@@ -52,6 +52,7 @@ class AdminBookingManagementTest {
     private final AvailabilitySlotRepository availabilitySlotRepository = mock(AvailabilitySlotRepository.class);
     private final PaymentService paymentService = mock(PaymentService.class);
     private final BookingConfirmationNotifier bookingConfirmationNotifier = mock(BookingConfirmationNotifier.class);
+    private final NotificationService notificationService = mock(NotificationService.class);
 
     private final BookingService service = new BookingService(
             bookingRepository,
@@ -59,7 +60,7 @@ class AdminBookingManagementTest {
             mock(ExperienceRepository.class),
             availabilitySlotRepository,
             mock(LocalProfileRepository.class),
-            mock(NotificationService.class),
+            notificationService,
             mock(ConsentService.class),
             mock(PromoCodeService.class),
             mock(ReferralService.class),
@@ -115,7 +116,7 @@ class AdminBookingManagementTest {
         stubFound(booking);
 
         service.cancelBookingByAdmin(booking.getId(),
-                new AdminCancelBookingRequest("weather", new BigDecimal("50"), null));
+                new AdminCancelBookingRequest("weather", new BigDecimal("50"), null, null, null));
 
         assertEquals(BookingStatus.CANCELLED_BY_ADMIN, booking.getStatus());
         assertNotNull(booking.getCancelledAt());
@@ -131,7 +132,7 @@ class AdminBookingManagementTest {
 
         // 69.00 of 138.00 == 50%
         service.cancelBookingByAdmin(booking.getId(),
-                new AdminCancelBookingRequest("goodwill", null, new BigDecimal("69.00")));
+                new AdminCancelBookingRequest("goodwill", null, new BigDecimal("69.00"), null, null));
 
         verify(paymentService).handleBookingCancellationPayment(
                 same(booking), eq(BookingCancellationActor.ADMIN), anyString(),
@@ -145,10 +146,72 @@ class AdminBookingManagementTest {
         stubFound(booking);
 
         service.cancelBookingByAdmin(booking.getId(),
-                new AdminCancelBookingRequest("duplicate booking", null, null));
+                new AdminCancelBookingRequest("duplicate booking", null, null, null, null));
 
         verify(paymentService).handleBookingCancellationPayment(
                 same(booking), eq(BookingCancellationActor.ADMIN), anyString(), isNull());
+    }
+
+    @Test
+    @DisplayName("Cancel with both notify flags false sends no cancellation notifications")
+    void cancelWithNotificationsSuppressed() {
+        Booking booking = booking(UUID.randomUUID(), BookingStatus.CONFIRMED);
+        stubFound(booking);
+
+        service.cancelBookingByAdmin(booking.getId(),
+                new AdminCancelBookingRequest("silent correction", null, null, false, false));
+
+        assertEquals(BookingStatus.CANCELLED_BY_ADMIN, booking.getStatus());
+        verifyNoInteractions(notificationService);
+    }
+
+    @Test
+    @DisplayName("Cancel with null notify flags defaults to notifying host and guest")
+    void cancelDefaultsToNotifyingBothParties() {
+        Booking booking = booking(UUID.randomUUID(), BookingStatus.CONFIRMED);
+        stubFound(booking);
+
+        service.cancelBookingByAdmin(booking.getId(),
+                new AdminCancelBookingRequest("weather", null, null, null, null));
+
+        // Host email (traveller is a guest booking here, so the guest channel is used for them).
+        verify(notificationService).createEmailNotificationForUser(
+                any(), any(), anyString(), anyString(), anyString(), any(), anyString());
+        verify(notificationService).createEmailNotificationForGuest(
+                eq("guest@example.com"), any(), any(), anyString(), anyString(), anyString(), any(), anyString());
+    }
+
+    @Test
+    @DisplayName("Editing the emergency-contact group re-applies it; all-blank clears it")
+    void updateEmergencyContact() {
+        Booking booking = booking(UUID.randomUUID(), BookingStatus.CONFIRMED);
+        stubFound(booking);
+
+        service.updateBookingDetailsByAdmin(booking.getId(), new AdminUpdateBookingRequest(
+                null, null, null, null, null, null,
+                "Ada", "Lovelace", "ada@example.com", "+31600000000", "Sister"));
+        assertEquals("Ada", booking.getEmergencyContactFirstName());
+        assertEquals("+31600000000", booking.getEmergencyContactPhone());
+        assertEquals("Sister", booking.getEmergencyContactRelationship());
+
+        service.updateBookingDetailsByAdmin(booking.getId(), new AdminUpdateBookingRequest(
+                null, null, null, null, null, null,
+                "", "", "", "", ""));
+        assertNull(booking.getEmergencyContactFirstName());
+        assertNull(booking.getEmergencyContactPhone());
+        assertNull(booking.getEmergencyContactRelationship());
+    }
+
+    @Test
+    @DisplayName("A partial emergency contact (missing phone) is rejected")
+    void updateEmergencyContactRejectsPartial() {
+        Booking booking = booking(UUID.randomUUID(), BookingStatus.CONFIRMED);
+        stubFound(booking);
+
+        assertThrows(BadRequestException.class, () ->
+                service.updateBookingDetailsByAdmin(booking.getId(), new AdminUpdateBookingRequest(
+                        null, null, null, null, null, null,
+                        "Ada", null, null, null, null)));
     }
 
     @Test
@@ -158,7 +221,7 @@ class AdminBookingManagementTest {
         when(bookingRepository.findById(booking.getId())).thenReturn(Optional.of(booking));
 
         assertThrows(BadRequestException.class, () -> service.cancelBookingByAdmin(
-                booking.getId(), new AdminCancelBookingRequest("x", null, null)));
+                booking.getId(), new AdminCancelBookingRequest("x", null, null, null, null)));
         verifyNoInteractions(paymentService);
     }
 
@@ -172,7 +235,7 @@ class AdminBookingManagementTest {
         stubFound(booking);
 
         BookingResponse response = service.updateBookingDetailsByAdmin(booking.getId(),
-                new AdminUpdateBookingRequest("New", "Name", "NEW@Example.com", "  ", "traveller note", ""));
+                new AdminUpdateBookingRequest("New", "Name", "NEW@Example.com", "  ", "traveller note", "", null, null, null, null, null));
 
         assertEquals("New", response.guestFirstName());
         assertEquals("Name", response.guestLastName());

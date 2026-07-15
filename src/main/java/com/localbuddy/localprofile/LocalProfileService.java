@@ -521,6 +521,31 @@ public class LocalProfileService {
      */
     @Transactional
     public LocalProfileResponse setCommissionOverride(UUID profileId, BigDecimal commissionRate) {
+        validateCommissionOverrideRate(commissionRate);
+        LocalProfile profile = localProfileRepository.findById(profileId)
+                .orElseThrow(() -> new ResourceNotFoundException("Local profile not found"));
+        profile.setCommissionRate(commissionRate);
+        return toResponse(localProfileRepository.save(profile));
+    }
+
+    /**
+     * Bulk variant of {@link #setCommissionOverride}: same rate (or clear) applied to every
+     * listed host atomically — one unknown id fails the whole batch so a partial apply can't
+     * go unnoticed.
+     */
+    @Transactional
+    public List<LocalProfileResponse> setCommissionOverrideBulk(List<UUID> profileIds, BigDecimal commissionRate) {
+        validateCommissionOverrideRate(commissionRate);
+        List<UUID> ids = profileIds.stream().distinct().toList();
+        List<LocalProfile> profiles = localProfileRepository.findAllById(ids);
+        if (profiles.size() != ids.size()) {
+            throw new ResourceNotFoundException("One or more local profiles were not found");
+        }
+        profiles.forEach(p -> p.setCommissionRate(commissionRate));
+        return localProfileRepository.saveAll(profiles).stream().map(this::toResponse).toList();
+    }
+
+    private void validateCommissionOverrideRate(BigDecimal commissionRate) {
         if (commissionRate != null) {
             if (commissionRate.signum() < 0) {
                 throw new BadRequestException("Commission rate must be zero or positive");
@@ -530,10 +555,6 @@ public class LocalProfileService {
                         + " exceeds the maximum allowed (" + maxCommissionRate + ")");
             }
         }
-        LocalProfile profile = localProfileRepository.findById(profileId)
-                .orElseThrow(() -> new ResourceNotFoundException("Local profile not found"));
-        profile.setCommissionRate(commissionRate);
-        return toResponse(localProfileRepository.save(profile));
     }
 
 

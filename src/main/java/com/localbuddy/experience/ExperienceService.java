@@ -689,6 +689,31 @@ public class ExperienceService {
      */
     @Transactional
     public ExperienceResponse setCommissionOverride(UUID experienceId, BigDecimal commissionRate) {
+        validateCommissionOverrideRate(commissionRate);
+        Experience experience = experienceRepository.findById(experienceId)
+                .orElseThrow(() -> new ResourceNotFoundException("Experience not found"));
+        experience.setCommissionRate(commissionRate);
+        return toResponse(experienceRepository.save(experience));
+    }
+
+    /**
+     * Bulk variant of {@link #setCommissionOverride}: same rate (or clear) applied to every
+     * listed experience atomically — one unknown id fails the whole batch so a partial apply
+     * can't go unnoticed.
+     */
+    @Transactional
+    public List<ExperienceResponse> setCommissionOverrideBulk(List<UUID> experienceIds, BigDecimal commissionRate) {
+        validateCommissionOverrideRate(commissionRate);
+        List<UUID> ids = experienceIds.stream().distinct().toList();
+        List<Experience> experiences = experienceRepository.findAllById(ids);
+        if (experiences.size() != ids.size()) {
+            throw new ResourceNotFoundException("One or more experiences were not found");
+        }
+        experiences.forEach(e -> e.setCommissionRate(commissionRate));
+        return experienceRepository.saveAll(experiences).stream().map(this::toResponse).toList();
+    }
+
+    private void validateCommissionOverrideRate(BigDecimal commissionRate) {
         if (commissionRate != null) {
             if (commissionRate.signum() < 0) {
                 throw new BadRequestException("Commission rate must be zero or positive");
@@ -698,10 +723,6 @@ public class ExperienceService {
                         + " exceeds the maximum allowed (" + maxCommissionRate + ")");
             }
         }
-        Experience experience = experienceRepository.findById(experienceId)
-                .orElseThrow(() -> new ResourceNotFoundException("Experience not found"));
-        experience.setCommissionRate(commissionRate);
-        return toResponse(experienceRepository.save(experience));
     }
 
     @Transactional

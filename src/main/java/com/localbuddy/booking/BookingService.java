@@ -1143,7 +1143,7 @@ public class BookingService {
         booking.setCancellationReason(optionalTrim(request.reason()));
 
         Booking savedBooking = bookingRepository.save(booking);
-        createBookingCancelledNotification(savedBooking);
+        createBookingCancelledNotification(savedBooking, request.shouldNotifyGuest(), request.shouldNotifyHost());
 
         return toResponse(savedBooking);
     }
@@ -1197,6 +1197,27 @@ public class BookingService {
         }
         if (request.localResponseNote() != null) {
             booking.setLocalResponseNote(optionalTrim(request.localResponseNote()));
+        }
+        if (request.touchesEmergencyContact()) {
+            boolean allBlank = optionalTrim(request.emergencyContactFirstName()) == null
+                    && optionalTrim(request.emergencyContactLastName()) == null
+                    && optionalTrim(request.emergencyContactEmail()) == null
+                    && optionalTrim(request.emergencyContactPhone()) == null
+                    && optionalTrim(request.emergencyContactRelationship()) == null;
+            if (allBlank) {
+                booking.setEmergencyContactFirstName(null);
+                booking.setEmergencyContactLastName(null);
+                booking.setEmergencyContactEmail(null);
+                booking.setEmergencyContactPhone(null);
+                booking.setEmergencyContactRelationship(null);
+            } else {
+                applyEmergencyContact(booking,
+                        request.emergencyContactFirstName(),
+                        request.emergencyContactLastName(),
+                        request.emergencyContactEmail(),
+                        request.emergencyContactPhone(),
+                        request.emergencyContactRelationship());
+            }
         }
 
         return toResponse(bookingRepository.save(booking));
@@ -1317,16 +1338,26 @@ public class BookingService {
 
 
     private void createBookingCancelledNotification(Booking booking) {
-        notificationService.createEmailNotificationForUser(
-                booking.getLocalProfile().getUser(),
-                NotificationType.BOOKING_CANCELLED,
-                "Booking cancelled",
-                "Booking has been cancelled: " + booking.getBookingReference(),
-                "BOOKING",
-                booking.getId(),
-                "BOOKING_CANCELLED:LOCAL:" + booking.getId()
-        );
+        createBookingCancelledNotification(booking, true, true);
+    }
 
+    /** Cancellation emails; the admin cancel flow can suppress either party's notification. */
+    private void createBookingCancelledNotification(Booking booking, boolean notifyGuest, boolean notifyHost) {
+        if (notifyHost) {
+            notificationService.createEmailNotificationForUser(
+                    booking.getLocalProfile().getUser(),
+                    NotificationType.BOOKING_CANCELLED,
+                    "Booking cancelled",
+                    "Booking has been cancelled: " + booking.getBookingReference(),
+                    "BOOKING",
+                    booking.getId(),
+                    "BOOKING_CANCELLED:LOCAL:" + booking.getId()
+            );
+        }
+
+        if (!notifyGuest) {
+            return;
+        }
         if (booking.getLoggedInUser() != null) {
             notificationService.createEmailNotificationForUser(
                     booking.getLoggedInUser(),

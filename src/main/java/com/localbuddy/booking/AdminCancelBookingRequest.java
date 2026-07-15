@@ -14,6 +14,9 @@ import java.math.BigDecimal;
  * explicit {@code refundAmount}. When both overrides are null the policy applies; when both
  * are set, {@code refundAmount} takes precedence. Bookings with no captured payment (e.g. an
  * admin-created offline booking) simply cancel with nothing to refund.
+ *
+ * <p>{@code notifyGuest} / {@code notifyHost} control the cancellation emails; null defaults
+ * to {@code true} so existing callers keep notifying both parties.
  */
 public record AdminCancelBookingRequest(
         @NotBlank(message = "Cancellation reason is required")
@@ -24,6 +27,17 @@ public record AdminCancelBookingRequest(
         BigDecimal refundPercentage,
 
         @DecimalMin(value = "0.0", message = "Refund amount cannot be negative")
-        BigDecimal refundAmount
+        BigDecimal refundAmount,
+
+        Boolean notifyGuest,
+
+        Boolean notifyHost
 ) {
+    public boolean shouldNotifyGuest() {
+        return notifyGuest == null || notifyGuest;
+    }
+
+    public boolean shouldNotifyHost() {
+        return notifyHost == null || notifyHost;
+    }
 }

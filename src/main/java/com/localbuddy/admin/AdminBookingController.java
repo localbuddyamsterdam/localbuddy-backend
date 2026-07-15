@@ -78,7 +78,13 @@ public class AdminBookingController {
         String refundNote = request.refundAmount() != null ? "refund €" + request.refundAmount()
                 : request.refundPercentage() != null ? "refund " + request.refundPercentage() + "%"
                 : "refund per policy";
-        bookingAuditService.record(bookingId, "CANCEL", "Cancelled (" + refundNote + ")", adminId(authentication));
+        String notified = request.shouldNotifyGuest() && request.shouldNotifyHost() ? "guest & host notified"
+                : request.shouldNotifyGuest() ? "guest notified, host not"
+                : request.shouldNotifyHost() ? "host notified, guest not"
+                : "no notifications sent";
+        bookingAuditService.record(bookingId, "CANCEL",
+                "Cancelled (" + refundNote + "; " + notified + ") — " + request.reason(),
+                adminId(authentication));
         return ResponseEntity.ok(updated);
     }
 
