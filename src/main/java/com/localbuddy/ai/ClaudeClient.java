@@ -181,17 +181,27 @@ public class ClaudeClient {
         RestClient client = longRunning ? longRunningRestClient : restClient;
         for (int attempt = 0; attempt <= maxRetries; attempt++) {
             try {
-                JsonNode response = client.post()
+                // Read the body as a String and parse it with our (Jackson 2) ObjectMapper.
+                // Spring Boot 4's RestClient message converter is Jackson 3 (tools.jackson), which
+                // cannot construct a Jackson 2 com.fasterxml JsonNode — binding to JsonNode.class
+                // throws InvalidDefinitionException (surfacing as a 500).
+                String rawResponse = client.post()
                         .header("x-api-key", apiKey)
                         .header("anthropic-version", "2023-06-01")
                         .contentType(MediaType.APPLICATION_JSON)
                         .body(body)
                         .retrieve()
-                        .body(JsonNode.class);
-                if (response == null) {
+                        .body(String.class);
+                if (rawResponse == null || rawResponse.isBlank()) {
                     throw new ServiceUnavailableException("The AI service returned an empty response");
                 }
-                return response;
+                try {
+                    return objectMapper.readTree(rawResponse);
+                } catch (Exception parseEx) {
+                    log.error("Anthropic response was not valid JSON", parseEx);
+                    throw new ServiceUnavailableException(
+                            "The AI service returned an unreadable response; please try again");
+                }
             } catch (RestClientResponseException ex) {
                 if (!isRetryable(ex.getStatusCode().value()) || attempt == maxRetries) {
                     log.error("Anthropic request failed with status {} (attempt {}/{}): {}",
