@@ -261,6 +261,62 @@ public class EmailTemplateService {
         return sb.toString();
     }
 
+    /**
+     * Model for an incident/status alert email sent to operators. Fields are plain strings so this
+     * template stays decoupled from the incident feature's domain types.
+     *
+     * @param accentHex   status colour for the pill (e.g. red for down, green for resolved)
+     * @param statusLabel short pill text, e.g. "Incident detected"
+     * @param headline    one-line summary
+     * @param intro       a sentence or two of context
+     * @param rows        {label, value} detail pairs rendered as a table (may be empty)
+     * @param note        muted footer line (why you're getting this)
+     */
+    public record IncidentAlertModel(
+            String accentHex,
+            String statusLabel,
+            String headline,
+            String intro,
+            java.util.List<String[]> rows,
+            String note
+    ) {
+    }
+
+    /** Renders an operator incident alert in the branded shell. All caller text is HTML-escaped. */
+    public String renderIncidentAlert(IncidentAlertModel m) {
+        StringBuilder rowsHtml = new StringBuilder();
+        for (String[] row : m.rows()) {
+            rowsHtml.append("<tr>")
+                    .append("<td style=\"padding:9px 0;font-size:11px;font-weight:600;letter-spacing:0.04em;")
+                    .append("text-transform:uppercase;color:#86868b;white-space:nowrap;vertical-align:top;width:96px;\">")
+                    .append(esc(row[0])).append("</td>")
+                    .append("<td style=\"padding:9px 0 9px 16px;font-size:14px;line-height:1.5;color:#111114;")
+                    .append("vertical-align:top;word-break:break-word;\">")
+                    .append(esc(row[1])).append("</td>")
+                    .append("</tr>");
+        }
+        String table = m.rows().isEmpty() ? "" :
+                "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" "
+                        + "style=\"margin:20px 0 4px;border-top:1px solid #e6e6e9;\">" + rowsHtml + "</table>";
+
+        String pill = "<span style=\"display:inline-block;background:" + m.accentHex()
+                + ";color:#ffffff;font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;"
+                + "padding:5px 12px;border-radius:999px;\">" + esc(m.statusLabel()) + "</span>";
+
+        String content = pill
+                + "<h1 style=\"margin:16px 0 10px;font-size:26px;line-height:1.25;font-weight:600;"
+                + "letter-spacing:-0.01em;color:#111114;\">" + esc(m.headline()) + "</h1>"
+                + "<p style=\"margin:0;font-size:16px;line-height:1.6;color:#3a3a3f;\">" + esc(m.intro()) + "</p>"
+                + table
+                + "<p style=\"margin:22px 0 0;font-size:13px;line-height:1.55;color:#86868b;\">" + esc(m.note()) + "</p>";
+
+        String preheader = m.headline() == null ? "" : m.headline();
+        return GENERIC_SHELL
+                .replace("{{title}}", esc(m.headline()))
+                .replace("{{preheader}}", esc(preheader))
+                .replace("{{content}}", content);
+    }
+
     private static final String GENERIC_SHELL = """
             <!DOCTYPE html>
             <html lang="en">

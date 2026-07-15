@@ -255,6 +255,12 @@ app:
   social:
     google:
       client-id: ${GOOGLE_CLIENT_ID:}
+    facebook:
+      # App ID is public; App Secret is server-only. Both required in prod so the
+      # token's app_id can be verified (blocks token-swap login). Blank in dev =
+      # that audience check is skipped, same off-until-configured pattern as above.
+      app-id: ${FACEBOOK_APP_ID:}
+      app-secret: ${FACEBOOK_APP_SECRET:}
 
   ai:
     anthropic:
@@ -262,3 +268,16 @@ app:
       model: ${ANTHROPIC_MODEL:claude-sonnet-4-6}
       base-url: ${ANTHROPIC_BASE_URL:https://api.anthropic.com/v1/messages}
       max-tokens: ${ANTHROPIC_MAX_TOKENS:1024}
+
+  incident:
+    # In-process incident monitor: probes the DB and, on sustained failure, opens an incident,
+    # emails operators (bypassing the DB-backed notification queue), and flips the public banner.
+    enabled: ${INCIDENT_MONITOR_ENABLED:true}
+    check-interval-ms: ${INCIDENT_CHECK_INTERVAL_MS:30000}
+    failure-threshold: ${INCIDENT_FAILURE_THRESHOLD:2}      # consecutive fails before declaring an incident
+    recovery-threshold: ${INCIDENT_RECOVERY_THRESHOLD:2}    # consecutive successes before auto-resolving
+    probe-timeout-ms: ${INCIDENT_PROBE_TIMEOUT_MS:5000}
+    reminder-interval-ms: ${INCIDENT_REMINDER_INTERVAL_MS:0}  # 0 = one email on open + one on resolve, no reminders
+    # Operator recipients (comma-separated). Falls back to app.support.email when blank.
+    alert-emails: ${INCIDENT_ALERT_EMAILS:}
+    banner-message: ${INCIDENT_BANNER_MESSAGE:We're experiencing some technical difficulties and are working to restore full service. Some features may be temporarily unavailable — please try again shortly.}
