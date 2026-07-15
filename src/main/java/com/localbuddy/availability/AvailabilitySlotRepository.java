@@ -55,4 +55,36 @@ public interface AvailabilitySlotRepository extends JpaRepository<AvailabilitySl
 
     /** Future slots produced by a given schedule — used when editing/pausing/deleting the schedule. */
     List<AvailabilitySlot> findBySourceScheduleIdAndStartTimeAfter(UUID sourceScheduleId, Instant startTime);
+
+    /**
+     * All seat-available slots of APPROVED experiences in a city within [from, to) — the AI trip
+     * planner's inventory query. Experience, host profile, category and city are fetch-joined so
+     * callers can build prompt/link data outside a lazy-loading context. Booking-window cutoffs
+     * are asymmetric (15/60 min) and must still be applied in Java via BookingWindowPolicy.
+     * Only per-guest bookable modes are eligible (buyout-only experiences can't be booked by the
+     * planner's per-guest deep links).
+     */
+    @Query("""
+            select slot from AvailabilitySlot slot
+            join fetch slot.experience experience
+            join fetch experience.localProfile
+            join fetch experience.city city
+            left join fetch experience.category
+            where city.slug = :citySlug
+              and experience.status = :experienceStatus
+              and experience.bookingMode in :bookingModes
+              and slot.status = :slotStatus
+              and slot.startTime >= :from
+              and slot.startTime < :to
+              and slot.bookedCount < slot.capacity
+            order by slot.startTime asc
+            """)
+    List<AvailabilitySlot> findBookableInCityBetween(
+            @Param("citySlug") String citySlug,
+            @Param("experienceStatus") com.localbuddy.experience.ExperienceStatus experienceStatus,
+            @Param("bookingModes") java.util.Collection<com.localbuddy.experience.BookingMode> bookingModes,
+            @Param("slotStatus") AvailabilityStatus slotStatus,
+            @Param("from") Instant from,
+            @Param("to") Instant to
+    );
 }

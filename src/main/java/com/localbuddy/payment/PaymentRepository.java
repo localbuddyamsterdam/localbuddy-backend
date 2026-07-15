@@ -56,4 +56,7 @@ public interface PaymentRepository extends JpaRepository<Payment, UUID> {
 
     /** Count of payments across several statuses — admin dashboard queues (e.g. FAILED + REFUND_PENDING). */
     long countByPaymentStatusIn(Collection<PaymentStatus> statuses);
+
+    /** Member payments of a bundle checkout, in creation order. */
+    List<Payment> findByPaymentGroupIdOrderByCreatedAtAsc(UUID paymentGroupId);
 }

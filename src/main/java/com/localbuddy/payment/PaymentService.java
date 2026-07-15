@@ -44,6 +44,7 @@ public class PaymentService {
     private final GiftCardService giftCardService;
     private final PaidBookingFinalizer paidBookingFinalizer;
     private final BigDecimal stripeMinimumCharge;
+    private final PaymentGroupRepository paymentGroupRepository;
 
     // Self-reference (lazy, to break the construction cycle). createCheckout is deliberately NOT
     // @Transactional — it must not hold a DB transaction open across the Stripe network call — so
@@ -56,7 +57,7 @@ public class PaymentService {
 
     public PaymentService(PaymentRepository paymentRepository,
                           BookingRepository bookingRepository,
-                          @Value("${app.platform.commission-percentage:20}") BigDecimal commissionPercentage, PaymentCheckoutProvider paymentCheckoutProvider, PaymentWebhookEventRepository paymentWebhookEventRepository, CancellationRefundPolicyService cancellationRefundPolicyService, PaymentTransactionService paymentTransactionService, BookingExpiryService bookingExpiryService, PricingEngine pricingEngine, HostLedgerService hostLedgerService, GiftCardService giftCardService, PaidBookingFinalizer paidBookingFinalizer, @Value("${app.payments.stripe.minimum-charge:0.50}") BigDecimal stripeMinimumCharge) {
+                          @Value("${app.platform.commission-percentage:20}") BigDecimal commissionPercentage, PaymentCheckoutProvider paymentCheckoutProvider, PaymentWebhookEventRepository paymentWebhookEventRepository, CancellationRefundPolicyService cancellationRefundPolicyService, PaymentTransactionService paymentTransactionService, BookingExpiryService bookingExpiryService, PricingEngine pricingEngine, HostLedgerService hostLedgerService, GiftCardService giftCardService, PaidBookingFinalizer paidBookingFinalizer, @Value("${app.payments.stripe.minimum-charge:0.50}") BigDecimal stripeMinimumCharge, PaymentGroupRepository paymentGroupRepository) {
         this.paymentRepository = paymentRepository;
         this.bookingRepository = bookingRepository;
         this.commissionPercentage = commissionPercentage;
@@ -70,6 +71,7 @@ public class PaymentService {
         this.giftCardService = giftCardService;
         this.paidBookingFinalizer = paidBookingFinalizer;
         this.stripeMinimumCharge = stripeMinimumCharge;
+        this.paymentGroupRepository = paymentGroupRepository;
     }
 
     @Transactional
@@ -272,6 +274,11 @@ public class PaymentService {
         validateBookingReadyForCheckout(booking);
 
         Payment payment = getOrCreatePendingPaymentForBooking(booking);
+
+        if (payment.getPaymentGroup() != null) {
+            throw new BadRequestException(
+                    "This booking is part of a bundle checkout — pay via the bundle link, or wait for it to expire");
+        }
 
         if (payment.getPaymentStatus() == PaymentStatus.PROCESSING &&
                 payment.getCheckoutUrl() != null &&
@@ -538,13 +545,19 @@ public class PaymentService {
                         ? session.getMetadata().get("giftCardId") : null;
                 if (purchasedGiftCardId != null && !purchasedGiftCardId.isBlank()) {
                     giftCardService.activatePurchasedCard(UUID.fromString(purchasedGiftCardId));
+                } else if (isGroupSession(session)) {
+                    markGroupPaidFromStripeSession(session);
                 } else {
                     markPaymentPaidFromStripeSession(session);
                 }
             } else if ("checkout.session.expired".equals(eventType) ||
                     "checkout.session.async_payment_failed".equals(eventType)) {
                 Session session = extractCheckoutSession(event);
-                handleFailedOrExpiredCheckoutSession(session);
+                if (isGroupSession(session)) {
+                    handleFailedOrExpiredGroupSession(session);
+                } else {
+                    handleFailedOrExpiredCheckoutSession(session);
+                }
             }
 
             webhookEvent.setProcessed(true);
@@ -729,6 +742,12 @@ public class PaymentService {
 
         if (payment.getPaymentStatus() == PaymentStatus.PENDING ||
                 payment.getPaymentStatus() == PaymentStatus.PROCESSING) {
+            // Return a reserved gift-card share so the balance isn't stranded on the dead payment.
+            // Bundle members are excluded: their gift accounting is group-level (the share is either
+            // returned once when the whole group dies, or refunded per-member if the group still pays).
+            if (payment.getPaymentGroup() == null) {
+                releaseGiftCardIfAny(payment);
+            }
             payment.setPaymentStatus(PaymentStatus.CANCELLED);
             payment.setCancelledAt(Instant.now());
             payment.setRefundReason(optionalTrim(reason));
@@ -782,6 +801,17 @@ public class PaymentService {
         BigDecimal giftCardAmount = payment.getGiftCardAmount() != null ? payment.getGiftCardAmount() : BigDecimal.ZERO;
         BigDecimal capturedCash = payment.getAmount().subtract(giftCardAmount).max(BigDecimal.ZERO);
 
+        // When the payment completed WITHOUT a Stripe charge (gift card covered everything but a
+        // sub-minimum remainder the platform absorbed), there is no payment intent anywhere — the
+        // "cash" was never the customer's money. Refund the gift share only; asking Stripe for the
+        // absorbed cents would fail the whole refund and strand the customer at EUR 0.
+        boolean hasStripeCharge = optionalTrim(payment.getProviderPaymentIntentId()) != null
+                || (payment.getPaymentGroup() != null
+                && optionalTrim(payment.getPaymentGroup().getProviderPaymentIntentId()) != null);
+        if (!hasStripeCharge) {
+            capturedCash = BigDecimal.ZERO;
+        }
+
         BigDecimal giftRefund = giftCardAmount.multiply(refundFraction)
                 .setScale(2, RoundingMode.HALF_UP)
                 .min(giftCardAmount)
@@ -790,12 +820,17 @@ public class PaymentService {
                 .min(capturedCash)
                 .setScale(2, RoundingMode.HALF_UP);
 
+        // What the customer actually paid: captured cash + gift draw. The absorbed remainder of a
+        // no-Stripe completion is excluded, so a full refund of a gift-covered booking reads
+        // REFUNDED rather than PARTIALLY_REFUNDED.
+        BigDecimal customerPaidTotal = capturedCash.add(giftCardAmount);
+
         // No cash leg — the gift-card return alone covers the refund.
         if (cashRefund.signum() <= 0) {
             if (giftRefund.signum() > 0) {
                 giftCardService.returnToCard(payment.getGiftCardId(), giftRefund);
             }
-            finishRefund(payment, giftRefund, null);
+            finishRefund(payment, giftRefund, null, customerPaidTotal);
             return;
         }
 
@@ -810,7 +845,8 @@ public class PaymentService {
             if (giftRefund.signum() > 0) {
                 giftCardService.returnToCard(payment.getGiftCardId(), giftRefund);
             }
-            finishRefund(payment, refundResult.refundedAmount().add(giftRefund), refundResult.providerRefundId());
+            finishRefund(payment, refundResult.refundedAmount().add(giftRefund),
+                    refundResult.providerRefundId(), customerPaidTotal);
 
         } catch (Exception ex) {
             // Stripe failed: nothing credited to the gift card, so no money is stranded. Safe to retry.
@@ -820,14 +856,19 @@ public class PaymentService {
         }
     }
 
-    /** Records a completed refund total and derives the status from the reconciled amount. */
-    private void finishRefund(Payment payment, BigDecimal totalRefunded, String providerRefundId) {
+    /**
+     * Records a completed refund total and derives the status from the reconciled amount,
+     * measured against what the customer actually paid (captured cash + gift draw — excludes
+     * any platform-absorbed sub-minimum remainder).
+     */
+    private void finishRefund(Payment payment, BigDecimal totalRefunded, String providerRefundId,
+                              BigDecimal customerPaidTotal) {
         if (providerRefundId != null) {
             payment.setProviderRefundId(providerRefundId);
         }
         payment.setRefundedAmount(totalRefunded);
         payment.setRefundedAt(Instant.now());
-        payment.setPaymentStatus(totalRefunded.compareTo(payment.getAmount()) >= 0
+        payment.setPaymentStatus(totalRefunded.compareTo(customerPaidTotal) >= 0
                 ? PaymentStatus.REFUNDED : PaymentStatus.PARTIALLY_REFUNDED);
         paymentRepository.save(payment);
     }
@@ -879,6 +920,12 @@ public class PaymentService {
 
         if (payment.getPaymentStatus() == PaymentStatus.PENDING ||
                 payment.getPaymentStatus() == PaymentStatus.PROCESSING) {
+            // Same rule as handleBookingCancellationPayment: return a reserved gift-card share
+            // so the balance isn't stranded on the dead payment (bundle members excluded —
+            // their gift accounting is group-level).
+            if (payment.getPaymentGroup() == null) {
+                releaseGiftCardIfAny(payment);
+            }
             payment.setPaymentStatus(PaymentStatus.CANCELLED);
             payment.setCancelledAt(Instant.now());
             payment.setRefundReason(optionalTrim(reason));
@@ -963,5 +1010,307 @@ public class PaymentService {
                 booking.getStatus() != BookingStatus.ACCEPTED) {
             throw new BadRequestException("Checkout can be created only for bookings pending payment");
         }
+    }
+
+    // ------------------------------------------------------------------
+    // Bundle checkout (payment groups): one Stripe session, many bookings
+    // ------------------------------------------------------------------
+
+    /**
+     * Creates ONE checkout covering several bookings (e.g. "book my whole AI trip plan").
+     * Mirrors {@link #createCheckout}: the group + member payments + gift-card reserve happen in
+     * one transaction, the Stripe call runs OUTSIDE any transaction, and the result is attached
+     * in a follow-up transaction. On a Stripe failure the group's gift-card draw is returned and
+     * the member payments stay PENDING for the expiry sweep to clean up.
+     *
+     * @param loggedInUserId owner for logged-in bundles (null for guest bundles)
+     * @param guestEmail     owner email for guest bundles (null for logged-in bundles)
+     */
+    public PaymentGroupResponse createGroupCheckout(
+            UUID loggedInUserId,
+            String guestEmail,
+            List<UUID> bookingIds,
+            String giftCardCode,
+            UUID tripPlanId
+    ) {
+        GroupCheckoutPreparation preparation = paymentTransactionService.prepareGroupForCheckout(
+                loggedInUserId, guestEmail, bookingIds, giftCardCode, tripPlanId);
+
+        PaymentGroup group = preparation.group();
+
+        BigDecimal giftCardAmount = group.getGiftCardAmount() != null
+                ? group.getGiftCardAmount() : BigDecimal.ZERO;
+        BigDecimal cashRemainder = group.getTotalAmount().subtract(giftCardAmount);
+        if (giftCardAmount.signum() > 0 && cashRemainder.compareTo(stripeMinimumCharge) < 0) {
+            return self.completeGroupWithoutStripeCharge(group.getId());
+        }
+
+        try {
+            PaymentCheckoutResult checkoutResult =
+                    paymentCheckoutProvider.createGroupCheckout(group, preparation.payments());
+            return self.attachGroupCheckoutResult(group.getId(), checkoutResult);
+        } catch (RuntimeException ex) {
+            self.releaseGroupGiftCardOnFailure(group.getId());
+            throw ex;
+        }
+    }
+
+    @Transactional
+    public PaymentGroupResponse attachGroupCheckoutResult(UUID groupId, PaymentCheckoutResult checkoutResult) {
+        PaymentGroup group = paymentGroupRepository.findById(groupId)
+                .orElseThrow(() -> new ResourceNotFoundException("Payment group not found"));
+
+        group.setStatus(PaymentGroupStatus.PROCESSING);
+        group.setCheckoutUrl(checkoutResult.checkoutUrl());
+        group.setProviderCheckoutSessionId(checkoutResult.providerCheckoutSessionId());
+        group.setProviderPaymentIntentId(checkoutResult.providerPaymentIntentId());
+        paymentGroupRepository.save(group);
+
+        List<Payment> members = paymentRepository.findByPaymentGroupIdOrderByCreatedAtAsc(groupId);
+        for (Payment member : members) {
+            if (member.getPaymentStatus() == PaymentStatus.PENDING) {
+                member.setPaymentStatus(PaymentStatus.PROCESSING);
+                // The member deliberately does NOT get the session id / checkout url: the Stripe
+                // session belongs to the group (and the payments partial-unique indexes must hold).
+            }
+        }
+        paymentRepository.saveAll(members);
+
+        return toGroupResponse(group, members);
+    }
+
+    /** Gift card covers the whole bundle (or all but a sub-minimum remainder): no Stripe session. */
+    @Transactional
+    public PaymentGroupResponse completeGroupWithoutStripeCharge(UUID groupId) {
+        PaymentGroup group = paymentGroupRepository.findById(groupId)
+                .orElseThrow(() -> new ResourceNotFoundException("Payment group not found"));
+
+        List<Payment> members = paymentRepository.findByPaymentGroupIdOrderByCreatedAtAsc(groupId);
+
+        group.setStatus(PaymentGroupStatus.PAID);
+        group.setPaidAt(Instant.now());
+        paymentGroupRepository.save(group);
+
+        for (Payment member : members) {
+            if (member.getPaymentStatus() == PaymentStatus.PAID) {
+                confirmBookingAfterPayment(member.getBooking());
+                continue;
+            }
+            member.setPaymentStatus(PaymentStatus.PAID);
+            member.setPaidAt(Instant.now());
+            paymentRepository.save(member);
+            finalizePaidBooking(member, member.getBooking());
+        }
+
+        return toGroupResponse(group, members);
+    }
+
+    /** Public status view of a bundle checkout, addressed by its unguessable token. */
+    @Transactional(readOnly = true)
+    public PaymentGroupResponse getPaymentGroupByToken(String groupToken) {
+        PaymentGroup group = paymentGroupRepository.findByGroupToken(groupToken)
+                .orElseThrow(() -> new ResourceNotFoundException("Payment group not found"));
+        List<Payment> members = paymentRepository.findByPaymentGroupIdOrderByCreatedAtAsc(group.getId());
+        return toGroupResponse(group, members);
+    }
+
+    @Transactional
+    public void releaseGroupGiftCardOnFailure(UUID groupId) {
+        paymentGroupRepository.findByIdForUpdate(groupId).ifPresent(group -> {
+            if (group.getStatus() == PaymentGroupStatus.PENDING
+                    || group.getStatus() == PaymentGroupStatus.PROCESSING) {
+                releaseGroupGiftCardIfAny(group);
+                paymentGroupRepository.save(group);
+            }
+        });
+    }
+
+    /**
+     * Returns the group's whole gift-card draw exactly once. Idempotency comes from the
+     * giftCardReturnedAt marker instead of zeroing giftCardAmount, because the original draw
+     * stays the basis for "cash actually captured" refund math on late payments.
+     */
+    private void releaseGroupGiftCardIfAny(PaymentGroup group) {
+        if (group.getGiftCardId() != null
+                && group.getGiftCardAmount() != null
+                && group.getGiftCardAmount().signum() > 0
+                && group.getGiftCardReturnedAt() == null) {
+            giftCardService.returnToCard(group.getGiftCardId(), group.getGiftCardAmount());
+            group.setGiftCardReturnedAt(Instant.now());
+        }
+    }
+
+    private boolean isGroupSession(Session session) {
+        String groupId = session.getMetadata() != null
+                ? session.getMetadata().get("paymentGroupId") : null;
+        return groupId != null && !groupId.isBlank();
+    }
+
+    private void markGroupPaidFromStripeSession(Session session) {
+        if (session.getId() == null || session.getId().trim().isEmpty()) {
+            throw new BadRequestException("Checkout session id is missing");
+        }
+
+        // Locking read FIRST (not a re-read): the expiry sweep can be cancelling this same
+        // group right now — the row lock serializes the two, and because this is the first
+        // load of the entity in this transaction, the status/gift fields are post-lock fresh.
+        PaymentGroup group = paymentGroupRepository
+                .findBySessionIdForUpdate(PaymentProvider.STRIPE, session.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Payment group not found for checkout session"));
+
+        List<Payment> members = paymentRepository.findByPaymentGroupIdOrderByCreatedAtAsc(group.getId());
+
+        if (group.getStatus() == PaymentGroupStatus.PAID) {
+            // Duplicate delivery: re-run only the idempotent confirmations.
+            for (Payment member : members) {
+                if (member.getPaymentStatus() == PaymentStatus.PAID) {
+                    confirmBookingAfterPayment(member.getBooking());
+                }
+            }
+            return;
+        }
+
+        if (group.getStatus() == PaymentGroupStatus.REFUNDED) {
+            throw new BadRequestException("Payment group cannot be marked paid from current status");
+        }
+
+        if (group.getStatus() == PaymentGroupStatus.CANCELLED
+                || group.getStatus() == PaymentGroupStatus.FAILED
+                || group.getStatus() == PaymentGroupStatus.REFUND_FAILED) {
+            // Late payment on a bundle that was already released (or a retried delivery after a
+            // failed refund): the seats are gone and the gift-card draw was already returned, so
+            // refund ALL captured cash once, in full. A provider failure must NOT vanish into the
+            // webhook's catch-all — record REFUND_FAILED on the group so it is visible and
+            // retryable instead of silently keeping the customer's money.
+            group.setProviderPaymentIntentId(session.getPaymentIntent());
+            BigDecimal capturedCash = group.getTotalAmount()
+                    .subtract(group.getGiftCardAmount() != null ? group.getGiftCardAmount() : BigDecimal.ZERO)
+                    .max(BigDecimal.ZERO);
+            try {
+                if (capturedCash.signum() > 0) {
+                    paymentCheckoutProvider.refundGroupCash(
+                            group, capturedCash, "Bundle was released before the payment completed");
+                }
+                group.setStatus(PaymentGroupStatus.REFUNDED);
+                group.setFailureReason("Late payment refunded in full — the bundle had already been released");
+            } catch (Exception ex) {
+                log.error("Late-payment refund of {} {} failed for payment group {} — customer cash is "
+                                + "still held; refund must be retried.",
+                        capturedCash, group.getCurrency(), group.getId(), ex);
+                group.setStatus(PaymentGroupStatus.REFUND_FAILED);
+                group.setFailureReason("Late payment refund failed: " + ex.getMessage());
+            }
+            paymentGroupRepository.save(group);
+            return;
+        }
+
+        group.setStatus(PaymentGroupStatus.PAID);
+        group.setPaidAt(Instant.now());
+        group.setProviderPaymentIntentId(session.getPaymentIntent());
+        paymentGroupRepository.save(group);
+
+        for (Payment member : members) {
+            Booking booking = member.getBooking();
+
+            if (member.getPaymentStatus() == PaymentStatus.PAID) {
+                confirmBookingAfterPayment(booking);
+                continue;
+            }
+
+            boolean bookingHonorable = booking.getStatus() == BookingStatus.PENDING_PAYMENT ||
+                    booking.getStatus() == BookingStatus.ACCEPTED ||
+                    booking.getStatus() == BookingStatus.CONFIRMED;
+            boolean memberOpen = member.getPaymentStatus() == PaymentStatus.PENDING ||
+                    member.getPaymentStatus() == PaymentStatus.PROCESSING;
+
+            if (!bookingHonorable || !memberOpen) {
+                // A member was released mid-checkout (e.g. the traveler cancelled one booking) but
+                // the customer paid for the full bundle: return this member's share (its gift part
+                // back to the card, its cash part as a partial refund on the shared intent) and
+                // keep confirming the healthy members.
+                if (member.getPaymentStatus() != PaymentStatus.REFUNDED &&
+                        member.getPaymentStatus() != PaymentStatus.PARTIALLY_REFUNDED &&
+                        member.getPaymentStatus() != PaymentStatus.REFUND_PENDING) {
+                    refundFullPayment(member, "Booking was released before the bundle payment completed");
+                }
+                continue;
+            }
+
+            member.setPaymentStatus(PaymentStatus.PAID);
+            member.setPaidAt(Instant.now());
+            paymentRepository.save(member);
+            finalizePaidBooking(member, booking);
+        }
+    }
+
+    private void handleFailedOrExpiredGroupSession(Session session) {
+        if (session.getId() == null || session.getId().trim().isEmpty()) {
+            return;
+        }
+
+        // Locking read FIRST — see markGroupPaidFromStripeSession for why.
+        PaymentGroup group = paymentGroupRepository
+                .findBySessionIdForUpdate(PaymentProvider.STRIPE, session.getId())
+                .orElse(null);
+
+        if (group == null) {
+            return;
+        }
+
+        if (group.getStatus() != PaymentGroupStatus.PENDING
+                && group.getStatus() != PaymentGroupStatus.PROCESSING) {
+            return;
+        }
+
+        group.setStatus(PaymentGroupStatus.FAILED);
+        group.setFailedAt(Instant.now());
+        group.setFailureReason("Stripe checkout session expired or payment failed");
+        releaseGroupGiftCardIfAny(group);
+        paymentGroupRepository.save(group);
+
+        List<Payment> members = paymentRepository.findByPaymentGroupIdOrderByCreatedAtAsc(group.getId());
+        for (Payment member : members) {
+            if (member.getPaymentStatus() == PaymentStatus.PENDING ||
+                    member.getPaymentStatus() == PaymentStatus.PROCESSING) {
+                member.setPaymentStatus(PaymentStatus.FAILED);
+                member.setFailedAt(Instant.now());
+                member.setFailureReason("Stripe checkout session expired or payment failed");
+                // No per-member gift release: the group-level return above covered the full draw.
+            }
+        }
+        paymentRepository.saveAll(members);
+
+        for (Payment member : members) {
+            bookingExpiryService.releaseBookingSlotAfterFailedPayment(member.getBooking().getId());
+        }
+    }
+
+    private PaymentGroupResponse toGroupResponse(PaymentGroup group, List<Payment> members) {
+        List<PaymentGroupMemberResponse> memberResponses = members.stream()
+                .map(member -> {
+                    Booking booking = member.getBooking();
+                    return new PaymentGroupMemberResponse(
+                            booking.getId(),
+                            booking.getBookingReference(),
+                            booking.getExperience() != null ? booking.getExperience().getTitle() : null,
+                            booking.getAvailabilitySlot() != null ? booking.getAvailabilitySlot().getStartTime() : null,
+                            booking.getStatus() != null ? booking.getStatus().name() : null,
+                            member.getPaymentStatus(),
+                            member.getAmount()
+                    );
+                })
+                .toList();
+
+        return new PaymentGroupResponse(
+                group.getGroupToken(),
+                group.getStatus(),
+                group.getTotalAmount(),
+                group.getGiftCardAmount(),
+                group.getCurrency(),
+                group.getCheckoutUrl(),
+                group.getCreatedAt(),
+                group.getPaidAt(),
+                memberResponses
+        );
     }
 }

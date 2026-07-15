@@ -26,6 +26,15 @@ public class Payment {
     @JoinColumn(name = "booking_id", nullable = false)
     private Booking booking;
 
+    /**
+     * Set when this payment is a member of a bundle checkout (one Stripe session paying
+     * several bookings). The Stripe session/intent ids then live on the group; this row
+     * keeps the per-booking amount + financial snapshot and its provider ids stay NULL.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "payment_group_id")
+    private PaymentGroup paymentGroup;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "provider", nullable = false, length = 40)
     private PaymentProvider provider = PaymentProvider.STRIPE;

@@ -4,6 +4,7 @@ import com.localbuddy.booking.BookingRepository;
 import com.localbuddy.booking.BookingStatus;
 import com.localbuddy.common.exception.BadRequestException;
 import com.localbuddy.common.exception.ResourceNotFoundException;
+import com.localbuddy.experience.BookingMode;
 import com.localbuddy.experience.City;
 import com.localbuddy.experience.Experience;
 import com.localbuddy.experience.ExperienceRepository;
@@ -309,6 +310,34 @@ public class AvailabilitySlotService {
                 .filter(slot -> slot.getBookedCount() < slot.getCapacity())
                 .filter(slot -> bookingWindowPolicy.isBookableAt(slot, now))
                 .map(this::toResponse)
+                .toList();
+    }
+
+    /**
+     * Bookable slots (still-open booking window, at least {@code minRemainingCapacity} seats left)
+     * for every APPROVED experience in a city within [from, to). Experience, host profile,
+     * category and city come fetch-joined, so callers may read them after the transaction.
+     * Used by the AI trip planner to ground itineraries in real, bookable inventory.
+     */
+    @Transactional(readOnly = true)
+    public List<AvailabilitySlot> getBookableSlotsForCityBetween(
+            String citySlug,
+            Instant from,
+            Instant to,
+            int minRemainingCapacity
+    ) {
+        Instant now = Instant.now();
+        return availabilitySlotRepository
+                .findBookableInCityBetween(
+                        citySlug,
+                        ExperienceStatus.APPROVED,
+                        List.of(BookingMode.SHARED, BookingMode.PRIVATE_ALLOWED),
+                        AvailabilityStatus.AVAILABLE,
+                        from,
+                        to)
+                .stream()
+                .filter(slot -> slot.getCapacity() - slot.getBookedCount() >= minRemainingCapacity)
+                .filter(slot -> bookingWindowPolicy.isBookableAt(slot, now))
                 .toList();
     }
 }

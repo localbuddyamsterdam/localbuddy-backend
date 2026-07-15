@@ -6,6 +6,8 @@ import com.stripe.model.Refund;
 import com.stripe.model.checkout.Session;
 import com.stripe.param.RefundCreateParams;
 import com.stripe.param.checkout.SessionCreateParams;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -15,6 +17,8 @@ import java.util.UUID;
 
 @Component
 public class StripePaymentCheckoutProvider implements PaymentCheckoutProvider {
+
+    private static final Logger log = LoggerFactory.getLogger(StripePaymentCheckoutProvider.class);
 
     // Stripe requires a checkout session to live at least 30 minutes; we add a
     // small buffer over that floor. The booking expiry job proactively expires
@@ -94,8 +98,89 @@ public class StripePaymentCheckoutProvider implements PaymentCheckoutProvider {
             );
 
         } catch (Exception ex) {
-            throw new BadRequestException("Unable to create Stripe checkout session: " + ex.getMessage());
+            log.error("Stripe checkout session creation failed", ex);
+            throw new BadRequestException("Unable to start the payment — please try again");
         }
+    }
+
+    @Override
+    public PaymentCheckoutResult createGroupCheckout(PaymentGroup group, java.util.List<Payment> payments) {
+        if (stripeProperties.secretKey() == null || stripeProperties.secretKey().trim().isEmpty()) {
+            throw new BadRequestException("Stripe secret key is not configured");
+        }
+        if (payments == null || payments.isEmpty()) {
+            throw new BadRequestException("A group checkout needs at least one payment");
+        }
+
+        try {
+            BigDecimal giftCardAmount = group.getGiftCardAmount() != null
+                    ? group.getGiftCardAmount() : BigDecimal.ZERO;
+            BigDecimal chargeAmount = group.getTotalAmount().subtract(giftCardAmount);
+
+            String successUrl = stripeProperties.successUrl()
+                    + "?groupToken=" + group.getGroupToken()
+                    + "&session_id={CHECKOUT_SESSION_ID}";
+            String cancelUrl = stripeProperties.cancelUrl()
+                    + "?groupToken=" + group.getGroupToken();
+
+            SessionCreateParams.Builder builder = SessionCreateParams.builder()
+                    .setMode(SessionCreateParams.Mode.PAYMENT)
+                    .setSuccessUrl(successUrl)
+                    .setCancelUrl(cancelUrl)
+                    .setExpiresAt(Instant.now().getEpochSecond() + SESSION_EXPIRATION_SECONDS)
+                    .setClientReferenceId(group.getId().toString())
+                    .putMetadata("paymentGroupId", group.getId().toString());
+
+            if (giftCardAmount.signum() > 0) {
+                // With a gift card applied there is no per-booking split of the remaining cash,
+                // so present one aggregated line for exactly the amount Stripe should capture.
+                builder.addLineItem(lineItem(
+                        group.getCurrency(),
+                        chargeAmount,
+                        "LocalBuddy trip (" + payments.size() + " bookings, gift card applied)"
+                ));
+            } else {
+                for (Payment payment : payments) {
+                    builder.addLineItem(lineItem(
+                            group.getCurrency(),
+                            payment.getAmount(),
+                            "LocalBuddy booking " + payment.getBooking().getBookingReference()
+                    ));
+                }
+            }
+
+            Session session = stripeClient.checkout().sessions().create(builder.build());
+
+            return new PaymentCheckoutResult(
+                    session.getUrl(),
+                    session.getId(),
+                    session.getPaymentIntent(),
+                    PaymentMethodType.UNKNOWN
+            );
+
+        } catch (BadRequestException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            log.error("Stripe group checkout session creation failed", ex);
+            throw new BadRequestException("Unable to start the payment — please try again");
+        }
+    }
+
+    private SessionCreateParams.LineItem lineItem(String currency, BigDecimal amount, String name) {
+        return SessionCreateParams.LineItem.builder()
+                .setQuantity(1L)
+                .setPriceData(
+                        SessionCreateParams.LineItem.PriceData.builder()
+                                .setCurrency(currency.toLowerCase())
+                                .setUnitAmount(amount.movePointRight(2).longValueExact())
+                                .setProductData(
+                                        SessionCreateParams.LineItem.PriceData.ProductData.builder()
+                                                .setName(name)
+                                                .build()
+                                )
+                                .build()
+                )
+                .build();
     }
 
     @Override
@@ -147,14 +232,21 @@ public class StripePaymentCheckoutProvider implements PaymentCheckoutProvider {
             );
 
         } catch (Exception ex) {
-            throw new BadRequestException("Unable to create Stripe gift card checkout session: " + ex.getMessage());
+            log.error("Stripe gift card checkout session creation failed", ex);
+            throw new BadRequestException("Unable to start the payment — please try again");
         }
     }
 
     @Override
     public PaymentRefundResult refundPayment(Payment payment, BigDecimal refundAmount, String reason) {
-        if (payment.getProviderPaymentIntentId() == null ||
-                payment.getProviderPaymentIntentId().trim().isEmpty()) {
+        // A bundle member's cash was captured on the group's shared payment intent, so a
+        // per-booking refund becomes a partial refund of that intent by the member's amount.
+        String paymentIntentId = payment.getProviderPaymentIntentId();
+        if ((paymentIntentId == null || paymentIntentId.trim().isEmpty())
+                && payment.getPaymentGroup() != null) {
+            paymentIntentId = payment.getPaymentGroup().getProviderPaymentIntentId();
+        }
+        if (paymentIntentId == null || paymentIntentId.trim().isEmpty()) {
             throw new BadRequestException("Stripe payment intent id is missing");
         }
 
@@ -181,7 +273,7 @@ public class StripePaymentCheckoutProvider implements PaymentCheckoutProvider {
                     .longValueExact();
 
             RefundCreateParams params = RefundCreateParams.builder()
-                    .setPaymentIntent(payment.getProviderPaymentIntentId())
+                    .setPaymentIntent(paymentIntentId.trim())
                     .setAmount(refundAmountInCents)
                     .setReason(resolveStripeRefundReason(reason))
                     .build();
@@ -204,7 +296,45 @@ public class StripePaymentCheckoutProvider implements PaymentCheckoutProvider {
             );
 
         } catch (Exception ex) {
-            throw new BadRequestException("Unable to refund Stripe payment: " + ex.getMessage());
+            log.error("Stripe refund failed", ex);
+            throw new BadRequestException("Unable to process the refund — please try again");
+        }
+    }
+
+    @Override
+    public PaymentRefundResult refundGroupCash(PaymentGroup group, BigDecimal refundAmount, String reason) {
+        if (group.getProviderPaymentIntentId() == null ||
+                group.getProviderPaymentIntentId().trim().isEmpty()) {
+            throw new BadRequestException("Stripe payment intent id is missing for the payment group");
+        }
+
+        BigDecimal normalizedRefundAmount = refundAmount == null
+                ? BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)
+                : refundAmount.setScale(2, RoundingMode.HALF_UP);
+
+        if (normalizedRefundAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            return new PaymentRefundResult(null, PaymentStatus.REFUNDED,
+                    BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
+        }
+
+        try {
+            RefundCreateParams params = RefundCreateParams.builder()
+                    .setPaymentIntent(group.getProviderPaymentIntentId().trim())
+                    .setAmount(normalizedRefundAmount.movePointRight(2).longValueExact())
+                    .setReason(resolveStripeRefundReason(reason))
+                    .build();
+
+            Refund refund = stripeClient.refunds().create(params);
+
+            return new PaymentRefundResult(
+                    refund.getId(),
+                    PaymentStatus.REFUNDED,
+                    normalizedRefundAmount
+            );
+
+        } catch (Exception ex) {
+            log.error("Stripe group refund failed", ex);
+            throw new BadRequestException("Unable to process the refund — please try again");
         }
     }
 

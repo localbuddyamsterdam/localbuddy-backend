@@ -23,6 +23,15 @@ public class RateLimitService {
     }
 
     public void checkPublicApiLimit(String key) {
+        checkPublicApiLimit(key, properties.maxRequests(), properties.windowSeconds());
+    }
+
+    /**
+     * Fixed-window limit with a per-call policy, for endpoints whose cost profile doesn't fit
+     * the global default (e.g. expensive AI generations get a much tighter budget). Same
+     * fail-open semantics as the default check.
+     */
+    public void checkPublicApiLimit(String key, int maxRequests, int windowSeconds) {
         if (!properties.enabled()) {
             return;
         }
@@ -33,10 +42,10 @@ public class RateLimitService {
             Long count = redisTemplate.opsForValue().increment(redisKey);
 
             if (count != null && count == 1) {
-                redisTemplate.expire(redisKey, Duration.ofSeconds(properties.windowSeconds()));
+                redisTemplate.expire(redisKey, Duration.ofSeconds(windowSeconds));
             }
 
-            if (count != null && count > properties.maxRequests()) {
+            if (count != null && count > maxRequests) {
                 throw new RateLimitExceededException("Too many requests. Please try again later.");
             }
 

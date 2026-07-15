@@ -58,7 +58,8 @@ class PaymentServiceFinalizationTest {
                 mock(com.localbuddy.payout.HostLedgerService.class),
                 mock(com.localbuddy.giftcard.GiftCardService.class),
                 finalizer,
-                new BigDecimal("0.50"));
+                new BigDecimal("0.50"),
+                mock(PaymentGroupRepository.class));
 
         when(paymentRepository.save(any(Payment.class))).thenAnswer(inv -> inv.getArgument(0));
         when(bookingRepository.save(any(Booking.class))).thenAnswer(inv -> inv.getArgument(0));
