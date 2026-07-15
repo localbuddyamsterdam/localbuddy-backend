@@ -17,6 +17,9 @@ public record LoginResponse(
         UserRole role,
         UserStatus status,
         /** When true, the client must route the user through the forced "set your password" screen. */
-        boolean mustChangePassword
+        boolean mustChangePassword,
+        /** True when this sign-in just created the account (first-time social login) so the client
+         *  can collect the remaining profile details. Always false for email login and refresh. */
+        boolean newUser
 ) {
 }

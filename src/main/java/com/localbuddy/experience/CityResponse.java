@@ -11,6 +11,7 @@ public record CityResponse(
         BigDecimal latitude,
         BigDecimal longitude,
         boolean active,
-        Integer displayOrder
+        Integer displayOrder,
+        String timezone
 ) {
 }

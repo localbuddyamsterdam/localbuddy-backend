@@ -1,5 +1,6 @@
 package com.localbuddy.booking;
 
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
@@ -49,6 +50,24 @@ public record CreateBookingRequest(
         @Size(max = 80, message = "Gift card code cannot exceed 80 characters")
         String giftCardCode,
 
-        Boolean privateBooking
+        Boolean privateBooking,
+
+        // Emergency contact (optional). "All-or-nothing" is enforced in BookingService:
+        // if any core field is present, first/last name + phone + relationship are required.
+        @Size(max = 100, message = "Emergency contact first name cannot exceed 100 characters")
+        String emergencyContactFirstName,
+
+        @Size(max = 100, message = "Emergency contact last name cannot exceed 100 characters")
+        String emergencyContactLastName,
+
+        @Email(message = "Emergency contact email must be valid")
+        @Size(max = 255, message = "Emergency contact email cannot exceed 255 characters")
+        String emergencyContactEmail,
+
+        @Size(max = 40, message = "Emergency contact phone cannot exceed 40 characters")
+        String emergencyContactPhone,
+
+        @Size(max = 80, message = "Emergency contact relationship cannot exceed 80 characters")
+        String emergencyContactRelationship
 ) {
 }

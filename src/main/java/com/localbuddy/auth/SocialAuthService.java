@@ -6,12 +6,14 @@ import com.localbuddy.user.User;
 import com.localbuddy.user.UserRepository;
 import com.localbuddy.user.UserRole;
 import com.localbuddy.user.UserStatus;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -22,16 +24,19 @@ public class SocialAuthService {
     private final UserRepository userRepository;
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
+    private final ApplicationEventPublisher eventPublisher;
 
     public SocialAuthService(List<SocialTokenVerifier> verifierList,
                              UserRepository userRepository,
                              JwtService jwtService,
-                             RefreshTokenService refreshTokenService) {
+                             RefreshTokenService refreshTokenService,
+                             ApplicationEventPublisher eventPublisher) {
         this.verifiers = verifierList.stream()
                 .collect(Collectors.toMap(SocialTokenVerifier::provider, Function.identity()));
         this.userRepository = userRepository;
         this.jwtService = jwtService;
         this.refreshTokenService = refreshTokenService;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional
@@ -48,11 +53,18 @@ public class SocialAuthService {
             throw new BadRequestException("Social account did not provide an email address");
         }
 
-        User user = userRepository.findByEmail(email)
-                .orElseGet(() -> createSocialUser(verified, email));
+        Optional<User> existing = userRepository.findByEmail(email);
+        boolean newUser = existing.isEmpty();
+        User user = existing.orElseGet(() -> createSocialUser(verified, email));
 
         if (user.getStatus() == UserStatus.SUSPENDED || user.getStatus() == UserStatus.DELETED) {
             throw new BadRequestException("Account is not active");
+        }
+
+        // The provider asserted this email, so ownership is proven regardless of the local
+        // email-verified flag — attach any guest bookings for it (travellers only) after commit.
+        if (user.getRole() == UserRole.LOGGED_IN_USER) {
+            eventPublisher.publishEvent(new UserEmailConfirmedEvent(user.getId(), user.getEmail()));
         }
 
         String accessToken = jwtService.generateAccessToken(user);
@@ -69,7 +81,8 @@ public class SocialAuthService {
                 user.getEmail(),
                 user.getRole(),
                 user.getStatus(),
-                user.isMustChangePassword()
+                user.isMustChangePassword(),
+                newUser
         );
     }
 

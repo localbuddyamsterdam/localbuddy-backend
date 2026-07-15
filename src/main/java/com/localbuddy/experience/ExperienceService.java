@@ -23,7 +23,7 @@ import java.math.BigDecimal;
 import java.text.Normalizer;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -50,6 +50,8 @@ public class ExperienceService {
     private final ExperiencePhotoRepository experiencePhotoRepository;
     /** Hard cap admins can assign (app.platform.max-commission-rate); guards host payouts. */
     private final BigDecimal maxCommissionRate;
+    /** Zone for building day windows in the availability date filter (fallback when a city has none). */
+    private final ZoneId defaultZone;
 
     public ExperienceService(ExperienceRepository experienceRepository,
                              ExperienceCategoryRepository categoryRepository,
@@ -60,7 +62,8 @@ public class ExperienceService {
                              VatService vatService,
                              BookingRepository bookingRepository,
                              ExperiencePhotoRepository experiencePhotoRepository,
-                             @Value("${app.platform.max-commission-rate:0.50}") BigDecimal maxCommissionRate) {
+                             @Value("${app.platform.max-commission-rate:0.50}") BigDecimal maxCommissionRate,
+                             @Value("${app.platform.default-timezone:Europe/Amsterdam}") String defaultTimezone) {
         this.experienceRepository = experienceRepository;
         this.categoryRepository = categoryRepository;
         this.cityRepository = cityRepository;
@@ -71,6 +74,7 @@ public class ExperienceService {
         this.bookingRepository = bookingRepository;
         this.experiencePhotoRepository = experiencePhotoRepository;
         this.maxCommissionRate = maxCommissionRate;
+        this.defaultZone = ZoneId.of(defaultTimezone);
     }
 
     @Transactional
@@ -300,8 +304,8 @@ public class ExperienceService {
         Instant dateStart = null;
         Instant dateEnd = null;
         if (date != null) {
-            dateStart = date.atStartOfDay(ZoneOffset.UTC).toInstant();
-            dateEnd = date.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+            dateStart = date.atStartOfDay(defaultZone).toInstant();
+            dateEnd = date.plusDays(1).atStartOfDay(defaultZone).toInstant();
         }
 
         int pageNumber = Math.max(0, page);
@@ -373,8 +377,8 @@ public class ExperienceService {
         Instant dateStart = null;
         Instant dateEnd = null;
         if (date != null) {
-            dateStart = date.atStartOfDay(ZoneOffset.UTC).toInstant();
-            dateEnd = date.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+            dateStart = date.atStartOfDay(defaultZone).toInstant();
+            dateEnd = date.plusDays(1).atStartOfDay(defaultZone).toInstant();
         }
 
         BigDecimal normalizedMinPrice = normalizePrice(minPrice);

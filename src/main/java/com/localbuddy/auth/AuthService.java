@@ -11,6 +11,7 @@ import com.localbuddy.user.UserRole;
 import com.localbuddy.user.UserService;
 import com.localbuddy.user.UserStatus;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +29,7 @@ public class AuthService {
     private final RefreshTokenService refreshTokenService;
     private final AuthTokenService authTokenService;
     private final NotificationService notificationService;
+    private final ApplicationEventPublisher eventPublisher;
     private final String frontendBaseUrl;
     private final long resetTokenExpirationMinutes;
     private final long verificationTokenExpirationHours;
@@ -38,6 +40,7 @@ public class AuthService {
                        RefreshTokenService refreshTokenService,
                        AuthTokenService authTokenService,
                        NotificationService notificationService,
+                       ApplicationEventPublisher eventPublisher,
                        @Value("${app.frontend.base-url:http://localhost:3000}") String frontendBaseUrl,
                        @Value("${app.security.reset-token-expiration-minutes:30}") long resetTokenExpirationMinutes,
                        @Value("${app.security.verification-token-expiration-hours:48}") long verificationTokenExpirationHours) {
@@ -47,6 +50,7 @@ public class AuthService {
         this.refreshTokenService = refreshTokenService;
         this.authTokenService = authTokenService;
         this.notificationService = notificationService;
+        this.eventPublisher = eventPublisher;
         this.frontendBaseUrl = frontendBaseUrl;
         this.resetTokenExpirationMinutes = resetTokenExpirationMinutes;
         this.verificationTokenExpirationHours = verificationTokenExpirationHours;
@@ -108,6 +112,10 @@ public class AuthService {
 
         String accessToken = jwtService.generateAccessToken(user);
         String refreshToken = refreshTokenService.issue(user);
+
+        // A verified traveller signing in is a chance to pick up guest bookings they made with this
+        // email (e.g. before this account existed, or while logged out) — see the helper for the gate.
+        publishEmailConfirmedIfTraveller(user);
 
         return buildLoginResponse(user, accessToken, refreshToken);
     }
@@ -177,6 +185,24 @@ public class AuthService {
         String refreshToken = refreshTokenService.issue(user);
 
         return buildLoginResponse(user, accessToken, refreshToken);
+    }
+
+    // ------------------------------------------------------------------ email-first sign-in
+
+    /**
+     * Probes whether an email already has an account, powering the email-first
+     * sign-in flow: a returning user gets a password step, a first-time user gets
+     * a sign-up step. {@code hasPassword} is false for social-only accounts so the
+     * client can point them back to their provider. A soft-deleted account is
+     * treated as unregistered so the email can be signed up afresh.
+     */
+    @Transactional(readOnly = true)
+    public CheckEmailResponse checkEmail(String email) {
+        String normalizedEmail = normalizeEmail(email);
+        return userRepository.findByEmail(normalizedEmail)
+                .filter(user -> user.getStatus() != UserStatus.DELETED)
+                .map(user -> new CheckEmailResponse(true, user.getPasswordHash() != null))
+                .orElseGet(() -> new CheckEmailResponse(false, false));
     }
 
     // ------------------------------------------------------------------ password reset
@@ -250,6 +276,9 @@ public class AuthService {
             user.setStatus(UserStatus.ACTIVE);
         }
         userRepository.save(user);
+
+        // The traveller has now proven this email is theirs — attach any guest bookings for it.
+        publishEmailConfirmedIfTraveller(user);
     }
 
     /** Re-sends a verification email if the account exists and isn't already verified. Silent otherwise. */
@@ -277,11 +306,25 @@ public class AuthService {
                 user.getEmail(),
                 user.getRole(),
                 user.getStatus(),
-                user.isMustChangePassword()
+                user.isMustChangePassword(),
+                false
         );
     }
 
     private String normalizeEmail(String email) {
         return email == null ? null : email.trim().toLowerCase(Locale.ROOT);
+    }
+
+    /**
+     * Publishes {@link UserEmailConfirmedEvent} for a verified traveller so their past guest bookings
+     * (made with this email) are attached to the account after the transaction commits. Gated to
+     * verified {@link UserRole#LOGGED_IN_USER} accounts: a host/admin "my bookings" view is scoped
+     * differently, and requiring a verified email stops an unverified sign-up from claiming a
+     * stranger's guest bookings.
+     */
+    private void publishEmailConfirmedIfTraveller(User user) {
+        if (user.getRole() == UserRole.LOGGED_IN_USER && user.isEmailVerified()) {
+            eventPublisher.publishEvent(new UserEmailConfirmedEvent(user.getId(), user.getEmail()));
+        }
     }
 }

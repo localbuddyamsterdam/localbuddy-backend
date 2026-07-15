@@ -26,6 +26,10 @@ public record CreateCityRequest(
         @DecimalMax(value = "180.0", message = "Longitude out of range")
         BigDecimal longitude,
 
-        Integer displayOrder
+        Integer displayOrder,
+
+        /** Optional IANA time-zone id (e.g. Europe/Paris); defaults to Europe/Amsterdam. */
+        @Size(max = 64, message = "Timezone cannot exceed 64 characters")
+        String timezone
 ) {
 }

@@ -37,6 +37,10 @@ public class City {
     @Column(name = "longitude", precision = 9, scale = 6)
     private BigDecimal longitude;
 
+    /** IANA time-zone id (e.g. Europe/Amsterdam) used to schedule and display this city's experiences. */
+    @Column(name = "timezone", nullable = false, length = 64)
+    private String timezone = "Europe/Amsterdam";
+
     @Column(name = "active", nullable = false)
     private boolean active = true;
 
@@ -63,6 +67,10 @@ public class City {
 
         if (displayOrder == null) {
             displayOrder = 0;
+        }
+
+        if (timezone == null || timezone.isBlank()) {
+            timezone = "Europe/Amsterdam";
         }
     }
 

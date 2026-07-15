@@ -54,6 +54,24 @@ public class Booking {
     @Column(name = "guest_phone_verified", nullable = false)
     private boolean guestPhoneVerified = false;
 
+    // Emergency-contact snapshot captured at checkout. Optional (all nullable); the
+    // "all-or-nothing" rule is enforced in BookingService. Frozen at booking time —
+    // it does NOT track later edits to the traveller's profile emergency contact.
+    @Column(name = "emergency_contact_first_name", length = 100)
+    private String emergencyContactFirstName;
+
+    @Column(name = "emergency_contact_last_name", length = 100)
+    private String emergencyContactLastName;
+
+    @Column(name = "emergency_contact_email", length = 255)
+    private String emergencyContactEmail;
+
+    @Column(name = "emergency_contact_phone", length = 40)
+    private String emergencyContactPhone;
+
+    @Column(name = "emergency_contact_relationship", length = 80)
+    private String emergencyContactRelationship;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "booking_source", nullable = false, length = 40)
     private BookingSource bookingSource = BookingSource.LOGGED_IN_USER;

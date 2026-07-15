@@ -26,9 +26,8 @@ $env:JAVA_HOME = "C:\Users\reddy\.jdks\temurin-21.0.11"
 ## Deploy (Azure)
 
 - GitHub Actions (`.github/workflows/azure-webapp.yml`) builds and deploys to **Azure App Service** (France Central) on push to `feature/private-tour-buyout`. DB is Supabase Postgres.
-- **Critical gotcha:** the workflow deploys the jar, but the running app does **not** reliably pick it up. After the deploy succeeds you must do a **full Stop → Start** (wait for state "Stopped" before Start) — a plain Restart or the deploy's own restart is not enough. Cold start is ~4–5 min, and the app returns transient 403s on all endpoints while booting; poll `/actuator/health` until `UP`.
-- `az` CLI **is installed** (2.88+) and logged in — do the Stop → Start with it directly: `az webapp stop --name localbuddy-backend --resource-group localbuddy-backend_group`, confirm `state` is `Stopped` via `az webapp show`, then `az webapp start`. App URL: `https://localbuddy-backend-b4exhkbjgahme6ge.francecentral-01.azurewebsites.net`.
-- To read runtime errors, use `az webapp log tail` or the Azure Portal **Log stream**. On any 500, get that stack trace *before* theorizing about causes.
+- **Critical gotcha:** the workflow deploys the jar, but the running app does **not** reliably pick it up. After the deploy succeeds you must do a **full Stop → Start** in the Azure Portal (wait for status "Stopped" before Start) — a plain Restart or the deploy's own restart is not enough. Cold start is ~4–5 min, and the app returns transient 403s on all endpoints while booting; poll `/actuator/health` until `UP`.
+- `az` CLI is not installed locally. To read runtime errors, use the Azure Portal **Log stream**. On any 500, get that stack trace *before* theorizing about causes.
 
 ## Architecture
 

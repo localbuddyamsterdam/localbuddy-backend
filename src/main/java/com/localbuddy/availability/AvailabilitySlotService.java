@@ -4,6 +4,7 @@ import com.localbuddy.booking.BookingRepository;
 import com.localbuddy.booking.BookingStatus;
 import com.localbuddy.common.exception.BadRequestException;
 import com.localbuddy.common.exception.ResourceNotFoundException;
+import com.localbuddy.experience.City;
 import com.localbuddy.experience.Experience;
 import com.localbuddy.experience.ExperienceRepository;
 import com.localbuddy.experience.ExperienceStatus;
@@ -34,15 +35,18 @@ public class AvailabilitySlotService {
     private final ExperienceRepository experienceRepository;
     private final LocalProfileRepository localProfileRepository;
     private final BookingRepository bookingRepository;
+    private final BookingWindowPolicy bookingWindowPolicy;
 
     public AvailabilitySlotService(AvailabilitySlotRepository availabilitySlotRepository,
                                    ExperienceRepository experienceRepository,
                                    LocalProfileRepository localProfileRepository,
-                                   BookingRepository bookingRepository) {
+                                   BookingRepository bookingRepository,
+                                   BookingWindowPolicy bookingWindowPolicy) {
         this.availabilitySlotRepository = availabilitySlotRepository;
         this.experienceRepository = experienceRepository;
         this.localProfileRepository = localProfileRepository;
         this.bookingRepository = bookingRepository;
+        this.bookingWindowPolicy = bookingWindowPolicy;
     }
 
     @Transactional
@@ -106,7 +110,7 @@ public class AvailabilitySlotService {
         ZoneId zone;
         try {
             zone = request.timezone() == null || request.timezone().isBlank()
-                    ? DEFAULT_ZONE : ZoneId.of(request.timezone());
+                    ? resolveZone(experience) : ZoneId.of(request.timezone());
         } catch (Exception ex) {
             throw new BadRequestException("Unknown timezone: " + request.timezone());
         }
@@ -248,6 +252,19 @@ public class AvailabilitySlotService {
         }
     }
 
+    /** The zone an experience's wall-clock availability is expressed in: its city's, falling back to the platform default. */
+    private ZoneId resolveZone(Experience experience) {
+        City city = experience.getCity();
+        if (city != null && city.getTimezone() != null && !city.getTimezone().isBlank()) {
+            try {
+                return ZoneId.of(city.getTimezone());
+            } catch (Exception ignored) {
+                // fall through to the platform default
+            }
+        }
+        return DEFAULT_ZONE;
+    }
+
     private AvailabilitySlotResponse toResponse(AvailabilitySlot slot) {
         int remainingCapacity = slot.getCapacity() - slot.getBookedCount();
 
@@ -281,14 +298,16 @@ public class AvailabilitySlotService {
             throw new BadRequestException("Experience is not available");
         }
 
+        Instant now = Instant.now();
         return availabilitySlotRepository
                 .findByExperienceIdAndStatusAndStartTimeAfterOrderByStartTimeAsc(
                         experienceId,
                         AvailabilityStatus.AVAILABLE,
-                        Instant.now()
+                        now
                 )
                 .stream()
                 .filter(slot -> slot.getBookedCount() < slot.getCapacity())
+                .filter(slot -> bookingWindowPolicy.isBookableAt(slot, now))
                 .map(this::toResponse)
                 .toList();
     }

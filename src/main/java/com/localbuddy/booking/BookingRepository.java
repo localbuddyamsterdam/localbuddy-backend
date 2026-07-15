@@ -1,5 +1,6 @@
 package com.localbuddy.booking;
 
+import com.localbuddy.user.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.time.Instant;
@@ -69,6 +70,38 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
             UUID availabilitySlotId,
             Collection<BookingStatus> statuses
     );
+
+    // --- Guest-booking account claiming (attach guest bookings to the account that owns the email) ---
+
+    /**
+     * Unclaimed guest bookings (no traveller attached yet) whose {@code guestEmail} equals the given
+     * value. Guest emails are stored already-normalized to lower-case, so callers pass a normalized
+     * email and this uses the plain {@code idx_bookings_guest_email} index.
+     */
+    List<Booking> findByLoggedInUserIsNullAndGuestEmail(String guestEmail);
+
+    /**
+     * Slot ids on which this traveller already holds a booking in one of the given statuses. Used to
+     * skip claiming a guest booking that would otherwise collide with the traveller on the
+     * {@code ux_bookings_active_traveler_slot} partial-unique index (one active booking per slot).
+     */
+    @org.springframework.data.jpa.repository.Query(
+            "SELECT b.availabilitySlot.id FROM Booking b "
+                    + "WHERE b.loggedInUser.id = :userId AND b.status IN :statuses")
+    List<UUID> findActiveSlotIdsForUser(UUID userId, Collection<BookingStatus> statuses);
+
+    /**
+     * Bulk-attaches the given bookings to a traveller — sets {@code traveler_user_id} and bumps
+     * {@code updated_at} (the {@code @PreUpdate} hook does not run for bulk JPQL updates, so the
+     * caller passes the timestamp). Leaves {@code booking_source} and the guest_* fields untouched,
+     * so the booking keeps its guest identity (and its emailed pay/check-in/lookup links) while
+     * becoming visible under the account.
+     */
+    @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true)
+    @org.springframework.data.jpa.repository.Query(
+            "UPDATE Booking b SET b.loggedInUser = :user, b.updatedAt = :updatedAt "
+                    + "WHERE b.id IN :ids")
+    int attachBookingsToUser(User user, Collection<UUID> ids, Instant updatedAt);
 
     List<Booking> findByAvailabilitySlotIdAndStatusIn(
             UUID availabilitySlotId,

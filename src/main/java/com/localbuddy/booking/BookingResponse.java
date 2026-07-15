@@ -64,6 +64,12 @@ public record BookingResponse(
         Integer adultsCount,
         Integer teensCount,
         Integer childrenCount,
-        Integer infantsCount
+        Integer infantsCount,
+        // Emergency-contact snapshot captured at checkout (null when not provided).
+        String emergencyContactFirstName,
+        String emergencyContactLastName,
+        String emergencyContactEmail,
+        String emergencyContactPhone,
+        String emergencyContactRelationship
 ) {
 }

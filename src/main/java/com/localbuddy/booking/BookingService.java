@@ -3,6 +3,7 @@ package com.localbuddy.booking;
 import com.localbuddy.availability.AvailabilitySlot;
 import com.localbuddy.availability.AvailabilitySlotRepository;
 import com.localbuddy.availability.AvailabilityStatus;
+import com.localbuddy.availability.BookingWindowPolicy;
 import com.localbuddy.common.NameFormatter;
 import com.localbuddy.common.exception.BadRequestException;
 import com.localbuddy.common.exception.ResourceNotFoundException;
@@ -75,12 +76,13 @@ public class BookingService {
     private final BookingConfirmationNotifier bookingConfirmationNotifier;
     private final ConversationRepository conversationRepository;
     private final DealService dealService;
+    private final BookingWindowPolicy bookingWindowPolicy;
 
     public BookingService(BookingRepository bookingRepository,
                           UserRepository userRepository,
                           ExperienceRepository experienceRepository,
                           AvailabilitySlotRepository availabilitySlotRepository,
-                          LocalProfileRepository localProfileRepository, NotificationService notificationService, ConsentService consentService, PromoCodeService promoCodeService, ReferralService referralService, BookingSafetyChecklistRepository bookingSafetyChecklistRepository, PaymentService paymentService, TrustSafetyService trustSafetyService, ApplicationEventPublisher eventPublisher, BookingReferenceGenerator bookingReferenceGenerator, WaitlistService waitlistService, AgeBandPricing ageBandPricing, BookingConfirmationNotifier bookingConfirmationNotifier, ConversationRepository conversationRepository, DealService dealService) {
+                          LocalProfileRepository localProfileRepository, NotificationService notificationService, ConsentService consentService, PromoCodeService promoCodeService, ReferralService referralService, BookingSafetyChecklistRepository bookingSafetyChecklistRepository, PaymentService paymentService, TrustSafetyService trustSafetyService, ApplicationEventPublisher eventPublisher, BookingReferenceGenerator bookingReferenceGenerator, WaitlistService waitlistService, AgeBandPricing ageBandPricing, BookingConfirmationNotifier bookingConfirmationNotifier, ConversationRepository conversationRepository, DealService dealService, BookingWindowPolicy bookingWindowPolicy) {
         this.bookingRepository = bookingRepository;
         this.userRepository = userRepository;
         this.experienceRepository = experienceRepository;
@@ -100,6 +102,7 @@ public class BookingService {
         this.bookingConfirmationNotifier = bookingConfirmationNotifier;
         this.conversationRepository = conversationRepository;
         this.dealService = dealService;
+        this.bookingWindowPolicy = bookingWindowPolicy;
     }
 
     @Transactional
@@ -241,6 +244,12 @@ public class BookingService {
         booking.setReferralDiscountAmount(referralDiscount);
 
         booking.setTravelerNote(optionalTrim(request.travelerNote()));
+        applyEmergencyContact(booking,
+                request.emergencyContactFirstName(),
+                request.emergencyContactLastName(),
+                request.emergencyContactEmail(),
+                request.emergencyContactPhone(),
+                request.emergencyContactRelationship());
         booking.setRequestedAt(Instant.now());
         log.info("LOGGED_IN_BOOKING_TIMING buildBookingObjectMs={}", System.currentTimeMillis() - stepStart);
 
@@ -291,7 +300,7 @@ public class BookingService {
 
             return bookingRepository.findByLocalProfileIdOrderByRequestedAtDesc(localProfile.getId())
                     .stream()
-                    .map(this::toResponse)
+                    .map(b -> toResponse(b, false))
                     .toList();
         }
 
@@ -386,8 +395,15 @@ public class BookingService {
             throw new BadRequestException("Availability slot is not available");
         }
 
-        if (!slot.getStartTime().isAfter(Instant.now())) {
+        Instant now = Instant.now();
+        if (!slot.getStartTime().isAfter(now)) {
             throw new BadRequestException("Cannot book a past slot");
+        }
+
+        if (!bookingWindowPolicy.isBookableAt(slot, now)) {
+            throw new BadRequestException(
+                    "Booking for this session has closed (bookings close "
+                    + bookingWindowPolicy.leadMinutes(slot) + " minutes before it starts)");
         }
 
         int remainingCapacity = slot.getCapacity() - slot.getBookedCount();
@@ -420,6 +436,16 @@ public class BookingService {
     }
 
     private BookingResponse toResponse(Booking booking) {
+        return toResponse(booking, true);
+    }
+
+    /**
+     * @param includeEmergencyContact false for host-facing (LOCAL) responses. The
+     *   emergency contact is the traveller's third party; the host UI never renders it and
+     *   an SOS escalates to support (not the host), so it's withheld from hosts for data
+     *   minimization. Travellers (their own booking), admins and support still receive it.
+     */
+    private BookingResponse toResponse(Booking booking, boolean includeEmergencyContact) {
         return new BookingResponse(
                 booking.getId(),
                 booking.getBookingReference(),
@@ -476,8 +502,54 @@ public class BookingService {
                 booking.getAdultsCount(),
                 booking.getTeensCount(),
                 booking.getChildrenCount(),
-                booking.getInfantsCount()
+                booking.getInfantsCount(),
+                includeEmergencyContact ? booking.getEmergencyContactFirstName() : null,
+                includeEmergencyContact ? booking.getEmergencyContactLastName() : null,
+                includeEmergencyContact ? booking.getEmergencyContactEmail() : null,
+                includeEmergencyContact ? booking.getEmergencyContactPhone() : null,
+                includeEmergencyContact ? booking.getEmergencyContactRelationship() : null
         );
+    }
+
+    /**
+     * Apply an optional emergency-contact snapshot to a new booking.
+     * <p>
+     * "All-or-nothing": if every field is blank the contact is skipped (left null).
+     * As soon as any core field is provided, first name, last name, phone and
+     * relationship are all required (email stays optional) — this mirrors the
+     * grouped-required rule the checkout form enforces, so a half-entered contact
+     * can never be persisted.
+     */
+    private void applyEmergencyContact(Booking booking,
+                                       String firstName,
+                                       String lastName,
+                                       String email,
+                                       String phone,
+                                       String relationship) {
+        String first = optionalTrim(firstName);
+        String last = optionalTrim(lastName);
+        String mail = optionalTrim(email);
+        String tel = optionalTrim(phone);
+        String rel = optionalTrim(relationship);
+
+        boolean anyProvided = first != null || last != null || tel != null || rel != null || mail != null;
+        if (!anyProvided) {
+            return;
+        }
+        // Data-integrity floor: a first name + phone are the minimum to be reachable.
+        // The checkout form enforces the richer first/last/phone/relationship rule for a
+        // newly-entered contact; this floor also accepts an unedited prefill of a saved
+        // profile contact (which may legitimately lack a relationship or last name).
+        if (first == null || tel == null) {
+            throw new BadRequestException(
+                    "An emergency contact needs at least a first name and a phone number.");
+        }
+
+        booking.setEmergencyContactFirstName(first);
+        booking.setEmergencyContactLastName(last);
+        booking.setEmergencyContactEmail(mail);
+        booking.setEmergencyContactPhone(tel);
+        booking.setEmergencyContactRelationship(rel);
     }
 
     @Transactional
@@ -509,7 +581,7 @@ public class BookingService {
         Booking savedBooking = bookingRepository.save(booking);
         createBookingAcceptedNotification(savedBooking);
 
-        return toResponse(savedBooking);
+        return toResponse(savedBooking, false);
     }
 
     @Transactional(readOnly = true)
@@ -556,7 +628,7 @@ public class BookingService {
         waitlistService.notifyOpenedSpots(slot);
         Booking savedBooking = bookingRepository.save(booking);
         createBookingDeclinedNotification(savedBooking);
-        return toResponse(savedBooking);
+        return toResponse(savedBooking, false);
     }
 
     @Transactional
@@ -617,7 +689,53 @@ public class BookingService {
 
         Booking savedBooking = bookingRepository.save(booking);
         createBookingCancelledNotification(savedBooking);
-        return toResponse(savedBooking);
+        return toResponse(savedBooking, false);
+    }
+
+    /**
+     * Host cancels an entire upcoming session (slot): every active booking is refunded and cancelled,
+     * then the slot is marked CANCELLED. Allowed only more than 24h before start — inside 24h the session
+     * is frozen and the host must contact support. Powers "cancel session" and "block a booked day" in the editor.
+     */
+    @Transactional
+    public int cancelSessionByLocal(UUID localUserId, UUID slotId, String reason) {
+        LocalProfile localProfile = localProfileRepository.findByUserId(localUserId)
+                .orElseThrow(() -> new BadRequestException("Local profile not found"));
+
+        AvailabilitySlot slot = availabilitySlotRepository.findByIdForUpdate(slotId)
+                .orElseThrow(() -> new ResourceNotFoundException("Availability slot not found"));
+
+        if (slot.getLocalProfile() == null || !slot.getLocalProfile().getId().equals(localProfile.getId())) {
+            throw new ResourceNotFoundException("Availability slot not found");
+        }
+        if (slot.getStatus() == AvailabilityStatus.CANCELLED) {
+            throw new BadRequestException("This session is already cancelled");
+        }
+
+        Instant now = Instant.now();
+        Instant startTime = slot.getStartTime();
+        if (startTime == null || !startTime.isAfter(now)) {
+            throw new BadRequestException("This session has already started");
+        }
+        if (Duration.between(now, startTime).toHours() < HOST_CANCEL_MIN_HOURS) {
+            throw new BadRequestException(
+                    "A host can only cancel more than 24 hours before the session starts. " +
+                    "Closer to the start time, please contact support.");
+        }
+
+        List<Booking> activeBookings = bookingRepository.findByAvailabilitySlotIdAndStatusIn(slotId, BookingStatus.ACTIVE);
+        for (Booking booking : activeBookings) {
+            handleCancellationPayment(booking, BookingCancellationActor.LOCAL, reason);
+            booking.setStatus(BookingStatus.CANCELLED_BY_LOCAL);
+            booking.setCancelledAt(now);
+            booking.setCancellationReason(optionalTrim(reason));
+            createBookingCancelledNotification(bookingRepository.save(booking));
+        }
+
+        slot.setBookedCount(0);
+        slot.setStatus(AvailabilityStatus.CANCELLED);
+        availabilitySlotRepository.save(slot);
+        return activeBookings.size();
     }
 
     private void releaseAvailabilityCapacity(Booking booking) {
@@ -667,7 +785,7 @@ public class BookingService {
                     .orElseThrow(() -> new BadRequestException("Local profile not found"));
 
             if (booking.getLocalProfile().getId().equals(localProfile.getId())) {
-                return toResponse(booking);
+                return toResponse(booking, false);
             }
         }
 
@@ -826,6 +944,12 @@ public class BookingService {
         booking.setReferralDiscountAmount(referralDiscount);
 
         booking.setTravelerNote(optionalTrim(request.travelerNote()));
+        applyEmergencyContact(booking,
+                request.emergencyContactFirstName(),
+                request.emergencyContactLastName(),
+                request.emergencyContactEmail(),
+                request.emergencyContactPhone(),
+                request.emergencyContactRelationship());
         booking.setRequestedAt(Instant.now());
         log.info("GUEST_BOOKING_TIMING buildBookingObjectMs={}", System.currentTimeMillis() - stepStart);
 
@@ -1249,7 +1373,7 @@ public class BookingService {
         Booking savedBooking = bookingRepository.save(booking);
         createBookingCompletedNotification(savedBooking);
 
-        return toResponse(savedBooking);
+        return toResponse(savedBooking, false);
     }
 
     @Transactional
@@ -1268,7 +1392,7 @@ public class BookingService {
             throw new ResourceNotFoundException("Booking not found");
         }
 
-        return rescheduleBooking(booking, request);
+        return rescheduleBooking(booking, request, false);
     }
 
     @Transactional
@@ -1279,12 +1403,13 @@ public class BookingService {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
 
-        return rescheduleBooking(booking, request);
+        return rescheduleBooking(booking, request, true);
     }
 
     private BookingResponse rescheduleBooking(
             Booking booking,
-            RescheduleBookingRequest request
+            RescheduleBookingRequest request,
+            boolean includeEmergencyContact
     ) {
         if (booking.getStatus() != BookingStatus.PENDING_PAYMENT &&
                 booking.getStatus() != BookingStatus.CONFIRMED) {
@@ -1322,7 +1447,7 @@ public class BookingService {
         Booking savedBooking = bookingRepository.save(booking);
         createBookingRescheduledNotification(savedBooking);
 
-        return toResponse(savedBooking);
+        return toResponse(savedBooking, includeEmergencyContact);
     }
 
 

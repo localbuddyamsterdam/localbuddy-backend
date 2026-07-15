@@ -1,5 +1,7 @@
 package com.localbuddy.availability;
 
+import com.localbuddy.booking.BookingService;
+import com.localbuddy.booking.CancelBookingRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -21,9 +23,12 @@ import java.util.UUID;
 public class AvailabilitySlotController {
 
     private final AvailabilitySlotService availabilitySlotService;
+    private final BookingService bookingService;
 
-    public AvailabilitySlotController(AvailabilitySlotService availabilitySlotService) {
+    public AvailabilitySlotController(AvailabilitySlotService availabilitySlotService,
+                                      BookingService bookingService) {
         this.availabilitySlotService = availabilitySlotService;
+        this.bookingService = bookingService;
     }
 
     @Operation(
@@ -129,5 +134,27 @@ public class AvailabilitySlotController {
         UUID userId = UUID.fromString(authentication.getName());
         availabilitySlotService.deleteMyAvailabilitySlot(userId, slotId);
         return ResponseEntity.noContent().build();
+    }
+
+    @Operation(
+            summary = "Cancel an entire session (slot)",
+            description = "Cancels a session and refunds every active booking on it. Allowed only more than "
+                    + "24h before start; closer to the start the session is frozen and the host must contact support."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Session cancelled; bookings refunded"),
+            @ApiResponse(responseCode = "400", description = "Within 24h of start, already started, or already cancelled"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "404", description = "Slot not found")
+    })
+    @PostMapping("/{slotId}/cancel")
+    public ResponseEntity<SessionCancellationResponse> cancelMySession(
+            Authentication authentication,
+            @PathVariable UUID slotId,
+            @Valid @RequestBody CancelBookingRequest request
+    ) {
+        UUID userId = UUID.fromString(authentication.getName());
+        int cancelled = bookingService.cancelSessionByLocal(userId, slotId, request.reason());
+        return ResponseEntity.ok(new SessionCancellationResponse(slotId, cancelled));
     }
 }

@@ -52,6 +52,7 @@ public class CityService {
         city.setLongitude(request.longitude());
         city.setActive(true);
         city.setDisplayOrder(request.displayOrder() != null ? request.displayOrder() : 0);
+        city.setTimezone(resolveTimezone(request.timezone()));
 
         return toResponse(cityRepository.save(city));
     }
@@ -75,8 +76,21 @@ public class CityService {
                 city.getLatitude(),
                 city.getLongitude(),
                 city.isActive(),
-                city.getDisplayOrder()
+                city.getDisplayOrder(),
+                city.getTimezone()
         );
+    }
+
+    /** Validates an optional IANA zone id, defaulting to Europe/Amsterdam. */
+    private String resolveTimezone(String requested) {
+        if (requested == null || requested.isBlank()) {
+            return "Europe/Amsterdam";
+        }
+        try {
+            return java.time.ZoneId.of(requested.trim()).getId();
+        } catch (Exception ex) {
+            throw new BadRequestException("Unknown timezone: " + requested);
+        }
     }
 
     private String generateUniqueSlug(String name) {

@@ -46,6 +46,14 @@ public class AvailabilitySlot {
     @Column(name = "status", nullable = false, length = 40)
     private AvailabilityStatus status = AvailabilityStatus.AVAILABLE;
 
+    /** The recurring schedule that produced this slot, if any (null for one-off manual slots). */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "source_schedule_id")
+    private AvailabilitySchedule sourceSchedule;
+
+    @Column(name = "private_eligible", nullable = false)
+    private boolean privateEligible = false;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

@@ -104,6 +104,7 @@ app:
 
   platform:
     default-city: Amsterdam
+    default-timezone: ${PLATFORM_DEFAULT_TIMEZONE:Europe/Amsterdam}   # fallback zone for city date windows when a city has none
     commission-percentage: 20          # fallback when no PLATFORM commission_rule row exists
     max-commission-rate: ${MAX_COMMISSION_RATE:0.50}   # hard cap (fraction) admins can assign; guards against negative host payouts
 
@@ -160,6 +161,11 @@ app:
       success-url: ${STRIPE_SUCCESS_URL:http://localhost:3000/payment/success}
       cancel-url: ${STRIPE_CANCEL_URL:http://localhost:3000/payment/cancel}
   booking:
+    # A slot with at least one booking closes this many minutes before it starts;
+    # an empty slot closes cutoff-minutes-empty before instead, so a cold
+    # last-minute booking can't ambush a host not yet committed to running it.
+    cutoff-minutes-min: ${BOOKING_CUTOFF_MINUTES_MIN:15}
+    cutoff-minutes-empty: ${BOOKING_CUTOFF_MINUTES_EMPTY:60}
     pending-payment-expiration-minutes: ${BOOKING_PENDING_PAYMENT_EXPIRATION_MINUTES:15}
     expiry-processor-delay-ms: ${BOOKING_EXPIRY_PROCESSOR_DELAY_MS:60000}
     minimum-guests-to-confirm: ${BOOKING_MINIMUM_GUESTS_TO_CONFIRM:3}
@@ -168,6 +174,20 @@ app:
     underbooked-processor-delay-ms: ${BOOKING_UNDERBOOKED_PROCESSOR_DELAY_MS:300000}
     auto-complete-after-hours: ${BOOKING_AUTO_COMPLETE_AFTER_HOURS:48}
     auto-complete-processor-delay-ms: ${BOOKING_AUTO_COMPLETE_PROCESSOR_DELAY_MS:300000}
+
+  scheduling:
+    # Minimum gap the host needs between two DIFFERENT experiences (travel to a new
+    # location) plus how early they must be on-site. Same-experience sessions may not overlap.
+    travel-gap-minutes: ${SCHEDULING_TRAVEL_GAP_MINUTES:30}
+    arrival-lead-minutes: ${SCHEDULING_ARRIVAL_LEAD_MINUTES:15}
+
+  availability:
+    # How far ahead concrete bookable slots are materialised from a recurring schedule.
+    materialization-horizon-days: ${AVAILABILITY_MATERIALIZATION_HORIZON_DAYS:90}
+    materialization-processor-delay-ms: ${AVAILABILITY_MATERIALIZATION_PROCESSOR_DELAY_MS:3600000}
+    # Days-before-end at which the host is reminded to extend a schedule (each fires once).
+    horizon-reminder-offsets-days: ${AVAILABILITY_HORIZON_REMINDER_OFFSETS_DAYS:30,7,2,1}
+    horizon-reminder-processor-delay-ms: ${AVAILABILITY_HORIZON_REMINDER_PROCESSOR_DELAY_MS:86400000}
 
   checkin:
     # How early before the slot start a check-in is allowed (minutes).

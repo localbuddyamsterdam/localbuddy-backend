@@ -58,7 +58,9 @@ public class TripSafetyService {
                     created.setUser(user);
                     return created;
                 });
-        contact.setContactName(request.contactName().trim());
+        contact.setFirstName(request.firstName().trim());
+        contact.setLastName(request.lastName().trim());
+        contact.setEmail(trimToNull(request.email()));
         contact.setContactPhone(request.contactPhone().trim());
         contact.setRelationship(trimToNull(request.relationship()));
         return EmergencyContactResponse.from(emergencyContactRepository.save(contact));
@@ -154,7 +156,8 @@ public class TripSafetyService {
         User traveler = booking.getLoggedInUser();
         if (traveler != null) {
             emergencyContactRepository.findByUserId(traveler.getId()).ifPresent(contact ->
-                    message.append(" Emergency contact: ").append(contact.getContactName())
+                    message.append(" Emergency contact: ")
+                            .append((contact.getFirstName() + " " + contact.getLastName()).trim())
                             .append(" (").append(contact.getContactPhone()).append(")."));
         }
 

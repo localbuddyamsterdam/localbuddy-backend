@@ -54,6 +54,25 @@ public class AuthController {
     }
 
     @Operation(
+            summary = "Check whether an email is registered",
+            description = "Public (no auth). Powers the email-first sign-in flow: returns whether an account "
+                    + "exists for the email and whether it has a password (false for social-only accounts). "
+                    + "Rate-limited per client IP."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Lookup completed"),
+            @ApiResponse(responseCode = "400", description = "Invalid request body")
+    })
+    @PostMapping("/check-email")
+    public ResponseEntity<CheckEmailResponse> checkEmail(
+            HttpServletRequest servletRequest,
+            @Valid @RequestBody CheckEmailRequest request
+    ) {
+        rateLimitService.checkPublicApiLimit("auth-check-email:" + clientIpResolver.resolveClientIp(servletRequest));
+        return ResponseEntity.ok(authService.checkEmail(request.email()));
+    }
+
+    @Operation(
             summary = "Log in with email and password",
             description = "Public (no auth). Authenticates a user and returns an access token plus a refresh token."
     )

@@ -210,7 +210,8 @@ public class AdminOpsService {
                 city.getLatitude(),
                 city.getLongitude(),
                 city.isActive(),
-                city.getDisplayOrder()
+                city.getDisplayOrder(),
+                city.getTimezone()
         );
     }
 

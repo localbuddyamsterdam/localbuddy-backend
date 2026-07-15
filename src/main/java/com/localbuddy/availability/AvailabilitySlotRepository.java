@@ -48,4 +48,11 @@ public interface AvailabilitySlotRepository extends JpaRepository<AvailabilitySl
             @Param("status") AvailabilityStatus status,
             @Param("minGuests") int minGuests
     );
+
+    /** A host's slots from an instant onward, excluding a status (e.g. CANCELLED) — used for conflict checks. */
+    List<AvailabilitySlot> findByLocalProfileIdAndStartTimeGreaterThanEqualAndStatusNot(
+            UUID localProfileId, Instant startTime, AvailabilityStatus status);
+
+    /** Future slots produced by a given schedule — used when editing/pausing/deleting the schedule. */
+    List<AvailabilitySlot> findBySourceScheduleIdAndStartTimeAfter(UUID sourceScheduleId, Instant startTime);
 }
