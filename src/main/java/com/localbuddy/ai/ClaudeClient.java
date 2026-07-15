@@ -127,8 +127,14 @@ public class ClaudeClient {
         }
         body.put("messages", wireMessages);
 
+        // The request body is serialized by the RestClient's message converter, which
+        // serializes a JsonNode as its bean getters (isArray/isObject/nodeType/…) rather than
+        // as the JSON tree it represents — producing a garbage schema Anthropic rejects with
+        // "Schema type is missing". Convert it to a plain object tree so it serializes as the
+        // real JSON Schema regardless of which Jackson the converter uses.
+        Object outputSchemaJson = objectMapper.convertValue(outputSchema, Object.class);
         Map<String, Object> outputConfig = new HashMap<>();
-        outputConfig.put("format", Map.of("type", "json_schema", "schema", outputSchema));
+        outputConfig.put("format", Map.of("type", "json_schema", "schema", outputSchemaJson));
         if (options.effort() != null && !options.effort().isBlank()) {
             outputConfig.put("effort", options.effort());
         }
