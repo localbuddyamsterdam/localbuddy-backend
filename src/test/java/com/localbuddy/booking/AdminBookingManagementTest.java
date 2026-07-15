@@ -72,7 +72,8 @@ class AdminBookingManagementTest {
             mock(AgeBandPricing.class),
             bookingConfirmationNotifier,
             mock(ConversationRepository.class),
-            mock(DealService.class)
+            mock(DealService.class),
+            mock(com.localbuddy.availability.BookingWindowPolicy.class)
     );
 
     /** A fully-wired confirmed booking so {@code toResponse} builds without NPEs. */

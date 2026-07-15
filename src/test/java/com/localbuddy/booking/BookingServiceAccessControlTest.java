@@ -65,7 +65,8 @@ class BookingServiceAccessControlTest {
             mock(AgeBandPricing.class),
             mock(BookingConfirmationNotifier.class),
             conversationRepository,
-            mock(DealService.class)
+            mock(DealService.class),
+            mock(com.localbuddy.availability.BookingWindowPolicy.class)
     );
 
     private User user(UUID id, UserRole role) {
