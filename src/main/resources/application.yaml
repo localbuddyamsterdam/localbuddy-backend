@@ -237,6 +237,16 @@ app:
     access-token: ${WHATSAPP_ACCESS_TOKEN:}
     phone-number-id: ${WHATSAPP_PHONE_NUMBER_ID:}
     api-base-url: ${WHATSAPP_API_BASE_URL:https://graph.facebook.com/v21.0}
+    # Language code of the Meta-approved templates below (one language per deployment for now).
+    template-language: ${WHATSAPP_TEMPLATE_LANGUAGE:en}
+    # Names of Meta-approved UTILITY templates (create them in Meta Business Manager; see
+    # WhatsAppTemplates for the expected {{n}} body placeholders). Blank = not approved yet →
+    # the pipeline falls back to free-form text, which only delivers inside an open 24h session.
+    # Utility-only by design: no marketing template names are ever configured here.
+    templates:
+      booking-confirmed: ${WHATSAPP_TEMPLATE_BOOKING_CONFIRMED:}
+      booking-reminder: ${WHATSAPP_TEMPLATE_BOOKING_REMINDER:}
+      booking-cancelled: ${WHATSAPP_TEMPLATE_BOOKING_CANCELLED:}
 
   wallet:
     google:

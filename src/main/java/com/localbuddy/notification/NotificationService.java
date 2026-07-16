@@ -1,5 +1,6 @@
 package com.localbuddy.notification;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.localbuddy.common.exception.ResourceNotFoundException;
 import com.localbuddy.notification.email.EmailTemplateService;
 import com.localbuddy.user.User;
@@ -16,11 +17,14 @@ public class NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final EmailTemplateService emailTemplateService;
+    private final ObjectMapper objectMapper;
 
     public NotificationService(NotificationRepository notificationRepository,
-                               EmailTemplateService emailTemplateService) {
+                               EmailTemplateService emailTemplateService,
+                               ObjectMapper objectMapper) {
         this.notificationRepository = notificationRepository;
         this.emailTemplateService = emailTemplateService;
+        this.objectMapper = objectMapper;
     }
 
     @Transactional
@@ -256,6 +260,67 @@ public class NotificationService {
         );
     }
 
+    // --- WhatsApp template overloads: deliverable business-initiated (outside the 24h session) ---
+
+    /**
+     * A WHATSAPP notification carrying a Meta-approved template + body params. The plain-text
+     * {@code message} is kept as the stored/fallback body; the processor prefers the template.
+     */
+    @Transactional
+    public void createWhatsAppTemplateNotificationForUser(
+            User recipientUser,
+            NotificationType notificationType,
+            String subject,
+            String message,
+            String waTemplate,
+            List<String> waParams,
+            String relatedEntityType,
+            UUID relatedEntityId,
+            String dedupeKey
+    ) {
+        if (recipientUser == null || recipientUser.getPhone() == null
+                || recipientUser.getPhone().trim().isEmpty()) {
+            return;
+        }
+        createNotification(recipientUser, recipientUser.getEmail(), recipientUser.getPhone(),
+                NotificationChannel.WHATSAPP, notificationType, subject, message, null,
+                waTemplate, toParamsJson(waParams), relatedEntityType, relatedEntityId, dedupeKey);
+    }
+
+    @Transactional
+    public void createWhatsAppTemplateNotificationForGuest(
+            String recipientEmail,
+            String recipientPhone,
+            NotificationType notificationType,
+            String subject,
+            String message,
+            String waTemplate,
+            List<String> waParams,
+            String relatedEntityType,
+            UUID relatedEntityId,
+            String dedupeKey
+    ) {
+        if (recipientPhone == null || recipientPhone.trim().isEmpty()) {
+            return;
+        }
+        createNotification(null, recipientEmail, recipientPhone,
+                NotificationChannel.WHATSAPP, notificationType, subject, message, null,
+                waTemplate, toParamsJson(waParams), relatedEntityType, relatedEntityId, dedupeKey);
+    }
+
+    /** Serializes template params to the stored JSON array; null/empty stays null (no components). */
+    private String toParamsJson(List<String> waParams) {
+        if (waParams == null || waParams.isEmpty()) {
+            return null;
+        }
+        try {
+            return objectMapper.writeValueAsString(waParams);
+        } catch (Exception ex) {
+            // Params that can't serialize shouldn't kill the notification — send template bare.
+            return null;
+        }
+    }
+
     private void createNotification(
             User recipientUser,
             String recipientEmail,
@@ -281,6 +346,25 @@ public class NotificationService {
             String subject,
             String message,
             String htmlBody,
+            String relatedEntityType,
+            UUID relatedEntityId,
+            String dedupeKey
+    ) {
+        createNotification(recipientUser, recipientEmail, recipientPhone, channel, notificationType,
+                subject, message, htmlBody, null, null, relatedEntityType, relatedEntityId, dedupeKey);
+    }
+
+    private void createNotification(
+            User recipientUser,
+            String recipientEmail,
+            String recipientPhone,
+            NotificationChannel channel,
+            NotificationType notificationType,
+            String subject,
+            String message,
+            String htmlBody,
+            String waTemplate,
+            String waParamsJson,
             String relatedEntityType,
             UUID relatedEntityId,
             String dedupeKey
@@ -311,6 +395,8 @@ public class NotificationService {
         notification.setSubject(optionalTrim(subject));
         notification.setMessage(message.trim());
         notification.setHtmlBody(effectiveHtml);
+        notification.setWaTemplate(optionalTrim(waTemplate));
+        notification.setWaParams(waParamsJson);
         notification.setStatus(NotificationStatus.PENDING);
         notification.setDedupeKey(dedupeKey);
         notification.setRelatedEntityType(relatedEntityType);

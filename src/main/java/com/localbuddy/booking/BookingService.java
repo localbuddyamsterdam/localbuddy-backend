@@ -17,6 +17,7 @@ import com.localbuddy.localprofile.LocalProfileRepository;
 import com.localbuddy.messaging.ConversationRepository;
 import com.localbuddy.notification.NotificationService;
 import com.localbuddy.notification.NotificationType;
+import com.localbuddy.whatsapp.WhatsAppTemplates;
 import com.localbuddy.payment.PaymentService;
 import com.localbuddy.promo.AppliedPromoCode;
 import com.localbuddy.promo.AppliedPromoCodes;
@@ -63,6 +64,7 @@ public class BookingService {
     private final AvailabilitySlotRepository availabilitySlotRepository;
     private final LocalProfileRepository localProfileRepository;
     private final NotificationService notificationService;
+    private final WhatsAppTemplates whatsAppTemplates;
     private final ConsentService consentService;
     private final PromoCodeService promoCodeService;
     private final ReferralService referralService;
@@ -82,13 +84,14 @@ public class BookingService {
                           UserRepository userRepository,
                           ExperienceRepository experienceRepository,
                           AvailabilitySlotRepository availabilitySlotRepository,
-                          LocalProfileRepository localProfileRepository, NotificationService notificationService, ConsentService consentService, PromoCodeService promoCodeService, ReferralService referralService, BookingSafetyChecklistRepository bookingSafetyChecklistRepository, PaymentService paymentService, TrustSafetyService trustSafetyService, ApplicationEventPublisher eventPublisher, BookingReferenceGenerator bookingReferenceGenerator, WaitlistService waitlistService, AgeBandPricing ageBandPricing, BookingConfirmationNotifier bookingConfirmationNotifier, ConversationRepository conversationRepository, DealService dealService, BookingWindowPolicy bookingWindowPolicy) {
+                          LocalProfileRepository localProfileRepository, NotificationService notificationService, WhatsAppTemplates whatsAppTemplates, ConsentService consentService, PromoCodeService promoCodeService, ReferralService referralService, BookingSafetyChecklistRepository bookingSafetyChecklistRepository, PaymentService paymentService, TrustSafetyService trustSafetyService, ApplicationEventPublisher eventPublisher, BookingReferenceGenerator bookingReferenceGenerator, WaitlistService waitlistService, AgeBandPricing ageBandPricing, BookingConfirmationNotifier bookingConfirmationNotifier, ConversationRepository conversationRepository, DealService dealService, BookingWindowPolicy bookingWindowPolicy) {
         this.bookingRepository = bookingRepository;
         this.userRepository = userRepository;
         this.experienceRepository = experienceRepository;
         this.availabilitySlotRepository = availabilitySlotRepository;
         this.localProfileRepository = localProfileRepository;
         this.notificationService = notificationService;
+        this.whatsAppTemplates = whatsAppTemplates;
         this.consentService = consentService;
         this.promoCodeService = promoCodeService;
         this.referralService = referralService;
@@ -250,6 +253,7 @@ public class BookingService {
                 request.emergencyContactEmail(),
                 request.emergencyContactPhone(),
                 request.emergencyContactRelationship());
+        booking.setWhatsappOptIn(Boolean.TRUE.equals(request.whatsAppOptIn()));
         booking.setRequestedAt(Instant.now());
         log.info("LOGGED_IN_BOOKING_TIMING buildBookingObjectMs={}", System.currentTimeMillis() - stepStart);
 
@@ -950,6 +954,7 @@ public class BookingService {
                 request.emergencyContactEmail(),
                 request.emergencyContactPhone(),
                 request.emergencyContactRelationship());
+        booking.setWhatsappOptIn(Boolean.TRUE.equals(request.whatsAppOptIn()));
         booking.setRequestedAt(Instant.now());
         log.info("GUEST_BOOKING_TIMING buildBookingObjectMs={}", System.currentTimeMillis() - stepStart);
 
@@ -1368,6 +1373,19 @@ public class BookingService {
                     booking.getId(),
                     "BOOKING_CANCELLED:TRAVELER:" + booking.getId()
             );
+            if (booking.isWhatsappOptIn()) {
+                notificationService.createWhatsAppTemplateNotificationForUser(
+                        booking.getLoggedInUser(),
+                        NotificationType.BOOKING_CANCELLED,
+                        "Booking cancelled",
+                        "Your booking has been cancelled: " + booking.getBookingReference(),
+                        whatsAppTemplates.forType(NotificationType.BOOKING_CANCELLED).orElse(null),
+                        cancellationWaParams(booking),
+                        "BOOKING",
+                        booking.getId(),
+                        "BOOKING_CANCELLED:TRAVELER:" + booking.getId() + ":WHATSAPP"
+                );
+            }
         } else {
             notificationService.createEmailNotificationForGuest(
                     booking.getGuestEmail(),
@@ -1379,7 +1397,31 @@ public class BookingService {
                     booking.getId(),
                     "BOOKING_CANCELLED:GUEST:" + booking.getId() + ":" + booking.getGuestEmail()
             );
+            if (booking.isWhatsappOptIn()) {
+                notificationService.createWhatsAppTemplateNotificationForGuest(
+                        booking.getGuestEmail(),
+                        booking.getGuestPhone(),
+                        NotificationType.BOOKING_CANCELLED,
+                        "Guest booking cancelled",
+                        "Your guest booking has been cancelled. Reference: " + booking.getBookingReference(),
+                        whatsAppTemplates.forType(NotificationType.BOOKING_CANCELLED).orElse(null),
+                        cancellationWaParams(booking),
+                        "BOOKING",
+                        booking.getId(),
+                        "BOOKING_CANCELLED:GUEST:" + booking.getId() + ":WHATSAPP"
+                );
+            }
         }
+    }
+
+    /** booking-cancelled template body params: {{1}} first name, {{2}} experience title, {{3}} reference. */
+    private List<String> cancellationWaParams(Booking booking) {
+        String fullName = booking.getLoggedInUser() != null
+                ? booking.getLoggedInUser().getFullName() : booking.getGuestName();
+        String name = fullName == null || fullName.isBlank() ? "there" : fullName.trim().split("\\s+")[0];
+        String title = booking.getExperience() != null && booking.getExperience().getTitle() != null
+                ? booking.getExperience().getTitle() : "your experience";
+        return List.of(name, title, booking.getBookingReference());
     }
 
     @Transactional

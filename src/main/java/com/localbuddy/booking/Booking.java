@@ -54,6 +54,14 @@ public class Booking {
     @Column(name = "guest_phone_verified", nullable = false)
     private boolean guestPhoneVerified = false;
 
+    /**
+     * Explicit checkout consent to receive this booking's updates (confirmation, reminder,
+     * cancellation) on WhatsApp. Default false — WhatsApp notifications are only ever created
+     * for bookings that asked for them.
+     */
+    @Column(name = "whatsapp_opt_in", nullable = false)
+    private boolean whatsappOptIn = false;
+
     // Emergency-contact snapshot captured at checkout. Optional (all nullable); the
     // "all-or-nothing" rule is enforced in BookingService. Frozen at booking time —
     // it does NOT track later edits to the traveller's profile emergency contact.

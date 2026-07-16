@@ -2,11 +2,14 @@ package com.localbuddy.whatsapp;
 
 import com.localbuddy.common.exception.BadRequestException;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -16,6 +19,11 @@ import java.util.Map;
  *   <li><b>Business API</b> (Meta Cloud API) — config-guarded outbound messages; dormant
  *       until {@code app.whatsapp.access-token} and {@code phone-number-id} are set.</li>
  * </ul>
+ *
+ * <p>Business-initiated messages (a booking confirmation to someone who never messaged us)
+ * only deliver as Meta-approved <b>templates</b> — free-form text delivers solely inside an
+ * open 24-hour customer-service session. Utility templates are the anti-spam guarantee too:
+ * without an approved marketing template, this integration physically cannot send ads.
  */
 @Service
 public class WhatsAppService {
@@ -23,14 +31,24 @@ public class WhatsAppService {
     private final String accessToken;
     private final String phoneNumberId;
     private final String apiBaseUrl;
+    private final String templateLanguage;
+    // Short connect/read timeouts so an unresponsive graph.facebook.com fails fast on the
+    // notification-processor thread instead of hanging it (same pattern as the token verifiers).
+    private final RestClient restClient;
 
     public WhatsAppService(
             @Value("${app.whatsapp.access-token:}") String accessToken,
             @Value("${app.whatsapp.phone-number-id:}") String phoneNumberId,
-            @Value("${app.whatsapp.api-base-url:https://graph.facebook.com/v21.0}") String apiBaseUrl) {
+            @Value("${app.whatsapp.api-base-url:https://graph.facebook.com/v21.0}") String apiBaseUrl,
+            @Value("${app.whatsapp.template-language:en}") String templateLanguage) {
         this.accessToken = accessToken;
         this.phoneNumberId = phoneNumberId;
         this.apiBaseUrl = apiBaseUrl;
+        this.templateLanguage = templateLanguage;
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(5_000);
+        factory.setReadTimeout(10_000);
+        this.restClient = RestClient.builder().requestFactory(factory).build();
     }
 
     /** Whether the Business API (outbound sending) is configured. */
@@ -65,15 +83,60 @@ public class WhatsAppService {
             throw new BadRequestException("Message body is required");
         }
 
-        try {
-            Map<String, Object> body = Map.of(
-                    "messaging_product", "whatsapp",
-                    "to", digits,
-                    "type", "text",
-                    "text", Map.of("preview_url", false, "body", message)
-            );
+        Map<String, Object> body = Map.of(
+                "messaging_product", "whatsapp",
+                "to", digits,
+                "type", "text",
+                "text", Map.of("preview_url", false, "body", message)
+        );
+        return post(body);
+    }
 
-            Map<?, ?> response = RestClient.create()
+    /**
+     * Sends a Meta-approved template message (the only kind that delivers business-initiated,
+     * outside an open 24h session). {@code bodyParams} fill the template's <code>{{1}}…{{n}}</code>
+     * body placeholders in order; the language is {@code app.whatsapp.template-language}.
+     */
+    public WhatsAppSendResult sendTemplate(String toPhone, String templateName, List<String> bodyParams) {
+        if (!isConfigured()) {
+            throw new BadRequestException(
+                    "WhatsApp Business API is not configured. Use a click-to-chat link instead.");
+        }
+        String digits = normalizePhone(toPhone);
+        if (digits.isEmpty()) {
+            throw new BadRequestException("A valid recipient phone number is required");
+        }
+        if (templateName == null || templateName.isBlank()) {
+            throw new BadRequestException("Template name is required");
+        }
+
+        List<Map<String, Object>> components = new ArrayList<>();
+        if (bodyParams != null && !bodyParams.isEmpty()) {
+            List<Map<String, Object>> parameters = bodyParams.stream()
+                    .map(p -> Map.<String, Object>of("type", "text", "text", p == null ? "" : p))
+                    .toList();
+            components.add(Map.of("type", "body", "parameters", parameters));
+        }
+
+        Map<String, Object> template = new java.util.LinkedHashMap<>();
+        template.put("name", templateName.trim());
+        template.put("language", Map.of("code", templateLanguage));
+        if (!components.isEmpty()) {
+            template.put("components", components);
+        }
+
+        Map<String, Object> body = Map.of(
+                "messaging_product", "whatsapp",
+                "to", digits,
+                "type", "template",
+                "template", template
+        );
+        return post(body);
+    }
+
+    private WhatsAppSendResult post(Map<String, Object> body) {
+        try {
+            Map<?, ?> response = restClient
                     .post()
                     .uri(apiBaseUrl + "/" + phoneNumberId + "/messages")
                     .header("Authorization", "Bearer " + accessToken)

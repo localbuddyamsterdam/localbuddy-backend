@@ -83,6 +83,9 @@ public record CreateGuestBookingRequest(
         String emergencyContactPhone,
 
         @Size(max = 80, message = "Emergency contact relationship cannot exceed 80 characters")
-        String emergencyContactRelationship
+        String emergencyContactRelationship,
+
+        /** Explicit consent to receive booking updates (confirmation/reminder/changes) on WhatsApp. */
+        Boolean whatsAppOptIn
 ) {
 }

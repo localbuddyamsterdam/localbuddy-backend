@@ -53,6 +53,7 @@ class BookingServiceAccessControlTest {
             mock(AvailabilitySlotRepository.class),
             localProfileRepository,
             mock(NotificationService.class),
+            new com.localbuddy.whatsapp.WhatsAppTemplates("", "", ""),
             mock(ConsentService.class),
             mock(PromoCodeService.class),
             mock(ReferralService.class),

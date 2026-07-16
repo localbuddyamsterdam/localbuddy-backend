@@ -49,6 +49,18 @@ public class Notification {
     @Column(name = "html_body", columnDefinition = "TEXT")
     private String htmlBody;
 
+    /**
+     * Meta-approved WhatsApp template name for WHATSAPP-channel notifications. When set, the
+     * processor sends this template (deliverable business-initiated); when null it falls back to
+     * free-form text, which Meta only delivers inside an open 24h customer-service session.
+     */
+    @Column(name = "wa_template", length = 120)
+    private String waTemplate;
+
+    /** JSON array of strings filling the template's {{1}}..{{n}} body placeholders, in order. */
+    @Column(name = "wa_params", length = 2000)
+    private String waParams;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 40)
     private NotificationStatus status = NotificationStatus.PENDING;

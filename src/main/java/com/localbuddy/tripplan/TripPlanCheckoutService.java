@@ -75,7 +75,8 @@ public class TripPlanCheckoutService {
                     request.emergencyContactLastName(),
                     request.emergencyContactEmail(),
                     request.emergencyContactPhone(),
-                    request.emergencyContactRelationship()
+                    request.emergencyContactRelationship(),
+                    request.whatsAppOptIn()
             );
             try {
                 BookingResponse booking = bookingService.createBooking(userId, bookingRequest);
@@ -132,7 +133,8 @@ public class TripPlanCheckoutService {
                     request.emergencyContactLastName(),
                     request.emergencyContactEmail(),
                     request.emergencyContactPhone(),
-                    request.emergencyContactRelationship()
+                    request.emergencyContactRelationship(),
+                    request.whatsAppOptIn()
             );
             try {
                 BookingResponse booking = bookingService.createGuestBooking(bookingRequest, clientIp, userAgent);

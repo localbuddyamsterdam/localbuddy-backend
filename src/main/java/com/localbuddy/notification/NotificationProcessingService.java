@@ -1,5 +1,7 @@
 package com.localbuddy.notification;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.localbuddy.calendar.CalendarService;
 import com.localbuddy.notification.email.EmailProviderService;
 import com.localbuddy.notification.email.EmailSendRequest;
@@ -12,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -23,15 +26,18 @@ public class NotificationProcessingService {
     private final EmailProviderService emailProviderService;
     private final WhatsAppService whatsAppService;
     private final CalendarService calendarService;
+    private final ObjectMapper objectMapper;
 
     public NotificationProcessingService(NotificationRepository notificationRepository,
                                          EmailProviderService emailProviderService,
                                          WhatsAppService whatsAppService,
-                                         CalendarService calendarService) {
+                                         CalendarService calendarService,
+                                         ObjectMapper objectMapper) {
         this.notificationRepository = notificationRepository;
         this.emailProviderService = emailProviderService;
         this.whatsAppService = whatsAppService;
         this.calendarService = calendarService;
+        this.objectMapper = objectMapper;
     }
 
     @Transactional
@@ -152,11 +158,19 @@ public class NotificationProcessingService {
             return;
         }
 
-        // NOTE: business-initiated WhatsApp messages outside the 24h customer-service
-        // window require pre-approved message templates; free-form text only delivers
-        // within an open session. Template support can be layered on later.
-        WhatsAppSendResult result = whatsAppService.sendMessage(
-                notification.getRecipientPhone(), notification.getMessage());
+        // Template messages are the only kind Meta delivers business-initiated (outside an open
+        // 24h customer-service session); free-form text remains as the in-session fallback for
+        // notifications created without a template (e.g. before Meta approves them).
+        WhatsAppSendResult result;
+        if (notification.getWaTemplate() != null && !notification.getWaTemplate().isBlank()) {
+            result = whatsAppService.sendTemplate(
+                    notification.getRecipientPhone(),
+                    notification.getWaTemplate(),
+                    parseWaParams(notification.getWaParams()));
+        } else {
+            result = whatsAppService.sendMessage(
+                    notification.getRecipientPhone(), notification.getMessage());
+        }
 
         notification.setStatus(NotificationStatus.SENT);
         notification.setProviderMessageId(result.providerMessageId());
@@ -164,5 +178,19 @@ public class NotificationProcessingService {
         notification.setSentAt(Instant.now());
         notification.setUpdatedAt(Instant.now());
         notificationRepository.save(notification);
+    }
+
+    /** Stored JSON array of template body params; null/unparseable → send the template bare. */
+    private List<String> parseWaParams(String waParamsJson) {
+        if (waParamsJson == null || waParamsJson.isBlank()) {
+            return List.of();
+        }
+        try {
+            return objectMapper.readValue(waParamsJson, new TypeReference<List<String>>() {
+            });
+        } catch (Exception ex) {
+            log.warn("Unparseable wa_params, sending template without parameters: {}", waParamsJson);
+            return List.of();
+        }
     }
 }

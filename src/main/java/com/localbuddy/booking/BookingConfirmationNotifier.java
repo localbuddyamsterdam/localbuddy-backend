@@ -11,6 +11,7 @@ import com.localbuddy.user.User;
 import com.localbuddy.wallet.AppleWalletService;
 import com.localbuddy.wallet.GoogleWalletService;
 import com.localbuddy.wallet.WalletPassData;
+import com.localbuddy.whatsapp.WhatsAppTemplates;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -49,6 +50,7 @@ public class BookingConfirmationNotifier {
     private final CalendarService calendarService;
     private final EmailTemplateService emailTemplateService;
     private final ExperiencePhotoRepository experiencePhotoRepository;
+    private final WhatsAppTemplates whatsAppTemplates;
     private final String frontendBaseUrl;
     private final String publicBaseUrl;
 
@@ -58,6 +60,7 @@ public class BookingConfirmationNotifier {
                                        CalendarService calendarService,
                                        EmailTemplateService emailTemplateService,
                                        ExperiencePhotoRepository experiencePhotoRepository,
+                                       WhatsAppTemplates whatsAppTemplates,
                                        @Value("${app.frontend.base-url:http://localhost:3000}") String frontendBaseUrl,
                                        @Value("${app.public-base-url:https://localbuddy-backend-b4exhkbjgahme6ge.francecentral-01.azurewebsites.net}") String publicBaseUrl) {
         this.notificationService = notificationService;
@@ -66,6 +69,7 @@ public class BookingConfirmationNotifier {
         this.calendarService = calendarService;
         this.emailTemplateService = emailTemplateService;
         this.experiencePhotoRepository = experiencePhotoRepository;
+        this.whatsAppTemplates = whatsAppTemplates;
         this.frontendBaseUrl = frontendBaseUrl;
         this.publicBaseUrl = publicBaseUrl;
     }
@@ -120,19 +124,46 @@ public class BookingConfirmationNotifier {
             notificationService.createInAppNotificationForUser(
                     traveler, NotificationType.BOOKING_CONFIRMED, subject, inApp.toString(),
                     "BOOKING", booking.getId(), dedupe + ":INAPP");
-            notificationService.createWhatsAppNotificationForUser(
-                    traveler, NotificationType.BOOKING_CONFIRMED, subject, message,
-                    "BOOKING", booking.getId(), dedupe + ":WHATSAPP");
+            // WhatsApp only with explicit checkout consent; template (deliverable business-
+            // initiated) when one is configured, plain text otherwise (in-session only).
+            if (booking.isWhatsappOptIn()) {
+                notificationService.createWhatsAppTemplateNotificationForUser(
+                        traveler, NotificationType.BOOKING_CONFIRMED, subject, message,
+                        whatsAppTemplates.forType(NotificationType.BOOKING_CONFIRMED).orElse(null),
+                        confirmationWaParams(booking, title, ref),
+                        "BOOKING", booking.getId(), dedupe + ":WHATSAPP");
+            }
         } else if (booking.getGuestEmail() != null && !booking.getGuestEmail().isBlank()) {
             notificationService.createEmailNotificationForGuest(
                     booking.getGuestEmail(), booking.getGuestPhone(),
                     NotificationType.BOOKING_CONFIRMED, subject, message, html,
                     "BOOKING", booking.getId(), dedupe + ":EMAIL");
-            notificationService.createWhatsAppNotificationForGuest(
-                    booking.getGuestEmail(), booking.getGuestPhone(),
-                    NotificationType.BOOKING_CONFIRMED, subject, message,
-                    "BOOKING", booking.getId(), dedupe + ":WHATSAPP");
+            if (booking.isWhatsappOptIn()) {
+                notificationService.createWhatsAppTemplateNotificationForGuest(
+                        booking.getGuestEmail(), booking.getGuestPhone(),
+                        NotificationType.BOOKING_CONFIRMED, subject, message,
+                        whatsAppTemplates.forType(NotificationType.BOOKING_CONFIRMED).orElse(null),
+                        confirmationWaParams(booking, title, ref),
+                        "BOOKING", booking.getId(), dedupe + ":WHATSAPP");
+            }
         }
+    }
+
+    /**
+     * Body params for the booking-confirmed / booking-reminder utility templates:
+     * {{1}} first name, {{2}} experience title, {{3}} date &amp; time, {{4}} meeting area, {{5}} reference.
+     */
+    private java.util.List<String> confirmationWaParams(Booking booking, String title, String ref) {
+        String name = firstName(booking.getLoggedInUser() != null
+                ? booking.getLoggedInUser().getFullName() : booking.getGuestName());
+        String when = booking.getAvailabilitySlot() != null && booking.getAvailabilitySlot().getStartTime() != null
+                ? WHEN.format(booking.getAvailabilitySlot().getStartTime())
+                : "your booked time";
+        Experience experience = booking.getExperience();
+        String meeting = experience != null && experience.getMeetingArea() != null
+                && !experience.getMeetingArea().isBlank()
+                ? experience.getMeetingArea() : "Shared before the day";
+        return java.util.List.of(name, title, when, meeting, ref);
     }
 
     private EmailTemplateService.BookingConfirmationModel buildModel(

@@ -2,6 +2,7 @@ package com.localbuddy.notification;
 
 import com.localbuddy.booking.Booking;
 import com.localbuddy.user.User;
+import com.localbuddy.whatsapp.WhatsAppTemplates;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -27,15 +28,18 @@ public class BookingReminderService {
     private final BookingReminderRepository bookingReminderRepository;
     private final NotificationService notificationService;
     private final NotificationPreferenceService preferenceService;
+    private final WhatsAppTemplates whatsAppTemplates;
     private final int leadHours;
 
     public BookingReminderService(BookingReminderRepository bookingReminderRepository,
                                   NotificationService notificationService,
                                   NotificationPreferenceService preferenceService,
+                                  WhatsAppTemplates whatsAppTemplates,
                                   @Value("${app.notifications.reminder-lead-hours:24}") int leadHours) {
         this.bookingReminderRepository = bookingReminderRepository;
         this.notificationService = notificationService;
         this.preferenceService = preferenceService;
+        this.whatsAppTemplates = whatsAppTemplates;
         this.leadHours = leadHours;
     }
 
@@ -71,19 +75,39 @@ public class BookingReminderService {
             notificationService.createEmailAndInAppNotificationForUser(
                     traveler, NotificationType.BOOKING_REMINDER, subject, message,
                     "BOOKING", booking.getId(), dedupeBase);
-            // Also deliver over WhatsApp when the traveler has a phone (no-op if WhatsApp is unconfigured).
-            notificationService.createWhatsAppNotificationForUser(
-                    traveler, NotificationType.BOOKING_REMINDER, subject, message,
-                    "BOOKING", booking.getId(), dedupeBase + ":WHATSAPP");
+            // WhatsApp only with the booking's explicit checkout consent; template when
+            // configured (deliverable business-initiated), plain text otherwise (in-session only).
+            if (booking.isWhatsappOptIn()) {
+                notificationService.createWhatsAppTemplateNotificationForUser(
+                        traveler, NotificationType.BOOKING_REMINDER, subject, message,
+                        whatsAppTemplates.forType(NotificationType.BOOKING_REMINDER).orElse(null),
+                        reminderWaParams(booking, experienceTitle, reference, startTime),
+                        "BOOKING", booking.getId(), dedupeBase + ":WHATSAPP");
+            }
         } else if (booking.getGuestEmail() != null && !booking.getGuestEmail().isBlank()) {
             notificationService.createEmailNotificationForGuest(
                     booking.getGuestEmail(), booking.getGuestPhone(),
                     NotificationType.BOOKING_REMINDER, subject, message,
                     "BOOKING", booking.getId(), dedupeBase + ":EMAIL");
-            notificationService.createWhatsAppNotificationForGuest(
-                    booking.getGuestEmail(), booking.getGuestPhone(),
-                    NotificationType.BOOKING_REMINDER, subject, message,
-                    "BOOKING", booking.getId(), dedupeBase + ":WHATSAPP");
+            if (booking.isWhatsappOptIn()) {
+                notificationService.createWhatsAppTemplateNotificationForGuest(
+                        booking.getGuestEmail(), booking.getGuestPhone(),
+                        NotificationType.BOOKING_REMINDER, subject, message,
+                        whatsAppTemplates.forType(NotificationType.BOOKING_REMINDER).orElse(null),
+                        reminderWaParams(booking, experienceTitle, reference, startTime),
+                        "BOOKING", booking.getId(), dedupeBase + ":WHATSAPP");
+            }
         }
+    }
+
+    /** {{1}} first name, {{2}} experience title, {{3}} date & time, {{4}} meeting area, {{5}} reference. */
+    private List<String> reminderWaParams(Booking booking, String title, String reference, Instant startTime) {
+        String fullName = booking.getLoggedInUser() != null
+                ? booking.getLoggedInUser().getFullName() : booking.getGuestName();
+        String name = fullName == null || fullName.isBlank() ? "there" : fullName.trim().split("\\s+")[0];
+        String meeting = booking.getExperience().getMeetingArea() != null
+                && !booking.getExperience().getMeetingArea().isBlank()
+                ? booking.getExperience().getMeetingArea() : "Shared before the day";
+        return List.of(name, title, WHEN_FORMAT.format(startTime), meeting, reference);
     }
 }

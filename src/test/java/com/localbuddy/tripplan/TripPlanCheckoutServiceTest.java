@@ -72,7 +72,7 @@ class TripPlanCheckoutServiceTest {
 
     private TripPlanCheckoutRequest request(List<String> itemIds) {
         return new TripPlanCheckoutRequest(itemIds, null, null, null, null, null,
-                null, null, null, null, null);
+                null, null, null, null, null, null);
     }
 
     @Test
