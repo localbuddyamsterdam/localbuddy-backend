@@ -21,6 +21,9 @@ public class AzureEmailProviderService implements EmailProviderService {
 
     private final EmailProperties emailProperties;
     private final AzureCommunicationProperties azureCommunicationProperties;
+    // Built once on first send and reused — the ACS client (HTTP pipeline, auth, serializers) is
+    // expensive to construct, and was previously rebuilt for every message on the notification thread.
+    private volatile EmailClient emailClient;
 
     public AzureEmailProviderService(EmailProperties emailProperties,
                                      AzureCommunicationProperties azureCommunicationProperties) {
@@ -40,9 +43,7 @@ public class AzureEmailProviderService implements EmailProviderService {
                 );
             }
 
-            EmailClient emailClient = new EmailClientBuilder()
-                    .connectionString(azureCommunicationProperties.connectionString())
-                    .buildClient();
+            EmailClient emailClient = emailClient();
 
             EmailMessage message = new EmailMessage()
                     .setSenderAddress(emailProperties.fromAddress())
@@ -81,5 +82,22 @@ public class AzureEmailProviderService implements EmailProviderService {
                     ex.getMessage()
             );
         }
+    }
+
+    /** Lazily build the ACS client once (after the connection-string guard) and reuse it thereafter. */
+    private EmailClient emailClient() {
+        EmailClient client = this.emailClient;
+        if (client == null) {
+            synchronized (this) {
+                client = this.emailClient;
+                if (client == null) {
+                    client = new EmailClientBuilder()
+                            .connectionString(azureCommunicationProperties.connectionString())
+                            .buildClient();
+                    this.emailClient = client;
+                }
+            }
+        }
+        return client;
     }
 }

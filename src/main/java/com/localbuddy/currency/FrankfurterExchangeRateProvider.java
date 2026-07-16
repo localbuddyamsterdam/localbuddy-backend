@@ -26,8 +26,12 @@ public class FrankfurterExchangeRateProvider implements ExchangeRateProvider {
 
     public FrankfurterExchangeRateProvider(
             @Value("${app.currency.provider-base-url:https://api.frankfurter.dev/v1}") String providerBaseUrl) {
+        var factory = new org.springframework.http.client.SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(java.time.Duration.ofSeconds(5));
+        factory.setReadTimeout(java.time.Duration.ofSeconds(8));
         this.restClient = RestClient.builder()
                 .baseUrl(providerBaseUrl)
+                .requestFactory(factory)
                 .build();
     }
 

@@ -51,11 +51,20 @@ public class GoogleTokenVerifier implements SocialTokenVerifier {
     private static final Duration DEFAULT_TTL = Duration.ofHours(1);
 
     private final String googleClientId;
-    private final RestClient restClient = RestClient.create();
+    private final RestClient restClient = timeoutRestClient();
 
     /** kid → RSA public key. Replaced wholesale on refresh (so reads are lock-free). */
     private volatile Map<String, PublicKey> keyCache = Map.of();
     private volatile Instant keyCacheExpiry = Instant.EPOCH;
+
+    /** Short connect/read timeouts so an unresponsive googleapis.com fails fast instead of hanging
+     * the login request thread during a JWKS refresh. */
+    private static RestClient timeoutRestClient() {
+        var factory = new org.springframework.http.client.SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(java.time.Duration.ofSeconds(5));
+        factory.setReadTimeout(java.time.Duration.ofSeconds(8));
+        return RestClient.builder().requestFactory(factory).build();
+    }
 
     public GoogleTokenVerifier(@Value("${app.social.google.client-id:}") String googleClientId) {
         this.googleClientId = googleClientId;

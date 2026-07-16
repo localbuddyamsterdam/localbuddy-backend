@@ -16,4 +16,8 @@ public interface ExperiencePhotoRepository extends JpaRepository<ExperiencePhoto
 
     @Query("SELECT p FROM ExperiencePhoto p WHERE p.experience.id = :experienceId AND p.cover = true")
     Optional<ExperiencePhoto> findCoverPhotoByExperienceId(@Param("experienceId") UUID experienceId);
+
+    /** Cover photos for a set of experiences in one query — lets list mapping avoid a per-row cover N+1. */
+    @Query("SELECT p FROM ExperiencePhoto p WHERE p.experience.id IN :ids AND p.cover = true")
+    List<ExperiencePhoto> findCoverPhotosByExperienceIds(@Param("ids") List<UUID> ids);
 }

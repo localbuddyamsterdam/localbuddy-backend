@@ -42,6 +42,8 @@ public interface AvailabilitySlotRepository extends JpaRepository<AvailabilitySl
               and slot.bookedCount < :minGuests
             order by slot.startTime asc
             """)
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {
+            "localProfile", "localProfile.user", "experience"})
     List<AvailabilitySlot> findUnderbookedSlotsForNotice(
             @Param("windowStart") Instant windowStart,
             @Param("windowEnd") Instant windowEnd,

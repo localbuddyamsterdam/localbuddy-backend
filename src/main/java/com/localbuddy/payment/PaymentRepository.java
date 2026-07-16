@@ -58,5 +58,7 @@ public interface PaymentRepository extends JpaRepository<Payment, UUID> {
     long countByPaymentStatusIn(Collection<PaymentStatus> statuses);
 
     /** Member payments of a bundle checkout, in creation order. */
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {
+            "booking", "booking.experience", "booking.availabilitySlot"})
     List<Payment> findByPaymentGroupIdOrderByCreatedAtAsc(UUID paymentGroupId);
 }

@@ -100,10 +100,7 @@ public class ExperienceService {
     public List<ExperienceResponse> getMyExperiences(UUID userId) {
         LocalProfile localProfile = getLocalProfileByUserId(userId);
 
-        return experienceRepository.findByLocalProfileId(localProfile.getId())
-                .stream()
-                .map(this::toResponse)
-                .toList();
+        return toResponseList(experienceRepository.findByLocalProfileId(localProfile.getId()));
     }
 
     @Transactional(readOnly = true)
@@ -320,9 +317,7 @@ public class ExperienceService {
                 city, category, bookingModes, maxMinimumAge, guests, Instant.now(), dateStart, dateEnd,
                 filterByAvailability, filterByDate, pageable);
 
-        List<ExperienceResponse> content = result.getContent().stream()
-                .map(this::toResponse)
-                .toList();
+        List<ExperienceResponse> content = toResponseList(result.getContent());
 
         return new ExperiencePageResponse(
                 content,
@@ -406,9 +401,7 @@ public class ExperienceService {
                 normalizedMinPrice, normalizedMaxPrice, normalizedMaxDuration, normalizedMinRating,
                 keywordPattern, filterByAvailability, filterByDate, pageable);
 
-        List<ExperienceResponse> content = result.getContent().stream()
-                .map(this::toResponse)
-                .toList();
+        List<ExperienceResponse> content = toResponseList(result.getContent());
 
         return new ExperiencePageResponse(
                 content,
@@ -614,7 +607,31 @@ public class ExperienceService {
         var coverImage = coverPhoto.map(photo ->
                 new ExperienceResponse.CoverImage(photo.getId(), photo.getUrl(), photo.getCaption())
         ).orElse(null);
+        return toResponse(experience, coverImage);
+    }
 
+    /**
+     * Maps a page/list of experiences, resolving all cover photos in ONE batched query instead of
+     * one lookup per row (the list-mapping N+1). Output is identical to mapping each experience with
+     * {@link #toResponse(Experience)} — same CoverImage per row, absent cover → null.
+     */
+    private List<ExperienceResponse> toResponseList(List<Experience> experiences) {
+        if (experiences.isEmpty()) {
+            return List.of();
+        }
+        List<UUID> ids = experiences.stream().map(Experience::getId).toList();
+        Map<UUID, ExperienceResponse.CoverImage> coversByExperienceId = new HashMap<>();
+        for (com.localbuddy.media.ExperiencePhoto photo : experiencePhotoRepository.findCoverPhotosByExperienceIds(ids)) {
+            coversByExperienceId.putIfAbsent(
+                    photo.getExperience().getId(),
+                    new ExperienceResponse.CoverImage(photo.getId(), photo.getUrl(), photo.getCaption()));
+        }
+        return experiences.stream()
+                .map(e -> toResponse(e, coversByExperienceId.get(e.getId())))
+                .toList();
+    }
+
+    private ExperienceResponse toResponse(Experience experience, ExperienceResponse.CoverImage coverImage) {
         return new ExperienceResponse(
                 experience.getId(),
                 experience.getLocalProfile().getId(),
@@ -661,10 +678,7 @@ public class ExperienceService {
 
     @Transactional(readOnly = true)
     public List<ExperienceResponse> getPendingExperiences() {
-        return experienceRepository.findByStatus(ExperienceStatus.SUBMITTED)
-                .stream()
-                .map(this::toResponse)
-                .toList();
+        return toResponseList(experienceRepository.findByStatus(ExperienceStatus.SUBMITTED));
     }
 
     @Transactional
@@ -710,7 +724,7 @@ public class ExperienceService {
             throw new ResourceNotFoundException("One or more experiences were not found");
         }
         experiences.forEach(e -> e.setCommissionRate(commissionRate));
-        return experienceRepository.saveAll(experiences).stream().map(this::toResponse).toList();
+        return toResponseList(experienceRepository.saveAll(experiences));
     }
 
     private void validateCommissionOverrideRate(BigDecimal commissionRate) {
@@ -748,9 +762,7 @@ public class ExperienceService {
     public List<ExperienceResponse> getApprovedExperiences(String citySlug, String categorySlug,
                                                            BookingMode bookingMode, Boolean shared) {
         Collection<BookingMode> bookingModes = resolveBookingModes(bookingMode, shared);
-        return findApprovedExperiences(citySlug, categorySlug, bookingModes).stream()
-                .map(this::toResponse)
-                .toList();
+        return toResponseList(findApprovedExperiences(citySlug, categorySlug, bookingModes));
     }
 
     @Transactional(readOnly = true)
@@ -776,10 +788,7 @@ public class ExperienceService {
                         Comparator.nullsLast(Comparator.<Instant>reverseOrder()));
         approved.sort(byTrending);
 
-        return approved.stream()
-                .limit(max)
-                .map(this::toResponse)
-                .toList();
+        return toResponseList(approved.stream().limit(max).toList());
     }
 
     private static BigDecimal hostRating(Experience e) {

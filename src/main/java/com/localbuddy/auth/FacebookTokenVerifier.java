@@ -43,12 +43,21 @@ public class FacebookTokenVerifier implements SocialTokenVerifier {
 
     private final String appId;
     private final String appSecret;
-    private final RestClient restClient = RestClient.create();
+    private final RestClient restClient = timeoutRestClient();
 
     public FacebookTokenVerifier(@Value("${app.social.facebook.app-id:}") String appId,
                                  @Value("${app.social.facebook.app-secret:}") String appSecret) {
         this.appId = appId;
         this.appSecret = appSecret;
+    }
+
+    /** Short connect/read timeouts so an unresponsive graph.facebook.com fails fast instead of hanging
+     * the login request thread — this verifier makes two synchronous Graph calls per login. */
+    private static RestClient timeoutRestClient() {
+        var factory = new org.springframework.http.client.SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(java.time.Duration.ofSeconds(5));
+        factory.setReadTimeout(java.time.Duration.ofSeconds(8));
+        return RestClient.builder().requestFactory(factory).build();
     }
 
     @Override

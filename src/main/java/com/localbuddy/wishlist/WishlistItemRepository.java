@@ -30,5 +30,6 @@ public interface WishlistItemRepository extends JpaRepository<WishlistItem, UUID
     long countByExperienceId(UUID experienceId);
 
     /** Wishlist items added within a createdAt window — for the reminder sweep. */
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"user", "experience"})
     List<WishlistItem> findTop200ByCreatedAtBetweenOrderByCreatedAtAsc(Instant from, Instant to);
 }

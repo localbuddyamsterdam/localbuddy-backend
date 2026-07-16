@@ -15,8 +15,12 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
 
     boolean existsByBookingReference(String bookingReference);
 
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {
+            "experience", "experience.city", "localProfile", "availabilitySlot", "loggedInUser"})
     List<Booking> findByLoggedInUserIdOrderByRequestedAtDesc(UUID loggedInUserId);
 
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {
+            "experience", "experience.city", "localProfile", "availabilitySlot", "loggedInUser"})
     List<Booking> findByLocalProfileIdOrderByRequestedAtDesc(UUID localProfileId);
 
     List<Booking> findByStatusOrderByRequestedAtDesc(BookingStatus status);

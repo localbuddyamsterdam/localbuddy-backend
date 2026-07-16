@@ -21,5 +21,7 @@ public interface BookingReminderRepository extends JpaRepository<Booking, UUID> 
               and b.availabilitySlot.startTime >= :from
               and b.availabilitySlot.startTime < :to
             """)
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {
+            "availabilitySlot", "experience", "loggedInUser"})
     List<Booking> findConfirmedStartingBetween(@Param("from") Instant from, @Param("to") Instant to);
 }

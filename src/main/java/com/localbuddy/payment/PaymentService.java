@@ -624,19 +624,22 @@ public class PaymentService {
 
 
     private Payment getOrCreatePendingPaymentForBooking(Booking booking) {
-        paymentRepository.findFirstByBookingIdAndPaymentStatusInOrderByCreatedAtDesc(
+        // Single lookup across all active statuses (most-recent first): a PAID row blocks re-payment,
+        // an existing PENDING/PROCESSING row is reused, otherwise a fresh payment is created. This is
+        // equivalent to the previous two-query form — when the newest active row is PENDING/PROCESSING
+        // it is exactly what the old [PENDING, PROCESSING] query returned — but costs one round-trip.
+        var existing = paymentRepository.findFirstByBookingIdAndPaymentStatusInOrderByCreatedAtDesc(
                 booking.getId(),
                 List.of(PaymentStatus.PENDING, PaymentStatus.PROCESSING, PaymentStatus.PAID)
-        ).ifPresent(existingPayment -> {
-            if (existingPayment.getPaymentStatus() == PaymentStatus.PAID) {
+        );
+        if (existing.isPresent()) {
+            Payment payment = existing.get();
+            if (payment.getPaymentStatus() == PaymentStatus.PAID) {
                 throw new BadRequestException("Payment is already completed for this booking");
             }
-        });
-
-        return paymentRepository.findFirstByBookingIdAndPaymentStatusInOrderByCreatedAtDesc(
-                booking.getId(),
-                List.of(PaymentStatus.PENDING, PaymentStatus.PROCESSING)
-        ).orElseGet(() -> createPaymentEntityForBooking(booking));
+            return payment;
+        }
+        return createPaymentEntityForBooking(booking);
     }
 
     private Payment createPaymentEntityForBooking(Booking booking) {
