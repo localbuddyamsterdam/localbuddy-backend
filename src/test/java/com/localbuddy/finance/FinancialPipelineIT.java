@@ -104,7 +104,7 @@ class FinancialPipelineIT {
         assertEq("24.20", commission.getTotalAmount(), "commission invoice total");
         assertEq("3.03", receipt.getTotalAmount(), "service-fee receipt total");
 
-        byte[] pdf = invoiceService.renderPdf(commission.getId(), null, true);
+        byte[] pdf = invoiceService.renderPdf(commission.getId(), null, true).pdf();
         assertTrue(pdf.length > 500 && "%PDF".equals(new String(pdf, 0, 4, StandardCharsets.US_ASCII)), "commission invoice is a PDF");
 
         // 4) Payout batches the payable earning; manual disbursement settles it + statement.

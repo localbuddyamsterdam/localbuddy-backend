@@ -44,8 +44,12 @@ public class TripPlanCalendarService {
                 : frontendBaseUrl;
     }
 
+    /** The rendered calendar plus its human-friendly download name. */
+    public record CalendarFile(String filename, String content) {
+    }
+
     @Transactional(readOnly = true)
-    public String buildCalendar(String token) {
+    public CalendarFile buildCalendar(String token) {
         TripPlan plan = tripPlanRepository.findByToken(token)
                 .filter(p -> p.getStatus() == TripPlanStatus.ACTIVE)
                 .orElseThrow(() -> new ResourceNotFoundException("Trip plan not found"));
@@ -122,7 +126,10 @@ public class TripPlanCalendarService {
         }
 
         line(ics, "END:VCALENDAR");
-        return ics.toString();
+
+        String filename = "localbuddy-itinerary-" + plan.getCity().getSlug() + "-" + plan.getStartDate()
+                + (plan.getEndDate().equals(plan.getStartDate()) ? "" : "-to-" + plan.getEndDate()) + ".ics";
+        return new CalendarFile(filename, ics.toString());
     }
 
     /** Escapes text per RFC 5545 (backslash, semicolon, comma, newline). */

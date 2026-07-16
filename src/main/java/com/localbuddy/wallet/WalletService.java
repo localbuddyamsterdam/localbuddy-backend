@@ -42,8 +42,16 @@ public class WalletService {
     }
 
     @Transactional(readOnly = true)
-    public byte[] applePass(UUID userId, UUID bookingId) {
-        return appleWalletService.buildPkpass(buildData(requireParticipant(userId, bookingId)));
+    /** A signed pass plus its human-friendly download name (from the booking reference). */
+    public record PassFile(String filename, byte[] bytes) {
+    }
+
+    public PassFile applePass(UUID userId, UUID bookingId) {
+        Booking booking = requireParticipant(userId, bookingId);
+        String reference = booking.getBookingReference() == null ? "booking"
+                : booking.getBookingReference().replaceAll("[^A-Za-z0-9._-]", "");
+        return new PassFile("localbuddy-" + reference + ".pkpass",
+                appleWalletService.buildPkpass(buildData(booking)));
     }
 
     private WalletPassData buildData(Booking booking) {

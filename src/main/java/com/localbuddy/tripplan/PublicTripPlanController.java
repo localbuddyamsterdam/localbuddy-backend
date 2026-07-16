@@ -68,8 +68,12 @@ public class PublicTripPlanController {
         rateLimitService.checkPublicApiLimit("trip-plan-pdf:" + clientIp, 10, 60);
         TripPlanResponse plan = tripPlanService.getPlanByToken(token);
         byte[] pdf = tripPlanPdfService.render(plan);
+        // Human-friendly download name (city slug + ISO dates are already filename-safe),
+        // e.g. localbuddy-itinerary-amsterdam-2026-07-20-to-2026-07-22.pdf
+        String filename = "localbuddy-itinerary-" + plan.citySlug() + "-" + plan.startDate()
+                + (plan.endDate().equals(plan.startDate()) ? "" : "-to-" + plan.endDate()) + ".pdf";
         return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"itinerary-" + token + ".pdf\"")
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
                 .contentType(MediaType.APPLICATION_PDF)
                 .body(pdf);
     }
@@ -84,11 +88,11 @@ public class PublicTripPlanController {
     ) {
         String clientIp = clientIpResolver.resolveClientIp(servletRequest);
         rateLimitService.checkPublicApiLimit("trip-plan-calendar:" + clientIp, 10, 60);
-        String ics = tripPlanCalendarService.buildCalendar(token);
+        TripPlanCalendarService.CalendarFile calendar = tripPlanCalendarService.buildCalendar(token);
         return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"itinerary-" + token + ".ics\"")
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + calendar.filename() + "\"")
                 .contentType(MediaType.parseMediaType("text/calendar; charset=UTF-8"))
-                .body(ics.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                .body(calendar.content().getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
 
     @Operation(summary = "Rate a trip plan",

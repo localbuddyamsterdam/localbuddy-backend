@@ -1,11 +1,18 @@
 package com.localbuddy.tripplan;
 
 import com.openhtmltopdf.pdfboxout.PdfRendererBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.Locale;
 
 /** Renders a saved trip plan (itinerary) to a PDF document via openhtmltopdf. */
@@ -31,6 +38,33 @@ public class TripPlanPdfService {
                         "Private tours", "Good to know", " / person", " for your group");
             };
         }
+    }
+
+    private static final Logger log = LoggerFactory.getLogger(TripPlanPdfService.class);
+
+    /**
+     * Renders a throwaway one-page document once after startup, off the request path, so the
+     * first traveler's export doesn't pay the one-time JVM/renderer warm-up (class loading,
+     * PDFBox font init) that only recurs after a restart.
+     */
+    @EventListener(ApplicationReadyEvent.class)
+    public void warmUp() {
+        Thread warmup = new Thread(() -> {
+            try {
+                long start = System.currentTimeMillis();
+                render(new TripPlanResponse(
+                        "warmup", "", "", "warmup", "Warm-up", null,
+                        LocalDate.now(), LocalDate.now(), 1, false, null, "en",
+                        new TripPlanDocument("Warm-up", null, "EUR", null, List.of(), List.of()),
+                        List.of(), Instant.now()));
+                log.info("PDF renderer warmed up in {} ms", System.currentTimeMillis() - start);
+            } catch (Exception ex) {
+                // Warm-up is best-effort — a failure here must never affect startup.
+                log.warn("PDF renderer warm-up failed: {}", ex.getMessage());
+            }
+        }, "pdf-warmup");
+        warmup.setDaemon(true);
+        warmup.start();
     }
 
     public byte[] render(TripPlanResponse plan) {

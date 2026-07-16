@@ -27,10 +27,10 @@ public class AdminInvoiceController {
 
     @GetMapping("/{invoiceId}/pdf")
     public ResponseEntity<byte[]> downloadPdf(@PathVariable UUID invoiceId) {
-        byte[] pdf = invoiceService.renderPdf(invoiceId, null, true);
+        InvoiceService.InvoicePdf invoice = invoiceService.renderPdf(invoiceId, null, true);
         return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"invoice-" + invoiceId + ".pdf\"")
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + invoice.filename() + "\"")
                 .contentType(MediaType.APPLICATION_PDF)
-                .body(pdf);
+                .body(invoice.pdf());
     }
 }

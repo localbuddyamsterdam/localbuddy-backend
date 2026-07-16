@@ -27,9 +27,20 @@ public class CalendarService {
         this.bookingRepository = bookingRepository;
     }
 
+    /** A rendered .ics plus its human-friendly download name (from the booking reference). */
+    public record IcsFile(String filename, String content) {
+    }
+
     @Transactional(readOnly = true)
-    public String buildIcs(UUID userId, UUID bookingId) {
-        return buildIcs(requireParticipant(userId, bookingId), false);
+    public IcsFile buildIcs(UUID userId, UUID bookingId) {
+        Booking booking = requireParticipant(userId, bookingId);
+        String filename = "localbuddy-booking-" + safeFilePart(booking.getBookingReference()) + ".ics";
+        return new IcsFile(filename, buildIcs(booking, false));
+    }
+
+    /** Keeps only filename-safe characters (booking references already are, but be defensive). */
+    private static String safeFilePart(String value) {
+        return value == null ? "unknown" : value.replaceAll("[^A-Za-z0-9._-]", "");
     }
 
     /**

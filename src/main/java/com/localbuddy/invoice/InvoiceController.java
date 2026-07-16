@@ -32,10 +32,10 @@ public class InvoiceController {
     @GetMapping("/{bookingId}/pdf")
     public ResponseEntity<byte[]> downloadPdf(Authentication authentication, @PathVariable UUID bookingId) {
         UUID userId = UUID.fromString(authentication.getName());
-        byte[] pdf = invoiceService.renderPdfByBookingId(bookingId, userId, false);
+        InvoiceService.InvoicePdf invoice = invoiceService.renderPdfByBookingId(bookingId, userId, false);
         return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"invoice-" + bookingId + ".pdf\"")
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + invoice.filename() + "\"")
                 .contentType(MediaType.APPLICATION_PDF)
-                .body(pdf);
+                .body(invoice.pdf());
     }
 }

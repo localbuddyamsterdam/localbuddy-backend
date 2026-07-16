@@ -32,11 +32,11 @@ public class CalendarController {
             @PathVariable UUID bookingId
     ) {
         UUID userId = UUID.fromString(authentication.getName());
-        byte[] body = calendarService.buildIcs(userId, bookingId).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        CalendarService.IcsFile ics = calendarService.buildIcs(userId, bookingId);
         return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"booking-" + bookingId + ".ics\"")
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + ics.filename() + "\"")
                 .contentType(MediaType.parseMediaType("text/calendar"))
-                .body(body);
+                .body(ics.content().getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
 
     @Operation(summary = "Get add-to-calendar links",

@@ -55,10 +55,10 @@ public class WalletController {
             @PathVariable UUID bookingId
     ) {
         UUID userId = UUID.fromString(authentication.getName());
-        byte[] pass = walletService.applePass(userId, bookingId);
+        WalletService.PassFile pass = walletService.applePass(userId, bookingId);
         return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"booking-" + bookingId + ".pkpass\"")
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + pass.filename() + "\"")
                 .contentType(MediaType.parseMediaType("application/vnd.apple.pkpass"))
-                .body(pass);
+                .body(pass.bytes());
     }
 }

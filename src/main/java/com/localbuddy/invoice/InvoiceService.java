@@ -192,14 +192,24 @@ public class InvoiceService {
     }
 
     @Transactional(readOnly = true)
-    public byte[] renderPdf(UUID invoiceId, UUID requesterUserId, boolean isAdmin) {
+    public InvoicePdf renderPdf(UUID invoiceId, UUID requesterUserId, boolean isAdmin) {
         Invoice invoice = invoiceRepository.findById(invoiceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Invoice not found"));
         if (!isAdmin && !canAccess(invoice, requesterUserId)) {
             throw new ResourceNotFoundException("Invoice not found");
         }
         List<InvoiceLine> lines = invoiceLineRepository.findByInvoiceIdOrderBySortOrderAsc(invoiceId);
-        return pdfService.render(invoice, lines);
+        return new InvoicePdf(invoice.getInvoiceNumber(), pdfService.render(invoice, lines));
+    }
+
+    /** A rendered invoice plus its number, so downloads can be named after the real invoice. */
+    public record InvoicePdf(String invoiceNumber, byte[] pdf) {
+
+        /** e.g. localbuddy-invoice-LB-2026-00042.pdf (invoice numbers are filename-safe; be defensive). */
+        public String filename() {
+            String number = invoiceNumber == null ? "unknown" : invoiceNumber.replaceAll("[^A-Za-z0-9._-]", "");
+            return "localbuddy-invoice-" + number + ".pdf";
+        }
     }
 
     @Transactional(readOnly = true)
@@ -214,14 +224,14 @@ public class InvoiceService {
     }
 
     @Transactional(readOnly = true)
-    public byte[] renderPdfByBookingId(UUID bookingId, UUID requesterUserId, boolean isAdmin) {
+    public InvoicePdf renderPdfByBookingId(UUID bookingId, UUID requesterUserId, boolean isAdmin) {
         Invoice invoice = invoiceRepository.findFirstByBookingIdOrderByIssuedAtDesc(bookingId)
                 .orElseThrow(() -> new ResourceNotFoundException("Invoice not found"));
         if (!isAdmin && !canAccess(invoice, requesterUserId)) {
             throw new ResourceNotFoundException("Invoice not found");
         }
         List<InvoiceLine> lines = invoiceLineRepository.findByInvoiceIdOrderBySortOrderAsc(invoice.getId());
-        return pdfService.render(invoice, lines);
+        return new InvoicePdf(invoice.getInvoiceNumber(), pdfService.render(invoice, lines));
     }
 
     private boolean canAccess(Invoice invoice, UUID userId) {
