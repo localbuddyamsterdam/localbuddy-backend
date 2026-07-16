@@ -1,6 +1,7 @@
 package com.localbuddy.tripplan;
 
 import com.localbuddy.experience.City;
+import com.localbuddy.user.User;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -35,6 +36,11 @@ public class TripPlan {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "city_id", nullable = false)
     private City city;
+
+    /** Owning traveler, set only when generation required login (older/guest plans have none). */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    private User user;
 
     @Column(name = "start_date", nullable = false)
     private LocalDate startDate;

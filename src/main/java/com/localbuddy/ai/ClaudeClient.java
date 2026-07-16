@@ -52,7 +52,7 @@ public class ClaudeClient {
     public ClaudeClient(
             ObjectMapper objectMapper,
             @Value("${app.ai.anthropic.api-key:}") String apiKey,
-            @Value("${app.ai.anthropic.model:claude-sonnet-5}") String model,
+            @Value("${app.ai.anthropic.model:claude-haiku-4-5-20251001}") String model,
             @Value("${app.ai.anthropic.base-url:https://api.anthropic.com/v1/messages}") String baseUrl,
             @Value("${app.ai.anthropic.max-tokens:1024}") int maxTokens,
             @Value("${app.ai.anthropic.timeout-seconds:90}") int timeoutSeconds,

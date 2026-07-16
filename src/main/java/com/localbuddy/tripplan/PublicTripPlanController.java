@@ -6,7 +6,9 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -22,34 +24,22 @@ public class PublicTripPlanController {
 
     private final TripPlanService tripPlanService;
     private final TripPlanCheckoutService tripPlanCheckoutService;
+    private final TripPlanPdfService tripPlanPdfService;
     private final RateLimitService rateLimitService;
     private final ClientIpResolver clientIpResolver;
 
     public PublicTripPlanController(
             TripPlanService tripPlanService,
             TripPlanCheckoutService tripPlanCheckoutService,
+            TripPlanPdfService tripPlanPdfService,
             RateLimitService rateLimitService,
             ClientIpResolver clientIpResolver
     ) {
         this.tripPlanService = tripPlanService;
         this.tripPlanCheckoutService = tripPlanCheckoutService;
+        this.tripPlanPdfService = tripPlanPdfService;
         this.rateLimitService = rateLimitService;
         this.clientIpResolver = clientIpResolver;
-    }
-
-    @Operation(summary = "Generate a trip plan",
-            description = "Builds a day-by-day itinerary for the given city and dates, weaving in real bookable "
-                    + "LocalBuddy experiences at their actual slot times. Returns a saved, shareable plan.")
-    @PostMapping
-    public ResponseEntity<TripPlanResponse> createTripPlan(
-            HttpServletRequest servletRequest,
-            @Valid @RequestBody CreateTripPlanRequest request
-    ) {
-        String clientIp = clientIpResolver.resolveClientIp(servletRequest);
-        // Much tighter than the generic public limit — each call is a paid model generation.
-        rateLimitService.checkPublicApiLimit("ai-trip-plan:" + clientIp, 3, 60);
-        rateLimitService.checkPublicApiLimit("ai-trip-plan-daily:" + clientIp, 30, 86400);
-        return ResponseEntity.status(HttpStatus.CREATED).body(tripPlanService.createPlan(request));
     }
 
     @Operation(summary = "Get a saved trip plan",
@@ -62,6 +52,23 @@ public class PublicTripPlanController {
         String clientIp = clientIpResolver.resolveClientIp(servletRequest);
         rateLimitService.checkPublicApiLimit("trip-plan-view:" + clientIp);
         return ResponseEntity.ok(tripPlanService.getPlanByToken(token));
+    }
+
+    @Operation(summary = "Export a trip plan as PDF",
+            description = "The saved plan, rendered as a downloadable day-by-day PDF itinerary.")
+    @GetMapping("/{token}/pdf")
+    public ResponseEntity<byte[]> downloadPdf(
+            HttpServletRequest servletRequest,
+            @PathVariable String token
+    ) {
+        String clientIp = clientIpResolver.resolveClientIp(servletRequest);
+        rateLimitService.checkPublicApiLimit("trip-plan-pdf:" + clientIp, 10, 60);
+        TripPlanResponse plan = tripPlanService.getPlanByToken(token);
+        byte[] pdf = tripPlanPdfService.render(plan);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"itinerary-" + token + ".pdf\"")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdf);
     }
 
     @Operation(summary = "Book selected trip-plan items as a guest",

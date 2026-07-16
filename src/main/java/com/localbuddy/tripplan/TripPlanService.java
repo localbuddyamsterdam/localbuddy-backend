@@ -21,9 +21,12 @@ import com.localbuddy.deals.DealService;
 import com.localbuddy.experience.City;
 import com.localbuddy.experience.CityRepository;
 import com.localbuddy.experience.Experience;
+import com.localbuddy.user.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -118,6 +121,7 @@ public class TripPlanService {
             """;
 
     private final TripPlanRepository tripPlanRepository;
+    private final UserRepository userRepository;
     private final CityRepository cityRepository;
     private final AvailabilitySlotService availabilitySlotService;
     private final AvailabilitySlotRepository availabilitySlotRepository;
@@ -133,6 +137,7 @@ public class TripPlanService {
 
     public TripPlanService(
             TripPlanRepository tripPlanRepository,
+            UserRepository userRepository,
             CityRepository cityRepository,
             AvailabilitySlotService availabilitySlotService,
             AvailabilitySlotRepository availabilitySlotRepository,
@@ -147,6 +152,7 @@ public class TripPlanService {
             @Value("${app.ai.trip-planner.max-tokens:12000}") int maxTokens
     ) {
         this.tripPlanRepository = tripPlanRepository;
+        this.userRepository = userRepository;
         this.cityRepository = cityRepository;
         this.availabilitySlotService = availabilitySlotService;
         this.availabilitySlotRepository = availabilitySlotRepository;
@@ -168,10 +174,10 @@ public class TripPlanService {
     }
 
     /**
-     * Generates, validates, and persists a new itinerary. Deliberately NOT transactional:
-     * the model call must never run inside an open database transaction.
+     * Generates, validates, and persists a new itinerary owned by {@code userId}. Deliberately
+     * NOT transactional: the model call must never run inside an open database transaction.
      */
-    public TripPlanResponse createPlan(CreateTripPlanRequest request) {
+    public TripPlanResponse createPlan(CreateTripPlanRequest request, UUID userId) {
         City city = cityRepository.findBySlug(request.citySlug().trim().toLowerCase())
                 .filter(City::isActive)
                 .orElseThrow(() -> new ResourceNotFoundException("City not found"));
@@ -219,6 +225,7 @@ public class TripPlanService {
         TripPlan tripPlan = new TripPlan();
         tripPlan.setToken(generateToken());
         tripPlan.setCity(city);
+        tripPlan.setUser(userRepository.getReferenceById(userId));
         tripPlan.setStartDate(request.startDate());
         tripPlan.setEndDate(request.endDate());
         tripPlan.setPartySize(request.partySize());
@@ -256,6 +263,31 @@ public class TripPlanService {
     }
 
     public record TripPlanWithDocument(UUID tripPlanId, Integer partySize, TripPlanDocument document) {
+    }
+
+    /** "My itineraries" (account tab): lightweight rows, newest first — no availability refresh. */
+    @Transactional(readOnly = true)
+    public Page<TripPlanSummaryResponse> listMine(UUID userId, Pageable pageable) {
+        return tripPlanRepository.findByUserIdOrderByCreatedAtDesc(userId, pageable)
+                .map(plan -> new TripPlanSummaryResponse(
+                        plan.getToken(),
+                        extractTitle(plan.getPlan()),
+                        plan.getCity().getSlug(),
+                        plan.getCity().getName(),
+                        plan.getStartDate(),
+                        plan.getEndDate(),
+                        plan.getPartySize(),
+                        plan.getCreatedAt()
+                ));
+    }
+
+    /** Reads just the "title" field from the stored plan JSON — no full document deserialization. */
+    private String extractTitle(String planJson) {
+        try {
+            return objectMapper.readTree(planJson).path("title").asText("Your trip plan");
+        } catch (Exception ex) {
+            return "Your trip plan";
+        }
     }
 
     // ------------------------------------------------------------------
@@ -662,7 +694,8 @@ public class TripPlanService {
     // ------------------------------------------------------------------
 
     private TripPlanResponse toResponse(TripPlan tripPlan, City city, TripPlanDocument document) {
-        String shareUrl = frontendBaseUrl + "/trip-planner/plan/" + tripPlan.getToken();
+        // Must match the Angular route exactly: /trip-planner/:token (no extra path segment).
+        String shareUrl = frontendBaseUrl + "/trip-planner/" + tripPlan.getToken();
         List<String> bookableItemIds = document.days().stream()
                 .flatMap(day -> day.items().stream())
                 .filter(TripPlanItem::bookable)
