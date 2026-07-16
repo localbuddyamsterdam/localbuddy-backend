@@ -82,8 +82,8 @@ public class TripPlanService {
               "additionalProperties": false,
               "required": ["title", "summary", "days", "tips"],
               "properties": {
-                "title": {"type": "string"},
-                "summary": {"type": "string"},
+                "title": {"type": "string", "description": "Max 6 words"},
+                "summary": {"type": "string", "description": "Exactly 2 sentences"},
                 "days": {
                   "type": "array",
                   "items": {
@@ -92,7 +92,7 @@ public class TripPlanService {
                     "required": ["date", "theme", "items"],
                     "properties": {
                       "date": {"type": "string"},
-                      "theme": {"type": "string"},
+                      "theme": {"type": "string", "description": "3-5 words"},
                       "items": {
                         "type": "array",
                         "items": {
@@ -104,7 +104,7 @@ public class TripPlanService {
                             "startTimeLocal": {"type": "string", "description": "24h HH:mm local time"},
                             "kind": {"type": "string", "enum": ["EXPERIENCE", "FOOD", "SIGHT", "TIP"]},
                             "title": {"type": "string"},
-                            "description": {"type": "string"},
+                            "description": {"type": "string", "description": "One vivid sentence, max 18 words"},
                             "experienceId": {"anyOf": [{"type": "string"}, {"type": "null"}]},
                             "slotId": {"anyOf": [{"type": "string"}, {"type": "null"}]},
                             "placeName": {"anyOf": [{"type": "string"}, {"type": "null"}]},
@@ -115,7 +115,7 @@ public class TripPlanService {
                     }
                   }
                 },
-                "tips": {"type": "array", "items": {"type": "string"}}
+                "tips": {"type": "array", "items": {"type": "string", "description": "One line, max 12 words"}}
               }
             }
             """;
@@ -558,12 +558,15 @@ public class TripPlanService {
                 activity, a late-afternoon/sunset moment (SIGHT), and an evening plan (FOOD or an evening EXPERIENCE).
                 - startTimeLocal is 24h "HH:mm" local time. Order items chronologically. No overlaps: respect each \
                 experience's durationMinutes and leave at least 30 minutes of travel time between consecutive items.
-                - Descriptions: 1-2 engaging sentences each. Mention a deal briefly in the description only if that \
-                exact experience has one listed.
+                - BREVITY (the plan is skimmed on a phone — short, punchy, concrete): title max 6 words; \
+                summary exactly 2 sentences; each day's theme 3-5 words; each item description exactly ONE \
+                vivid sentence of at most 18 words. No filler phrases like "immerse yourself" or "hidden gem" — \
+                name the concrete thing that makes the place worth it. Mention a deal in a description only \
+                if that exact experience has one listed.
                 - Honor the traveler's interests, notes, dietary hints, and party size.
                 - If the provided experience list is empty or sparse, still produce an excellent local itinerary \
                 from FOOD/SIGHT/TIP items and say so in the summary.
-                - tips: 2-5 short practical tips for this city and season.
+                - tips: exactly 3 practical one-line tips (max 12 words each) for this city and season.
                 """ + privateRule + languageRule).formatted(dayCount);
     }
 
