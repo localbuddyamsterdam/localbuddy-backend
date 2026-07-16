@@ -248,6 +248,23 @@ app:
       booking-reminder: ${WHATSAPP_TEMPLATE_BOOKING_REMINDER:}
       booking-cancelled: ${WHATSAPP_TEMPLATE_BOOKING_CANCELLED:}
 
+  # Third-party attraction tickets (museums, landmarks) via the Tiqets aggregator.
+  # Dormant until TIQETS_API_KEY is set (same convention as every other integration).
+  attractions:
+    # Master switch: flip to false to hide the whole attractions surface even with a key set.
+    enabled: ${ATTRACTIONS_ENABLED:true}
+    # In-app ordering through the distributor API (needs an approved Tiqets DISTRIBUTOR
+    # account, not just an affiliate id). Off = search + affiliate "Get tickets" link-out only.
+    booking-enabled: ${ATTRACTIONS_BOOKING_ENABLED:false}
+    tiqets:
+      api-key: ${TIQETS_API_KEY:}
+      base-url: ${TIQETS_BASE_URL:https://api.tiqets.com/v2}
+      # Affiliate/partner id appended to every ticket link so link-out sales earn commission.
+      partner-id: ${TIQETS_PARTNER_ID:}
+      # Our city slug -> Tiqets city id, CSV (e.g. "amsterdam:75061,paris:66746"). Slugs
+      # without a mapping fall back to a free-text search on the city name.
+      city-map: ${TIQETS_CITY_MAP:}
+
   wallet:
     google:
       issuer-id: ${GOOGLE_WALLET_ISSUER_ID:}
