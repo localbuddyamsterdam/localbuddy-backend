@@ -6,6 +6,8 @@ import com.localbuddy.notification.email.EmailSendRequest;
 import com.localbuddy.notification.email.EmailSendResult;
 import com.localbuddy.whatsapp.WhatsAppSendResult;
 import com.localbuddy.whatsapp.WhatsAppService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,6 +16,8 @@ import java.util.UUID;
 
 @Service
 public class NotificationProcessingService {
+
+    private static final Logger log = LoggerFactory.getLogger(NotificationProcessingService.class);
 
     private final NotificationRepository notificationRepository;
     private final EmailProviderService emailProviderService;
@@ -46,6 +50,8 @@ public class NotificationProcessingService {
         try {
             processNotification(notification);
         } catch (Exception ex) {
+            log.warn("Notification {} ({}/{}) failed to process", notification.getId(),
+                    notification.getChannel(), notification.getNotificationType(), ex);
             notification.setStatus(NotificationStatus.FAILED);
             notification.setFailureReason(ex.getMessage());
             notification.setUpdatedAt(Instant.now());
@@ -115,6 +121,12 @@ public class NotificationProcessingService {
             notification.setFailureReason(null);
             notification.setSentAt(Instant.now());
         } else {
+            // The email provider catches its own exceptions and returns success=false rather than
+            // throwing, so this is the only place a send failure is ever visible — log it, or it
+            // only ever surfaces as a FAILED row nobody is looking at.
+            log.warn("Email send failed for notification {} ({}) to {}: {}",
+                    notification.getId(), notification.getNotificationType(),
+                    notification.getRecipientEmail(), result.failureReason());
             notification.setStatus(NotificationStatus.FAILED);
             notification.setFailureReason(result.failureReason());
         }

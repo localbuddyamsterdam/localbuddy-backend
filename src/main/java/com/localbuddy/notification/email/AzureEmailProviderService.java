@@ -7,6 +7,8 @@ import com.azure.communication.email.models.EmailAttachment;
 import com.azure.communication.email.models.EmailMessage;
 import com.azure.core.util.BinaryData;
 import com.azure.core.util.polling.SyncPoller;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
@@ -18,6 +20,8 @@ import java.util.List;
         havingValue = "azure"
 )
 public class AzureEmailProviderService implements EmailProviderService {
+
+    private static final Logger log = LoggerFactory.getLogger(AzureEmailProviderService.class);
 
     private final EmailProperties emailProperties;
     private final AzureCommunicationProperties azureCommunicationProperties;
@@ -76,6 +80,7 @@ public class AzureEmailProviderService implements EmailProviderService {
             );
 
         } catch (Exception ex) {
+            log.warn("ACS email send failed for {}: {}", request.toEmail(), ex.toString(), ex);
             return new EmailSendResult(
                     false,
                     null,
