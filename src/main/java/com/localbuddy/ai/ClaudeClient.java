@@ -89,6 +89,11 @@ public class ClaudeClient {
         return model;
     }
 
+    /** Effort control exists on Sonnet/Opus-tier models; Haiku 400s on it. */
+    private boolean modelSupportsEffort() {
+        return model != null && !model.toLowerCase(java.util.Locale.ROOT).contains("haiku");
+    }
+
     /** Send a single-turn prompt and return the concatenated text content. */
     public String complete(String systemPrompt, String userPrompt) {
         requireConfigured();
@@ -135,7 +140,10 @@ public class ClaudeClient {
         Object outputSchemaJson = objectMapper.convertValue(outputSchema, Object.class);
         Map<String, Object> outputConfig = new HashMap<>();
         outputConfig.put("format", Map.of("type", "json_schema", "schema", outputSchemaJson));
-        if (options.effort() != null && !options.effort().isBlank()) {
+        // output_config.effort is only supported by Sonnet/Opus-tier models — Haiku rejects the
+        // whole request with a 400 invalid_request_error (this silently broke every chat call
+        // when the configured model swapped to Haiku). Send it only when the model supports it.
+        if (options.effort() != null && !options.effort().isBlank() && modelSupportsEffort()) {
             outputConfig.put("effort", options.effort());
         }
         body.put("output_config", outputConfig);
