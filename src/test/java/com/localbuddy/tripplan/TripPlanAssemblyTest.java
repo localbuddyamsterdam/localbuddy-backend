@@ -12,6 +12,7 @@ import com.localbuddy.experience.City;
 import com.localbuddy.experience.CityRepository;
 import com.localbuddy.experience.Experience;
 import com.localbuddy.localprofile.LocalProfile;
+import com.localbuddy.user.UserRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -45,8 +46,10 @@ class TripPlanAssemblyTest {
 
     private static final ZoneId ZONE = ZoneId.of("Europe/Amsterdam");
     private static final LocalDate START = LocalDate.now(ZONE).plusDays(7);
+    private static final UUID TRAVELER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
 
     private final TripPlanRepository tripPlanRepository = mock(TripPlanRepository.class);
+    private final UserRepository userRepository = mock(UserRepository.class);
     private final CityRepository cityRepository = mock(CityRepository.class);
     private final AvailabilitySlotService availabilitySlotService = mock(AvailabilitySlotService.class);
     private final AvailabilitySlotRepository availabilitySlotRepository = mock(AvailabilitySlotRepository.class);
@@ -56,7 +59,7 @@ class TripPlanAssemblyTest {
     private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
 
     private final TripPlanService tripPlanService = new TripPlanService(
-            tripPlanRepository, cityRepository, availabilitySlotService, availabilitySlotRepository,
+            tripPlanRepository, userRepository, cityRepository, availabilitySlotService, availabilitySlotRepository,
             bookingWindowPolicy, dealService, claudeClient, objectMapper,
             "https://app.example.com", 7, 40, 4, 12000);
 
@@ -147,7 +150,7 @@ class TripPlanAssemblyTest {
                  "placeName":null,"placeArea":null}
                 """.formatted(experience.getId(), morningSlot.getId())));
 
-        TripPlanResponse response = tripPlanService.createPlan(request());
+        TripPlanResponse response = tripPlanService.createPlan(request(), TRAVELER_ID);
 
         TripPlanItem item = response.plan().days().get(0).items().get(0);
         assertTrue(item.bookable(), "item is bookable");
@@ -169,7 +172,7 @@ class TripPlanAssemblyTest {
                  "placeName":null,"placeArea":null}
                 """.formatted(UUID.randomUUID(), UUID.randomUUID())));
 
-        TripPlanResponse response = tripPlanService.createPlan(request());
+        TripPlanResponse response = tripPlanService.createPlan(request(), TRAVELER_ID);
 
         assertTrue(response.plan().days().get(0).items().isEmpty(), "invented experience removed");
         assertEquals(0, response.bookableItemIds().size());
@@ -184,7 +187,7 @@ class TripPlanAssemblyTest {
                  "placeName":null,"placeArea":null}
                 """.formatted(experience.getId(), UUID.randomUUID())));
 
-        TripPlanResponse response = tripPlanService.createPlan(request());
+        TripPlanResponse response = tripPlanService.createPlan(request(), TRAVELER_ID);
 
         TripPlanItem item = response.plan().days().get(0).items().get(0);
         assertTrue(item.bookable());
@@ -201,7 +204,7 @@ class TripPlanAssemblyTest {
                 """.formatted(experience.getId(), morningSlot.getId());
         stubWorld(modelJson(item + "," + item));
 
-        TripPlanResponse response = tripPlanService.createPlan(request());
+        TripPlanResponse response = tripPlanService.createPlan(request(), TRAVELER_ID);
 
         List<TripPlanItem> items = response.plan().days().get(0).items();
         long morningUses = items.stream().filter(i -> morningSlot.getId().equals(i.slotId())).count();
@@ -222,7 +225,7 @@ class TripPlanAssemblyTest {
                  "placeName":null,"placeArea":null}
                 """));
 
-        TripPlanResponse response = tripPlanService.createPlan(request());
+        TripPlanResponse response = tripPlanService.createPlan(request(), TRAVELER_ID);
 
         List<TripPlanItem> items = response.plan().days().get(0).items();
         TripPlanItem food = items.get(0);
