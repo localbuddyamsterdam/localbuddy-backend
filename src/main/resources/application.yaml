@@ -2,6 +2,15 @@ spring:
   application:
     name: localbuddy-backend
 
+  # Scheduler thread pool. The ~12 @Scheduled processors previously shared Spring's default
+  # single scheduling thread, so one slow tick blocked all the others. Parallelise them: each
+  # job still can't overlap itself (fixedDelay), and distinct jobs mutate their rows under DB
+  # locks, so concurrent runs are safe.
+  task:
+    scheduling:
+      pool:
+        size: ${SCHEDULING_POOL_SIZE:4}
+
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
 
