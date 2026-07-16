@@ -25,6 +25,7 @@ public class PublicTripPlanController {
     private final TripPlanService tripPlanService;
     private final TripPlanCheckoutService tripPlanCheckoutService;
     private final TripPlanPdfService tripPlanPdfService;
+    private final TripPlanCalendarService tripPlanCalendarService;
     private final RateLimitService rateLimitService;
     private final ClientIpResolver clientIpResolver;
 
@@ -32,12 +33,14 @@ public class PublicTripPlanController {
             TripPlanService tripPlanService,
             TripPlanCheckoutService tripPlanCheckoutService,
             TripPlanPdfService tripPlanPdfService,
+            TripPlanCalendarService tripPlanCalendarService,
             RateLimitService rateLimitService,
             ClientIpResolver clientIpResolver
     ) {
         this.tripPlanService = tripPlanService;
         this.tripPlanCheckoutService = tripPlanCheckoutService;
         this.tripPlanPdfService = tripPlanPdfService;
+        this.tripPlanCalendarService = tripPlanCalendarService;
         this.rateLimitService = rateLimitService;
         this.clientIpResolver = clientIpResolver;
     }
@@ -69,6 +72,37 @@ public class PublicTripPlanController {
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"itinerary-" + token + ".pdf\"")
                 .contentType(MediaType.APPLICATION_PDF)
                 .body(pdf);
+    }
+
+    @Operation(summary = "Export a trip plan as a calendar (.ics)",
+            description = "The whole itinerary as one iCalendar file — booked experiences at their real slot "
+                    + "times, suggestions at their planned local times — importable into Google/Apple/Outlook.")
+    @GetMapping("/{token}/calendar")
+    public ResponseEntity<byte[]> downloadCalendar(
+            HttpServletRequest servletRequest,
+            @PathVariable String token
+    ) {
+        String clientIp = clientIpResolver.resolveClientIp(servletRequest);
+        rateLimitService.checkPublicApiLimit("trip-plan-calendar:" + clientIp, 10, 60);
+        String ics = tripPlanCalendarService.buildCalendar(token);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"itinerary-" + token + ".ics\"")
+                .contentType(MediaType.parseMediaType("text/calendar; charset=UTF-8"))
+                .body(ics.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    }
+
+    @Operation(summary = "Rate a trip plan",
+            description = "One-tap 'was this itinerary helpful?' feedback; a repeat vote overwrites the previous one.")
+    @PostMapping("/{token}/feedback")
+    public ResponseEntity<Void> submitFeedback(
+            HttpServletRequest servletRequest,
+            @PathVariable String token,
+            @Valid @RequestBody TripPlanFeedbackRequest request
+    ) {
+        String clientIp = clientIpResolver.resolveClientIp(servletRequest);
+        rateLimitService.checkPublicApiLimit("trip-plan-feedback:" + clientIp, 10, 60);
+        tripPlanService.recordFeedback(token, request.helpful());
+        return ResponseEntity.noContent().build();
     }
 
     @Operation(summary = "Book selected trip-plan items as a guest",

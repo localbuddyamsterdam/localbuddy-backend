@@ -70,7 +70,8 @@ public class TripPlanCheckoutService {
                     null,
                     null,
                     null,
-                    null,
+                    // A private plan books every item as a whole-slot buyout at the flat price.
+                    plan.privateTour() ? Boolean.TRUE : null,
                     request.emergencyContactFirstName(),
                     request.emergencyContactLastName(),
                     request.emergencyContactEmail(),
@@ -128,7 +129,8 @@ public class TripPlanCheckoutService {
                     null,
                     request.acceptedTerms(),
                     request.consentVersion(),
-                    null,
+                    // A private plan books every item as a whole-slot buyout at the flat price.
+                    plan.privateTour() ? Boolean.TRUE : null,
                     request.emergencyContactFirstName(),
                     request.emergencyContactLastName(),
                     request.emergencyContactEmail(),

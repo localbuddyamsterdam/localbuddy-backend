@@ -14,6 +14,25 @@ public class TripPlanPdfService {
 
     private static final DateTimeFormatter DAY_FORMAT = DateTimeFormatter.ofPattern("EEEE d MMMM", Locale.ENGLISH);
 
+    /**
+     * The handful of static labels the PDF prints around the (already localized) plan text,
+     * in the plan's own language. Weekday/month names follow the same locale via {@code locale}.
+     */
+    private record Labels(Locale locale, String day, String to, String travellerOne, String travellerMany,
+                          String privateTours, String goodToKnow, String perPerson, String forYourGroup) {
+
+        static Labels of(String language) {
+            return switch (language == null ? "en" : language) {
+                case "nl" -> new Labels(Locale.of("nl"), "Dag", "t/m", "reiziger", "reizigers",
+                        "Privétours", "Goed om te weten", " p.p.", " voor je groep");
+                case "fr" -> new Labels(Locale.of("fr"), "Jour", "au", "voyageur", "voyageurs",
+                        "Visites privées", "Bon à savoir", " / personne", " pour votre groupe");
+                default -> new Labels(Locale.ENGLISH, "Day", "to", "traveller", "travellers",
+                        "Private tours", "Good to know", " / person", " for your group");
+            };
+        }
+    }
+
     public byte[] render(TripPlanResponse plan) {
         String html = buildHtml(plan);
         try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
@@ -30,12 +49,15 @@ public class TripPlanPdfService {
 
     private String buildHtml(TripPlanResponse plan) {
         TripPlanDocument doc = plan.plan();
+        Labels labels = Labels.of(plan.language());
+        DateTimeFormatter dayFormat = DAY_FORMAT.withLocale(labels.locale());
         StringBuilder days = new StringBuilder();
         int dayNum = 1;
         for (TripPlanDay day : doc.days()) {
             days.append("<div class='day'>")
-                    .append("<div class='day-head'><span class='daynum'>Day ").append(dayNum++).append("</span>")
-                    .append("<span class='daydate'>").append(DAY_FORMAT.format(day.date())).append("</span></div>");
+                    .append("<div class='day-head'><span class='daynum'>").append(labels.day())
+                    .append(" ").append(dayNum++).append("</span>")
+                    .append("<span class='daydate'>").append(dayFormat.format(day.date())).append("</span></div>");
             if (notBlank(day.theme())) {
                 days.append("<div class='theme'>").append(esc(day.theme())).append("</div>");
             }
@@ -46,7 +68,10 @@ public class TripPlanPdfService {
                         .append("<div class='item-title'>").append(esc(item.title()));
                 if ("EXPERIENCE".equals(item.kind()) && item.pricePerGuest() != null) {
                     days.append(" <span class='price'>").append(money(item.pricePerGuest()))
-                            .append(" ").append(esc(doc.currency())).append(" / person</span>");
+                            .append(" ").append(esc(doc.currency()))
+                            // Private plans store the flat whole-group buyout price on the item.
+                            .append(esc(plan.privateTour() ? labels.forYourGroup() : labels.perPerson()))
+                            .append("</span>");
                 }
                 days.append("</div>");
                 if (notBlank(item.description())) {
@@ -62,7 +87,7 @@ public class TripPlanPdfService {
 
         StringBuilder tips = new StringBuilder();
         if (!doc.tips().isEmpty()) {
-            tips.append("<div class='tips'><h2>Good to know</h2><ul>");
+            tips.append("<div class='tips'><h2>").append(esc(labels.goodToKnow())).append("</h2><ul>");
             for (String tip : doc.tips()) {
                 tips.append("<li>").append(esc(tip)).append("</li>");
             }
@@ -97,14 +122,26 @@ public class TripPlanPdfService {
                 + "<h1>" + esc(doc.title()) + "</h1>"
                 + "<div class='meta'>" + esc(plan.cityName())
                 + (notBlank(plan.country()) ? ", " + esc(plan.country()) : "")
-                + " &middot; " + plan.startDate() + " to " + plan.endDate()
-                + " &middot; " + plan.partySize() + (plan.partySize() != null && plan.partySize() == 1 ? " traveller" : " travellers")
+                // openhtmltopdf parses this as strict XML — named HTML entities like &middot; are
+                // undeclared there and abort the whole render, so use the numeric form.
+                + " &#183; " + plan.startDate() + " " + esc(labels.to()) + " " + plan.endDate()
+                + partySizeFragment(plan.partySize(), labels)
+                + (plan.privateTour() ? " &#183; " + esc(labels.privateTours()) : "")
                 + "</div>"
                 + (notBlank(doc.summary()) ? "<div class='summary'>" + esc(doc.summary()) + "</div>" : "")
                 + "</div>"
                 + days
                 + tips
                 + "</body></html>";
+    }
+
+    /** Older plans may have no stored party size — omit the fragment rather than print "null travellers". */
+    private static String partySizeFragment(Integer partySize, Labels labels) {
+        if (partySize == null) {
+            return "";
+        }
+        return " &#183; " + partySize + " "
+                + esc(partySize == 1 ? labels.travellerOne() : labels.travellerMany());
     }
 
     private static String money(BigDecimal v) {

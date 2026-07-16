@@ -12,6 +12,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -67,5 +68,20 @@ public class TripPlanController {
         UUID userId = UUID.fromString(authentication.getName());
         Pageable pageable = PageRequest.of(page, Math.min(size, 50));
         return ResponseEntity.ok(tripPlanService.listMine(userId, pageable));
+    }
+
+    @Operation(summary = "Replace a sold-out itinerary item",
+            description = "Verifies the item's slot really is no longer bookable, then swaps in the closest live "
+                    + "alternative for the same day — preferring another time of the same experience, otherwise "
+                    + "an experience not already in the plan. Owner only.")
+    @PostMapping("/{token}/items/{itemId}/alternative")
+    public ResponseEntity<TripPlanResponse> replaceSoldOutItem(
+            Authentication authentication,
+            @PathVariable String token,
+            @PathVariable String itemId
+    ) {
+        UUID userId = UUID.fromString(authentication.getName());
+        rateLimitService.checkPublicApiLimit("trip-plan-heal:" + userId, 10, 60);
+        return ResponseEntity.ok(tripPlanService.replaceSoldOutItem(userId, token, itemId));
     }
 }

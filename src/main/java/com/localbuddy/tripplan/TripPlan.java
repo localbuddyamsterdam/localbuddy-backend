@@ -51,6 +51,10 @@ public class TripPlan {
     @Column(name = "party_size", nullable = false)
     private Integer partySize = 2;
 
+    /** True when the plan was generated for private whole-slot buyouts instead of shared seats. */
+    @Column(name = "private_tour", nullable = false)
+    private boolean privateTour = false;
+
     @Column(name = "interests", length = 500)
     private String interests;
 
@@ -65,6 +69,17 @@ public class TripPlan {
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "plan", nullable = false, columnDefinition = "jsonb")
     private String plan;
+
+    /** Language of the generated itinerary text (en/nl/fr) — set from the traveler's UI language. */
+    @Column(name = "language", nullable = false, length = 5)
+    private String language = "en";
+
+    /** One-tap plan feedback ("was this itinerary helpful?"); null until the traveler votes. */
+    @Column(name = "feedback_helpful")
+    private Boolean feedbackHelpful;
+
+    @Column(name = "feedback_at")
+    private Instant feedbackAt;
 
     @Column(name = "model", length = 60)
     private String model;

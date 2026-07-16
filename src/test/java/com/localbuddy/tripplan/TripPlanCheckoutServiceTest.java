@@ -61,7 +61,7 @@ class TripPlanCheckoutServiceTest {
                 BigDecimal.ZERO, List.of(new TripPlanDay(LocalDate.now().plusDays(3), "Day", List.of(items))),
                 List.of());
         when(tripPlanService.getPlanEntityByToken("tok"))
-                .thenReturn(new TripPlanService.TripPlanWithDocument(planId, 2, document));
+                .thenReturn(new TripPlanService.TripPlanWithDocument(planId, 2, false, document));
     }
 
     private PaymentGroupResponse groupResponse() {

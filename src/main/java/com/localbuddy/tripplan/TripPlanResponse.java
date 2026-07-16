@@ -19,7 +19,11 @@ public record TripPlanResponse(
         LocalDate startDate,
         LocalDate endDate,
         Integer partySize,
+        /** True when every EXPERIENCE item is a private whole-group buyout at a flat price. */
+        boolean privateTour,
         String interests,
+        /** Language of the itinerary text (en/nl/fr); also drives the PDF's static labels. */
+        String language,
         TripPlanDocument plan,
         List<String> bookableItemIds,
         Instant createdAt

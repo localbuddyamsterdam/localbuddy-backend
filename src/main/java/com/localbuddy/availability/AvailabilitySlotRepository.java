@@ -59,6 +59,18 @@ public interface AvailabilitySlotRepository extends JpaRepository<AvailabilitySl
     List<AvailabilitySlot> findBySourceScheduleIdAndStartTimeAfter(UUID sourceScheduleId, Instant startTime);
 
     /**
+     * Slots by id with their experience fetch-joined. The trip-plan availability refresh reads
+     * experience status/booking mode for every slot on each (public) plan view — a plain
+     * findAllById would lazy-load each experience with one query apiece.
+     */
+    @Query("""
+            select slot from AvailabilitySlot slot
+            join fetch slot.experience
+            where slot.id in :ids
+            """)
+    List<AvailabilitySlot> findAllWithExperienceByIdIn(@Param("ids") java.util.Collection<UUID> ids);
+
+    /**
      * All seat-available slots of APPROVED experiences in a city within [from, to) — the AI trip
      * planner's inventory query. Experience, host profile, category and city are fetch-joined so
      * callers can build prompt/link data outside a lazy-loading context. Booking-window cutoffs

@@ -29,6 +29,27 @@ public record CreateTripPlanRequest(
         String interests,
 
         @Size(max = 500, message = "Notes cannot exceed 500 characters")
-        String notes
+        String notes,
+
+        /**
+         * When true the itinerary is built exclusively from experiences bookable as a private
+         * whole-slot buyout for the party (flat private price); otherwise shared seats (default).
+         */
+        Boolean privateTour,
+
+        /** Itinerary text language, from the traveler's UI language; unknown/blank falls back to en. */
+        @Size(max = 5, message = "Language cannot exceed 5 characters")
+        String language
 ) {
+
+    public boolean isPrivateTour() {
+        return Boolean.TRUE.equals(privateTour);
+    }
+
+    /** Whitelisted output language — anything unsupported degrades safely to English. */
+    public String languageOrDefault() {
+        return language != null && java.util.Set.of("en", "nl", "fr").contains(language.trim().toLowerCase())
+                ? language.trim().toLowerCase()
+                : "en";
+    }
 }

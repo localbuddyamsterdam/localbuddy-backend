@@ -199,15 +199,22 @@ public class TripPlanService {
         Instant from = request.startDate().atStartOfDay(zone).toInstant();
         Instant to = request.endDate().plusDays(1).atStartOfDay(zone).toInstant();
 
-        // Real, bookable inventory only: seat-available, cutoff-open slots for the party size.
-        List<AvailabilitySlot> slots = availabilitySlotService.getBookableSlotsForCityBetween(
-                city.getSlug(), from, to, request.partySize());
+        boolean privateTour = request.isPrivateTour();
+
+        // Real, bookable inventory only. Shared mode: seat-available, cutoff-open slots for the
+        // party size. Private mode: empty slots of buyout-capable experiences (flat private price).
+        List<AvailabilitySlot> slots = privateTour
+                ? availabilitySlotService.getPrivateBuyoutSlotsForCityBetween(
+                        city.getSlug(), from, to, request.partySize())
+                : availabilitySlotService.getBookableSlotsForCityBetween(
+                        city.getSlug(), from, to, request.partySize());
         Map<UUID, ExperienceInventory> inventory = groupInventory(slots, zone);
 
         List<DealResponse> deals = liveDealsForWindow(city, from);
 
+        String language = request.languageOrDefault();
         String userPrompt = buildUserPrompt(request, city, zone, dayCount, inventory, deals);
-        String systemPrompt = buildSystemPrompt(dayCount);
+        String systemPrompt = buildSystemPrompt(dayCount, privateTour, language);
 
         JsonNode schema = readSchema();
         AiStructuredResult result = claudeClient.completeStructured(
@@ -229,9 +236,11 @@ public class TripPlanService {
         tripPlan.setStartDate(request.startDate());
         tripPlan.setEndDate(request.endDate());
         tripPlan.setPartySize(request.partySize());
+        tripPlan.setPrivateTour(privateTour);
         tripPlan.setInterests(trimToNull(request.interests()));
         tripPlan.setNotes(trimToNull(request.notes()));
         tripPlan.setStatus(TripPlanStatus.ACTIVE);
+        tripPlan.setLanguage(language);
         tripPlan.setPlan(writeDocument(document));
         tripPlan.setModel(claudeClient.getModel());
         tripPlan.setInputTokens(result.inputTokens());
@@ -244,11 +253,10 @@ public class TripPlanService {
     /** A saved plan with each bookable item's availability re-checked against live inventory. */
     @Transactional(readOnly = true)
     public TripPlanResponse getPlanByToken(String token) {
-        TripPlan tripPlan = tripPlanRepository.findByToken(token)
-                .orElseThrow(() -> new ResourceNotFoundException("Trip plan not found"));
+        TripPlan tripPlan = findActivePlanByToken(token);
 
         TripPlanDocument document = readDocument(tripPlan.getPlan());
-        TripPlanDocument refreshed = refreshAvailability(document, tripPlan.getPartySize());
+        TripPlanDocument refreshed = refreshAvailability(document, tripPlan.getPartySize(), tripPlan.isPrivateTour());
 
         return toResponse(tripPlan, tripPlan.getCity(), refreshed);
     }
@@ -256,13 +264,20 @@ public class TripPlanService {
     /** Entity + parsed document for the bundle-checkout flow. */
     @Transactional(readOnly = true)
     public TripPlanWithDocument getPlanEntityByToken(String token) {
-        TripPlan tripPlan = tripPlanRepository.findByToken(token)
-                .orElseThrow(() -> new ResourceNotFoundException("Trip plan not found"));
+        TripPlan tripPlan = findActivePlanByToken(token);
         return new TripPlanWithDocument(tripPlan.getId(), tripPlan.getPartySize(),
-                readDocument(tripPlan.getPlan()));
+                tripPlan.isPrivateTour(), readDocument(tripPlan.getPlan()));
     }
 
-    public record TripPlanWithDocument(UUID tripPlanId, Integer partySize, TripPlanDocument document) {
+    /** An archived plan is gone as far as the share link is concerned — viewing and checkout both 404. */
+    private TripPlan findActivePlanByToken(String token) {
+        return tripPlanRepository.findByToken(token)
+                .filter(plan -> plan.getStatus() == TripPlanStatus.ACTIVE)
+                .orElseThrow(() -> new ResourceNotFoundException("Trip plan not found"));
+    }
+
+    public record TripPlanWithDocument(UUID tripPlanId, Integer partySize, boolean privateTour,
+                                       TripPlanDocument document) {
     }
 
     /** "My itineraries" (account tab): lightweight rows, newest first — no availability refresh. */
@@ -288,6 +303,154 @@ public class TripPlanService {
         } catch (Exception ex) {
             return "Your trip plan";
         }
+    }
+
+    /**
+     * One-tap "was this itinerary helpful?" vote. Anyone with the share link may vote (the token
+     * is unguessable); a repeat vote simply overwrites — the point is a per-model quality signal,
+     * not a poll.
+     */
+    @Transactional
+    public void recordFeedback(String token, boolean helpful) {
+        TripPlan tripPlan = findActivePlanByToken(token);
+        tripPlan.setFeedbackHelpful(helpful);
+        tripPlan.setFeedbackAt(Instant.now());
+        tripPlanRepository.save(tripPlan);
+        log.info("Trip plan feedback: token={} helpful={} model={}", token, helpful, tripPlan.getModel());
+    }
+
+    /**
+     * Self-healing for a sold-out itinerary item (owner only): verifies the item's slot really is
+     * gone, then swaps in the closest live alternative for the same day — preferring another slot
+     * of the same experience, otherwise an experience not already in the plan — and re-saves the
+     * plan with a recomputed bookable total.
+     */
+    @Transactional
+    public TripPlanResponse replaceSoldOutItem(UUID userId, String token, String itemId) {
+        TripPlan tripPlan = findActivePlanByToken(token);
+        // 404 (not 403) for non-owners so the endpoint doesn't confirm a token exists.
+        if (tripPlan.getUser() == null || !tripPlan.getUser().getId().equals(userId)) {
+            throw new ResourceNotFoundException("Trip plan not found");
+        }
+
+        TripPlanDocument document = readDocument(tripPlan.getPlan());
+        City city = tripPlan.getCity();
+        ZoneId zone = resolveZone(city);
+        int partySize = tripPlan.getPartySize() != null ? tripPlan.getPartySize() : 1;
+        boolean privateTour = tripPlan.isPrivateTour();
+        Instant now = Instant.now();
+
+        TripPlanDay targetDay = null;
+        TripPlanItem target = null;
+        for (TripPlanDay day : document.days()) {
+            for (TripPlanItem item : day.items()) {
+                if (item.id().equals(itemId)) {
+                    targetDay = day;
+                    target = item;
+                }
+            }
+        }
+        if (target == null || !target.bookable() || target.slotId() == null) {
+            throw new BadRequestException("This item cannot be replaced");
+        }
+
+        // Live re-check — the client saying "sold out" isn't trusted.
+        AvailabilitySlot currentSlot = availabilitySlotRepository
+                .findAllWithExperienceByIdIn(List.of(target.slotId()))
+                .stream().findFirst().orElse(null);
+        if (isSlotStillBookable(currentSlot, partySize, privateTour, now)) {
+            throw new BadRequestException("This item is still bookable — no replacement needed");
+        }
+
+        LocalDate date = targetDay.date();
+        Instant from = date.atStartOfDay(zone).toInstant();
+        Instant to = date.plusDays(1).atStartOfDay(zone).toInstant();
+        List<AvailabilitySlot> daySlots = privateTour
+                ? availabilitySlotService.getPrivateBuyoutSlotsForCityBetween(city.getSlug(), from, to, partySize)
+                : availabilitySlotService.getBookableSlotsForCityBetween(city.getSlug(), from, to, partySize);
+
+        Set<UUID> usedSlotIds = document.days().stream()
+                .flatMap(day -> day.items().stream())
+                .map(TripPlanItem::slotId)
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toSet());
+        Set<UUID> plannedExperienceIds = document.days().stream()
+                .flatMap(day -> day.items().stream())
+                .map(TripPlanItem::experienceId)
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toSet());
+        UUID soldOutExperienceId = target.experienceId();
+
+        List<AvailabilitySlot> candidates = daySlots.stream()
+                .filter(slot -> !usedSlotIds.contains(slot.getId()))
+                .filter(slot -> slot.getExperience().getId().equals(soldOutExperienceId)
+                        || !plannedExperienceIds.contains(slot.getExperience().getId()))
+                .toList();
+
+        String intendedTime = target.startTimeLocal();
+        AvailabilitySlot replacementSlot = pickClosestFreeSlot(
+                candidates.stream()
+                        .filter(slot -> slot.getExperience().getId().equals(soldOutExperienceId))
+                        .toList(),
+                Set.of(), intendedTime, zone);
+        boolean sameExperience = replacementSlot != null;
+        if (replacementSlot == null) {
+            replacementSlot = pickClosestFreeSlot(candidates, Set.of(), intendedTime, zone);
+        }
+        if (replacementSlot == null) {
+            throw new ResourceNotFoundException("No bookable alternative was found for that day");
+        }
+
+        Experience experience = replacementSlot.getExperience();
+        String slotTimeLocal = TIME_FORMAT.format(replacementSlot.getStartTime().atZone(zone));
+        BigDecimal itemPrice = privateTour ? experience.getPrivatePrice() : experience.getPriceAmount();
+        String description = sameExperience
+                ? target.description()
+                : replacementNote(tripPlan.getLanguage()).formatted(target.title());
+
+        TripPlanItem replacement = new TripPlanItem(
+                target.id(), slotTimeLocal, "EXPERIENCE",
+                sameExperience ? target.title() : experience.getTitle(),
+                description,
+                experience.getId(), experience.getSlug(), experience.getTitle(),
+                frontendBaseUrl + "/experience/" + experience.getSlug(),
+                buildBookingUrl(experience, date, slotTimeLocal, partySize, privateTour),
+                replacementSlot.getId(), replacementSlot.getStartTime(), replacementSlot.getEndTime(),
+                itemPrice, null, experienceMapsUrl(experience), true, null);
+
+        List<TripPlanDay> newDays = document.days().stream()
+                .map(day -> day.withItems(day.items().stream()
+                        .map(item -> item.id().equals(itemId) ? replacement : item)
+                        .toList()))
+                .toList();
+        TripPlanDocument updated = recomputeEstimatedTotal(document.withDays(newDays), partySize, privateTour);
+
+        tripPlan.setPlan(writeDocument(updated));
+        tripPlan = tripPlanRepository.save(tripPlan);
+
+        return toResponse(tripPlan, city, refreshAvailability(updated, partySize, privateTour));
+    }
+
+    /** Note shown on a swapped-in item, in the plan's own language. */
+    private String replacementNote(String language) {
+        return switch (language == null ? "en" : language) {
+            case "nl" -> "Vervanging voor \"%s\", dat niet meer beschikbaar is.";
+            case "fr" -> "Remplacement de « %s », qui n'est plus disponible.";
+            default -> "Replacement for \"%s\", which is no longer available.";
+        };
+    }
+
+    /** Same math as initial assembly: private = flat buyout price, shared = per-guest × party. */
+    private TripPlanDocument recomputeEstimatedTotal(TripPlanDocument document, int partySize, boolean privateTour) {
+        BigDecimal total = document.days().stream()
+                .flatMap(day -> day.items().stream())
+                .filter(TripPlanItem::bookable)
+                .map(TripPlanItem::pricePerGuest)
+                .filter(java.util.Objects::nonNull)
+                .map(price -> privateTour ? price : price.multiply(BigDecimal.valueOf(partySize)))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return new TripPlanDocument(document.title(), document.summary(), document.currency(),
+                total, document.days(), document.tips());
     }
 
     // ------------------------------------------------------------------
@@ -356,8 +519,26 @@ public class TripPlanService {
         }
     }
 
-    private String buildSystemPrompt(long dayCount) {
-        return """
+    private String buildSystemPrompt(long dayCount, boolean privateTour, String language) {
+        String privateRule = privateTour
+                ? """
+                - PRIVATE TOURS: the traveler booked this trip as private tours — every listed \
+                experience is reserved exclusively for their group (no other guests join), and the \
+                listed privateTotalPrice is the flat price for the whole group, not per person. \
+                Reflect this exclusivity naturally in your descriptions.
+                """
+                : "";
+        String languageName = switch (language) {
+            case "nl" -> "Dutch";
+            case "fr" -> "French";
+            default -> "English";
+        };
+        String languageRule = "en".equals(language) ? "" :
+                "- LANGUAGE: write every human-readable text (title, summary, day themes, descriptions, "
+                        + "FOOD/SIGHT/TIP titles, tips) in " + languageName + ". Keep proper nouns and place "
+                        + "names in their local form, and copy LocalBuddy experience titles EXACTLY as given — "
+                        + "never translate them.\n";
+        return ("""
                 You are the AI trip planner for LocalBuddy, a marketplace where travelers book small-group \
                 experiences hosted by locals. You design warm, realistic, city-local itineraries.
 
@@ -383,7 +564,7 @@ public class TripPlanService {
                 - If the provided experience list is empty or sparse, still produce an excellent local itinerary \
                 from FOOD/SIGHT/TIP items and say so in the summary.
                 - tips: 2-5 short practical tips for this city and season.
-                """.formatted(dayCount);
+                """ + privateRule + languageRule).formatted(dayCount);
     }
 
     private String buildUserPrompt(
@@ -400,6 +581,9 @@ public class TripPlanService {
         sb.append("DATES: ").append(request.startDate()).append(" to ").append(request.endDate())
                 .append(" (").append(dayCount).append(" day(s))\n");
         sb.append("PARTY SIZE: ").append(request.partySize()).append("\n");
+        if (request.isPrivateTour()) {
+            sb.append("TOUR TYPE: PRIVATE — each experience is a whole-group private buyout\n");
+        }
         if (notBlank(request.interests())) {
             sb.append("INTERESTS: ").append(request.interests().trim()).append("\n");
         }
@@ -433,7 +617,13 @@ public class TripPlanService {
                 sb.append("  category: ").append(experience.getCategory().getName()).append("\n");
             }
             sb.append("  durationMinutes: ").append(experience.getDurationMinutes()).append("\n");
-            if (experience.getPriceAmount() != null) {
+            if (request.isPrivateTour()) {
+                if (experience.getPrivatePrice() != null) {
+                    sb.append("  privateTotalPrice: ").append(experience.getPrivatePrice())
+                            .append(" ").append(experience.getCurrency())
+                            .append(" (flat, whole group)\n");
+                }
+            } else if (experience.getPriceAmount() != null) {
                 sb.append("  pricePerGuest: ").append(experience.getPriceAmount())
                         .append(" ").append(experience.getCurrency()).append("\n");
             }
@@ -503,12 +693,16 @@ public class TripPlanService {
                     TripPlanItem item = assembleItem(
                             modelItems.get(itemIndex),
                             "d" + (dayIndex + 1) + "-i" + (itemIndex + 1),
-                            date, zone, inventory, usedSlotIds, request.partySize(), city);
+                            date, zone, inventory, usedSlotIds, request.partySize(),
+                            request.isPrivateTour(), city);
                     if (item != null) {
                         items.add(item);
                         if (item.bookable() && item.pricePerGuest() != null) {
-                            estimatedTotal = estimatedTotal.add(
-                                    item.pricePerGuest().multiply(BigDecimal.valueOf(request.partySize())));
+                            // Private tours carry the flat whole-group price on the item, so it
+                            // counts once; shared items are per guest.
+                            estimatedTotal = estimatedTotal.add(request.isPrivateTour()
+                                    ? item.pricePerGuest()
+                                    : item.pricePerGuest().multiply(BigDecimal.valueOf(request.partySize())));
                         }
                     }
                 }
@@ -549,6 +743,7 @@ public class TripPlanService {
             Map<UUID, ExperienceInventory> inventory,
             Set<UUID> usedSlotIds,
             int partySize,
+            boolean privateTour,
             City city
     ) {
         String kind = modelItem.path("kind").asText("");
@@ -602,28 +797,37 @@ public class TripPlanService {
         }
 
         String experienceUrl = frontendBaseUrl + "/experience/" + experience.getSlug();
+        // Private plans carry the flat whole-group buyout price; shared plans the per-guest price.
+        BigDecimal itemPrice = privateTour ? experience.getPrivatePrice() : experience.getPriceAmount();
 
         if (slot == null) {
             // No bookable slot this day: keep it as a non-bookable recommendation with a link
             // to the experience page (it may be bookable on other dates).
             return new TripPlanItem(itemId, startTimeLocal, kind, title, description,
                     experience.getId(), experience.getSlug(), experience.getTitle(), experienceUrl,
-                    null, null, null, null, experience.getPriceAmount(),
+                    null, null, null, null, itemPrice,
                     null, experienceMapsUrl(experience), false, null);
         }
 
         usedSlotIds.add(slot.getId());
         String slotTimeLocal = TIME_FORMAT.format(slot.getStartTime().atZone(zone));
-        String bookingUrl = frontendBaseUrl + "/experience/" + experience.getId() + "/book"
-                + "?date=" + date
-                + "&slot=" + urlEncode(slotTimeLocal)
-                + "&guests=" + partySize
-                + "&adults=" + partySize;
+        String bookingUrl = buildBookingUrl(experience, date, slotTimeLocal, partySize, privateTour);
 
         return new TripPlanItem(itemId, slotTimeLocal, kind, title, description,
                 experience.getId(), experience.getSlug(), experience.getTitle(), experienceUrl,
                 bookingUrl, slot.getId(), slot.getStartTime(), slot.getEndTime(),
-                experience.getPriceAmount(), null, experienceMapsUrl(experience), true, null);
+                itemPrice, null, experienceMapsUrl(experience), true, null);
+    }
+
+    /** Deep link that starts checkout pre-filled; ?private=1 books the whole slot at the flat private price. */
+    private String buildBookingUrl(Experience experience, LocalDate date, String slotTimeLocal,
+                                   int partySize, boolean privateTour) {
+        return frontendBaseUrl + "/experience/" + experience.getId() + "/book"
+                + "?date=" + date
+                + "&slot=" + urlEncode(slotTimeLocal)
+                + "&guests=" + partySize
+                + "&adults=" + partySize
+                + (privateTour ? "&private=1" : "");
     }
 
     private AvailabilitySlot pickClosestFreeSlot(
@@ -649,7 +853,7 @@ public class TripPlanService {
     // Reads: availability refresh
     // ------------------------------------------------------------------
 
-    private TripPlanDocument refreshAvailability(TripPlanDocument document, Integer partySize) {
+    private TripPlanDocument refreshAvailability(TripPlanDocument document, Integer partySize, boolean privateTour) {
         List<UUID> slotIds = document.days().stream()
                 .flatMap(day -> day.items().stream())
                 .filter(TripPlanItem::bookable)
@@ -659,7 +863,7 @@ public class TripPlanService {
 
         Map<UUID, AvailabilitySlot> slots = slotIds.isEmpty()
                 ? Map.of()
-                : availabilitySlotRepository.findAllById(slotIds).stream()
+                : availabilitySlotRepository.findAllWithExperienceByIdIn(slotIds).stream()
                         .collect(Collectors.toMap(AvailabilitySlot::getId, Function.identity()));
 
         Instant now = Instant.now();
@@ -672,21 +876,32 @@ public class TripPlanService {
                                 return item.withAvailable(null);
                             }
                             AvailabilitySlot slot = slots.get(item.slotId());
-                            boolean available = slot != null
-                                    && slot.getStatus() == AvailabilityStatus.AVAILABLE
-                                    && slot.getCapacity() - slot.getBookedCount() >= neededSeats
-                                    && bookingWindowPolicy.isBookableAt(slot, now)
-                                    // The experience itself must still be sellable per guest
-                                    // (it may have been paused/blocked or switched to
-                                    // buyout-only since the plan was generated).
-                                    && slot.getExperience().getStatus() == ExperienceStatus.APPROVED
-                                    && slot.getExperience().getBookingMode() != BookingMode.PRIVATE_ONLY;
-                            return item.withAvailable(available);
+                            return item.withAvailable(isSlotStillBookable(slot, neededSeats, privateTour, now));
                         })
                         .toList()))
                 .toList();
 
         return document.withDays(refreshedDays);
+    }
+
+    /**
+     * Whether one specific slot can still be booked for this plan's party. Private buyout: the
+     * slot must be untouched (a single shared guest removes the private option) and the experience
+     * must still offer a private price. Shared: enough seats left and the experience still
+     * sellable per guest (it may have switched to buyout-only since the plan was generated).
+     */
+    private boolean isSlotStillBookable(AvailabilitySlot slot, int neededSeats, boolean privateTour, Instant now) {
+        return slot != null
+                && slot.getStatus() == AvailabilityStatus.AVAILABLE
+                && bookingWindowPolicy.isBookableAt(slot, now)
+                && slot.getExperience().getStatus() == ExperienceStatus.APPROVED
+                && (privateTour
+                        ? slot.getBookedCount() == 0
+                                && slot.getCapacity() >= neededSeats
+                                && slot.getExperience().getBookingMode() != BookingMode.SHARED
+                                && slot.getExperience().getPrivatePrice() != null
+                        : slot.getCapacity() - slot.getBookedCount() >= neededSeats
+                                && slot.getExperience().getBookingMode() != BookingMode.PRIVATE_ONLY);
     }
 
     // ------------------------------------------------------------------
@@ -711,7 +926,9 @@ public class TripPlanService {
                 tripPlan.getStartDate(),
                 tripPlan.getEndDate(),
                 tripPlan.getPartySize(),
+                tripPlan.isPrivateTour(),
                 tripPlan.getInterests(),
+                tripPlan.getLanguage(),
                 document,
                 bookableItemIds,
                 tripPlan.getCreatedAt()

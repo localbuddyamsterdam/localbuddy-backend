@@ -340,4 +340,37 @@ public class AvailabilitySlotService {
                 .filter(slot -> bookingWindowPolicy.isBookableAt(slot, now))
                 .toList();
     }
+
+    /**
+     * Slots bookable as a private whole-slot buyout for a party of {@code partySize} in a city
+     * within [from, to): the experience must offer private booking with a private price and not
+     * be listed on an external platform, and the slot must be completely empty (the first shared
+     * guest removes the private option) with capacity for the whole party. Mirrors the rules
+     * {@code BookingService.requirePrivateBookingAllowed} enforces at booking time. Used by the
+     * AI trip planner's private-tour mode.
+     */
+    @Transactional(readOnly = true)
+    public List<AvailabilitySlot> getPrivateBuyoutSlotsForCityBetween(
+            String citySlug,
+            Instant from,
+            Instant to,
+            int partySize
+    ) {
+        Instant now = Instant.now();
+        return availabilitySlotRepository
+                .findBookableInCityBetween(
+                        citySlug,
+                        ExperienceStatus.APPROVED,
+                        List.of(BookingMode.PRIVATE_ALLOWED, BookingMode.PRIVATE_ONLY),
+                        AvailabilityStatus.AVAILABLE,
+                        from,
+                        to)
+                .stream()
+                .filter(slot -> slot.getBookedCount() == 0)
+                .filter(slot -> slot.getCapacity() >= partySize)
+                .filter(slot -> slot.getExperience().getPrivatePrice() != null)
+                .filter(slot -> !slot.getExperience().isListedOnExternalPlatform())
+                .filter(slot -> bookingWindowPolicy.isBookableAt(slot, now))
+                .toList();
+    }
 }

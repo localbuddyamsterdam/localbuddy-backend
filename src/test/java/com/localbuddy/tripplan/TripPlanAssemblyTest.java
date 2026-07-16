@@ -138,7 +138,7 @@ class TripPlanAssemblyTest {
     }
 
     private CreateTripPlanRequest request() {
-        return new CreateTripPlanRequest("amsterdam", START, START, 2, "food", null);
+        return new CreateTripPlanRequest("amsterdam", START, START, 2, "food", null, null, null);
     }
 
     @Test
@@ -161,6 +161,31 @@ class TripPlanAssemblyTest {
         assertTrue(item.bookingUrl().contains("guests=2"), "party size prefilled");
         assertEquals(new BigDecimal("90.00"), response.plan().estimatedBookableTotal(),
                 "estimate = price x party size");
+    }
+
+    @Test
+    @DisplayName("a private-tour plan uses buyout inventory, prices items at the flat group price, and deep-links private checkout")
+    void privateTourUsesFlatGroupPricing() throws Exception {
+        experience.setPrivatePrice(new BigDecimal("300.00"));
+        stubWorld(modelJson("""
+                {"startTimeLocal":"10:00","kind":"EXPERIENCE","title":"Canal food walk",
+                 "description":"Just your group.","experienceId":"%s","slotId":"%s",
+                 "placeName":null,"placeArea":null}
+                """.formatted(experience.getId(), morningSlot.getId())));
+        when(availabilitySlotService.getPrivateBuyoutSlotsForCityBetween(anyString(), any(), any(), anyInt()))
+                .thenReturn(List.of(morningSlot, afternoonSlot));
+
+        CreateTripPlanRequest privateRequest =
+                new CreateTripPlanRequest("amsterdam", START, START, 2, "food", null, true, null);
+        TripPlanResponse response = tripPlanService.createPlan(privateRequest, TRAVELER_ID);
+
+        assertTrue(response.privateTour(), "response carries the private-tour flag");
+        TripPlanItem item = response.plan().days().get(0).items().get(0);
+        assertTrue(item.bookable());
+        assertEquals(new BigDecimal("300.00"), item.pricePerGuest(), "item carries the flat private price");
+        assertTrue(item.bookingUrl().contains("private=1"), "deep link books the whole slot privately");
+        assertEquals(new BigDecimal("300.00"), response.plan().estimatedBookableTotal(),
+                "flat group price counts once, not x party size");
     }
 
     @Test
