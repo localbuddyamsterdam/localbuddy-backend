@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDate;
 import java.util.UUID;
 
 /**
@@ -83,5 +84,37 @@ public class TripPlanController {
         UUID userId = UUID.fromString(authentication.getName());
         rateLimitService.checkPublicApiLimit("trip-plan-heal:" + userId, 10, 60);
         return ResponseEntity.ok(tripPlanService.replaceSoldOutItem(userId, token, itemId));
+    }
+
+    @Operation(summary = "Swap an itinerary item",
+            description = "Deliberately replaces a bookable item with a DIFFERENT experience on the same day, "
+                    + "closest to the same time — no AI call. Owner only.")
+    @PostMapping("/{token}/items/{itemId}/swap")
+    public ResponseEntity<TripPlanResponse> swapItem(
+            Authentication authentication,
+            @PathVariable String token,
+            @PathVariable String itemId
+    ) {
+        UUID userId = UUID.fromString(authentication.getName());
+        rateLimitService.checkPublicApiLimit("trip-plan-swap:" + userId, 10, 60);
+        return ResponseEntity.ok(tripPlanService.swapItem(userId, token, itemId));
+    }
+
+    @Operation(summary = "Refine one itinerary day",
+            description = "Regenerates a single day of the plan to the owner's free-text instruction "
+                    + "(\"more food, slower morning\") — one day-scoped model call, validated against live "
+                    + "inventory exactly like initial generation. Owner only.")
+    @PostMapping("/{token}/days/{date}/refine")
+    public ResponseEntity<TripPlanResponse> refineDay(
+            Authentication authentication,
+            @PathVariable String token,
+            @PathVariable LocalDate date,
+            @Valid @RequestBody RefineDayRequest request
+    ) {
+        UUID userId = UUID.fromString(authentication.getName());
+        // Per-user, not per-IP: each refine is a paid model call.
+        rateLimitService.checkPublicApiLimit("trip-plan-refine:" + userId, 4, 60);
+        rateLimitService.checkPublicApiLimit("trip-plan-refine-daily:" + userId, 40, 86400);
+        return ResponseEntity.ok(tripPlanService.refineDay(userId, token, date, request.instruction()));
     }
 }

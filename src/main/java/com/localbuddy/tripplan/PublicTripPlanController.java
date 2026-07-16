@@ -10,12 +10,15 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/public/trip-plans")
@@ -50,11 +53,28 @@ public class PublicTripPlanController {
     @GetMapping("/{token}")
     public ResponseEntity<TripPlanResponse> getTripPlan(
             HttpServletRequest servletRequest,
+            Authentication authentication,
             @PathVariable String token
     ) {
         String clientIp = clientIpResolver.resolveClientIp(servletRequest);
         rateLimitService.checkPublicApiLimit("trip-plan-view:" + clientIp);
-        return ResponseEntity.ok(tripPlanService.getPlanByToken(token));
+        // Page views feed the funnel's "came back to it" step; PDF/calendar exports don't count.
+        return ResponseEntity.ok(tripPlanService.getPlanByTokenCountingView(token, viewerId(authentication)));
+    }
+
+    /**
+     * The viewer's user id when a JWT rode along on this public route (the filter still runs
+     * on permitAll paths); null for guests and the anonymous principal.
+     */
+    private UUID viewerId(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return null;
+        }
+        try {
+            return UUID.fromString(authentication.getName());
+        } catch (IllegalArgumentException ex) {
+            return null; // e.g. "anonymousUser"
+        }
     }
 
     @Operation(summary = "Export a trip plan as PDF",

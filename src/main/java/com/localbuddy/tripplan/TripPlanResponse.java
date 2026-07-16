@@ -26,6 +26,10 @@ public record TripPlanResponse(
         String language,
         TripPlanDocument plan,
         List<String> bookableItemIds,
-        Instant createdAt
+        Instant createdAt,
+        /** True once the trip's end date has passed and the plan was archived (view-only). */
+        boolean archived,
+        /** True when the authenticated viewer is the plan's owner (enables swap/refine UI). */
+        boolean owned
 ) {
 }

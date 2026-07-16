@@ -56,7 +56,7 @@ public class TripPlanPdfService {
                         "warmup", "", "", "warmup", "Warm-up", null,
                         LocalDate.now(), LocalDate.now(), 1, false, null, "en",
                         new TripPlanDocument("Warm-up", null, "EUR", null, List.of(), List.of()),
-                        List.of(), Instant.now()));
+                        List.of(), Instant.now(), false, false));
                 log.info("PDF renderer warmed up in {} ms", System.currentTimeMillis() - start);
             } catch (Exception ex) {
                 // Warm-up is best-effort — a failure here must never affect startup.

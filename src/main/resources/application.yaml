@@ -328,6 +328,11 @@ app:
       # Cap on bookable slots listed per experience per day in the prompt.
       max-slots-per-experience-day: ${TRIP_PLANNER_MAX_SLOTS_PER_DAY:4}
       max-tokens: ${TRIP_PLANNER_MAX_TOKENS:12000}
+      # Booking horizon: trips can start at most this many months from today (city timezone).
+      max-months-ahead: ${TRIP_PLANNER_MAX_MONTHS_AHEAD:6}
+      # Lifecycle sweep: ended trips flip ACTIVE -> ARCHIVED (view-only; split out in "My
+      # itineraries"). Every 6h is plenty for a date-granular transition.
+      archive-processor-delay-ms: ${TRIP_PLANNER_ARCHIVE_PROCESSOR_DELAY_MS:21600000}
     chat:
       max-tokens: ${AI_CHAT_MAX_TOKENS:1200}
       # Older turns beyond this are dropped before the model call (cost bound).

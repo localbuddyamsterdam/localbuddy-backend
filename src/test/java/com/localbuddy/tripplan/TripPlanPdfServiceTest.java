@@ -51,7 +51,7 @@ class TripPlanPdfServiceTest {
                 "tok-123", "https://example.com/trip-planner/tok-123", "https://example.com/trip-planner/tok-123#book",
                 "amsterdam", "Amsterdam", "Netherlands",
                 LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 3), 2, false,
-                "food, history", "en", doc, List.of("item-1"), Instant.now());
+                "food, history", "en", doc, List.of("item-1"), Instant.now(), false, false);
 
         byte[] pdf = service.render(plan);
         assertNotNull(pdf);
@@ -65,7 +65,7 @@ class TripPlanPdfServiceTest {
                 "tok-456", "https://example.com/trip-planner/tok-456", "https://example.com/trip-planner/tok-456#book",
                 "paris", "Paris", null,
                 LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 2), null, true,
-                null, "en", doc, List.of(), Instant.now());
+                null, "en", doc, List.of(), Instant.now(), false, false);
 
         byte[] pdf = service.render(plan);
         assertNotNull(pdf);

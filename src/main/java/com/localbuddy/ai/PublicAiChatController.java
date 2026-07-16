@@ -50,8 +50,30 @@ public class PublicAiChatController {
     ) {
         String clientIp = clientIpResolver.resolveClientIp(servletRequest);
         // Tighter than the generic public limit — each call is a paid model generation.
-        rateLimitService.checkPublicApiLimit("ai-chat:" + clientIp, 10, 60);
-        rateLimitService.checkPublicApiLimit("ai-chat-daily:" + clientIp, 300, 86400);
+        // Primary key is the client's chat session id (travelers cluster behind hotel/hostel
+        // NATs, so per-IP alone throttles a busy lobby); a looser per-IP cap stays as the
+        // backstop so rotating session ids can't mint unlimited quota.
+        String sessionKey = chatSessionKey(servletRequest);
+        if (sessionKey != null) {
+            rateLimitService.checkPublicApiLimit("ai-chat-session:" + sessionKey, 10, 60);
+            rateLimitService.checkPublicApiLimit("ai-chat-session-daily:" + sessionKey, 300, 86400);
+            rateLimitService.checkPublicApiLimit("ai-chat-ip:" + clientIp, 40, 60);
+            rateLimitService.checkPublicApiLimit("ai-chat-ip-daily:" + clientIp, 1500, 86400);
+        } else {
+            // No/invalid session header (old clients, curl): the strict per-IP limits apply.
+            rateLimitService.checkPublicApiLimit("ai-chat:" + clientIp, 10, 60);
+            rateLimitService.checkPublicApiLimit("ai-chat-daily:" + clientIp, 300, 86400);
+        }
         return ResponseEntity.ok(aiChatService.chat(request));
+    }
+
+    /** The X-Chat-Session header when it looks like a client-generated id; null otherwise. */
+    private String chatSessionKey(HttpServletRequest servletRequest) {
+        String session = servletRequest.getHeader("X-Chat-Session");
+        if (session == null) {
+            return null;
+        }
+        String trimmed = session.trim();
+        return trimmed.matches("[A-Za-z0-9-]{8,64}") ? trimmed : null;
     }
 }

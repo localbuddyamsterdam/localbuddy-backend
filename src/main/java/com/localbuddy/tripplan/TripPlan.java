@@ -81,6 +81,13 @@ public class TripPlan {
     @Column(name = "feedback_at")
     private Instant feedbackAt;
 
+    /** Times the plan page was opened by share token; >= 2 means the traveler came back. */
+    @Column(name = "viewed_count", nullable = false)
+    private int viewedCount = 0;
+
+    @Column(name = "last_viewed_at")
+    private Instant lastViewedAt;
+
     @Column(name = "model", length = 60)
     private String model;
 

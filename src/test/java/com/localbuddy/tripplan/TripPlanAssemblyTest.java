@@ -61,7 +61,7 @@ class TripPlanAssemblyTest {
     private final TripPlanService tripPlanService = new TripPlanService(
             tripPlanRepository, userRepository, cityRepository, availabilitySlotService, availabilitySlotRepository,
             bookingWindowPolicy, dealService, claudeClient, objectMapper,
-            "https://app.example.com", 7, 40, 4, 12000);
+            "https://app.example.com", 7, 40, 4, 12000, 6);
 
     private final City city = city();
     private final Experience experience = experience(city);
