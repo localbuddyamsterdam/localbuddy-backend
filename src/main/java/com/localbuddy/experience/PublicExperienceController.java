@@ -126,6 +126,8 @@ public class PublicExperienceController {
             @RequestParam(required = false) java.math.BigDecimal minPrice,
             @Parameter(description = "Maximum price per guest")
             @RequestParam(required = false) java.math.BigDecimal maxPrice,
+            @Parameter(description = "Minimum duration in minutes")
+            @RequestParam(required = false) Integer minDurationMinutes,
             @Parameter(description = "Maximum duration in minutes")
             @RequestParam(required = false) Integer maxDurationMinutes,
             @Parameter(description = "Minimum host rating (0-5)")
@@ -137,7 +139,7 @@ public class PublicExperienceController {
     ) {
         return ResponseEntity.ok(experienceService.advancedSearch(
                 citySlug, categorySlug, bookingMode, shared, date, adults, teens, children, infants,
-                minPrice, maxPrice, maxDurationMinutes, minHostRating, keyword, page, size));
+                minPrice, maxPrice, minDurationMinutes, maxDurationMinutes, minHostRating, keyword, page, size));
     }
 
     @Operation(

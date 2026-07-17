@@ -146,6 +146,7 @@ public interface ExperienceRepository extends JpaRepository<Experience, UUID> {
               AND (:maxMinimumAge IS NULL OR e.minimumAge <= :maxMinimumAge)
               AND (:minPrice IS NULL OR e.priceAmount >= :minPrice)
               AND (:maxPrice IS NULL OR e.priceAmount <= :maxPrice)
+              AND (:minDurationMinutes IS NULL OR e.durationMinutes >= :minDurationMinutes)
               AND (:maxDurationMinutes IS NULL OR e.durationMinutes <= :maxDurationMinutes)
               AND (:minHostRating IS NULL OR (u IS NOT NULL AND u.ratingAvg >= :minHostRating))
               AND (:keyword IS NULL OR lower(e.title) LIKE :keyword OR lower(e.description) LIKE :keyword)
@@ -174,6 +175,7 @@ public interface ExperienceRepository extends JpaRepository<Experience, UUID> {
               AND (:maxMinimumAge IS NULL OR e.minimumAge <= :maxMinimumAge)
               AND (:minPrice IS NULL OR e.priceAmount >= :minPrice)
               AND (:maxPrice IS NULL OR e.priceAmount <= :maxPrice)
+              AND (:minDurationMinutes IS NULL OR e.durationMinutes >= :minDurationMinutes)
               AND (:maxDurationMinutes IS NULL OR e.durationMinutes <= :maxDurationMinutes)
               AND (:minHostRating IS NULL OR (u IS NOT NULL AND u.ratingAvg >= :minHostRating))
               AND (:keyword IS NULL OR lower(e.title) LIKE :keyword OR lower(e.description) LIKE :keyword)
@@ -200,6 +202,7 @@ public interface ExperienceRepository extends JpaRepository<Experience, UUID> {
             @Param("dateEnd") Instant dateEnd,
             @Param("minPrice") BigDecimal minPrice,
             @Param("maxPrice") BigDecimal maxPrice,
+            @Param("minDurationMinutes") Integer minDurationMinutes,
             @Param("maxDurationMinutes") Integer maxDurationMinutes,
             @Param("minHostRating") BigDecimal minHostRating,
             @Param("keyword") String keyword,

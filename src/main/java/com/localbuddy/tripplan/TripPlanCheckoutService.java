@@ -77,7 +77,9 @@ public class TripPlanCheckoutService {
                     request.emergencyContactEmail(),
                     request.emergencyContactPhone(),
                     request.emergencyContactRelationship(),
-                    request.whatsAppOptIn()
+                    request.whatsAppOptIn(),
+                    // Bundle checkout always pays through the payment group — never waived.
+                    null
             );
             try {
                 BookingResponse booking = bookingService.createBooking(userId, bookingRequest);

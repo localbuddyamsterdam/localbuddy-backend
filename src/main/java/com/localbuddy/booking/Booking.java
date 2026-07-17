@@ -137,6 +137,13 @@ public class Booking {
     @Column(name = "guest_show_marked_at")
     private Instant guestShowMarkedAt;
 
+    /**
+     * True when an admin confirmed this booking without payment (customer-flow
+     * "book as admin" skip). No Payment row exists; finance must exclude it.
+     */
+    @Column(name = "payment_waived", nullable = false)
+    private boolean paymentWaived = false;
+
     @Column(name = "price_per_guest", nullable = false, precision = 10, scale = 2)
     private BigDecimal pricePerGuest;
 

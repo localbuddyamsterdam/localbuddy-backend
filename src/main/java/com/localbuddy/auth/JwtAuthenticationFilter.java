@@ -73,9 +73,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             User user = userRepository.findById(userId).orElse(null);
 
             if (user != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                List<SimpleGrantedAuthority> authorities = List.of(
-                        new SimpleGrantedAuthority("ROLE_" + user.getRole().name())
-                );
+                // SUPER_ADMIN carries ROLE_ADMIN too, so every existing admin gate
+                // (URL rules, hasRole checks) applies to super admins with no per-site
+                // changes. Authorities derive from the DB role on every request, so a
+                // demotion takes effect immediately — no stale-JWT privilege window.
+                List<SimpleGrantedAuthority> authorities =
+                        user.getRole() == com.localbuddy.user.UserRole.SUPER_ADMIN
+                                ? List.of(new SimpleGrantedAuthority("ROLE_SUPER_ADMIN"),
+                                          new SimpleGrantedAuthority("ROLE_ADMIN"))
+                                : List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().name()));
 
                 UsernamePasswordAuthenticationToken authentication =
                         new UsernamePasswordAuthenticationToken(

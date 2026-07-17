@@ -71,6 +71,12 @@ public record CreateBookingRequest(
         String emergencyContactRelationship,
 
         /** Explicit consent to receive booking updates (confirmation/reminder/changes) on WhatsApp. */
-        Boolean whatsAppOptIn
+        Boolean whatsAppOptIn,
+
+        /**
+         * Admin-only: confirm the booking immediately without any payment (no Stripe, no
+         * gift card). Enforced server-side against the JWT role — non-admins get a 400.
+         */
+        Boolean skipPayment
 ) {
 }

@@ -129,6 +129,27 @@ public class RateAdminService {
     }
 
     @Transactional
+    public ServiceFeeRuleResponse updateServiceFeeRule(UUID id, UpdateServiceFeeRuleRequest req, UUID adminId) {
+        ServiceFeeRule rule = serviceFeeRuleRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Service fee rule not found: " + id));
+        Map<String, Object> before = serviceFeeSnapshot(rule);
+
+        validateRate(req.rate());
+        validateWindow(req.effectiveFrom(), req.effectiveTo());
+
+        rule.setRate(req.rate());
+        rule.setEffectiveFrom(req.effectiveFrom());
+        rule.setEffectiveTo(req.effectiveTo());
+        rule.setNote(req.note());
+        if (req.active() != null) {
+            rule.setActive(req.active());
+        }
+        ServiceFeeRule saved = serviceFeeRuleRepository.save(rule);
+        audit("SERVICE_FEE", id, before, serviceFeeSnapshot(saved), adminId);
+        return toResponse(saved);
+    }
+
+    @Transactional
     public ServiceFeeRuleResponse deactivateServiceFeeRule(UUID id, UUID adminId) {
         ServiceFeeRule rule = serviceFeeRuleRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Service fee rule not found: " + id));

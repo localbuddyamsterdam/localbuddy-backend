@@ -70,6 +70,8 @@ public record BookingResponse(
         String emergencyContactLastName,
         String emergencyContactEmail,
         String emergencyContactPhone,
-        String emergencyContactRelationship
+        String emergencyContactRelationship,
+        // True when an admin confirmed this booking without payment ("book as admin").
+        boolean paymentWaived
 ) {
 }

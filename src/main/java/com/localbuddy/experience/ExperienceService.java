@@ -341,6 +341,7 @@ public class ExperienceService {
             Integer infants,
             BigDecimal minPrice,
             BigDecimal maxPrice,
+            Integer minDurationMinutes,
             Integer maxDurationMinutes,
             BigDecimal minHostRating,
             String keyword,
@@ -378,6 +379,8 @@ public class ExperienceService {
 
         BigDecimal normalizedMinPrice = normalizePrice(minPrice);
         BigDecimal normalizedMaxPrice = normalizePrice(maxPrice);
+        Integer normalizedMinDuration = (minDurationMinutes != null && minDurationMinutes > 0)
+                ? minDurationMinutes : null;
         Integer normalizedMaxDuration = (maxDurationMinutes != null && maxDurationMinutes > 0)
                 ? maxDurationMinutes : null;
         BigDecimal normalizedMinRating = (minHostRating != null && minHostRating.signum() > 0)
@@ -398,7 +401,7 @@ public class ExperienceService {
         Collection<BookingMode> bookingModes = resolveBookingModes(bookingMode, shared);
         Page<Experience> result = experienceRepository.searchApprovedAdvanced(
                 city, category, bookingModes, maxMinimumAge, guests, Instant.now(), dateStart, dateEnd,
-                normalizedMinPrice, normalizedMaxPrice, normalizedMaxDuration, normalizedMinRating,
+                normalizedMinPrice, normalizedMaxPrice, normalizedMinDuration, normalizedMaxDuration, normalizedMinRating,
                 keywordPattern, filterByAvailability, filterByDate, pageable);
 
         List<ExperienceResponse> content = toResponseList(result.getContent());

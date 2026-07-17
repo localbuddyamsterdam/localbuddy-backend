@@ -68,7 +68,8 @@ public class AuthService {
             throw new BadRequestException("Email already exists");
         }
 
-        if (request.role() == UserRole.ADMIN || request.role() == UserRole.SUPPORT) {
+        if (request.role() == UserRole.ADMIN || request.role() == UserRole.SUPPORT
+                || request.role() == UserRole.SUPER_ADMIN) {
             throw new BadRequestException("Public signup is allowed only for LOGGED_IN_USER or LOCAL");
         }
 

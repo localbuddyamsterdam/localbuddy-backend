@@ -105,6 +105,23 @@ public class AdminRatesController {
         return ResponseEntity.ok(rateAdminService.createServiceFeeRule(request, adminId(authentication)));
     }
 
+    @Operation(summary = "Update a service-fee rule",
+            description = "Edits the rate, effective window, note, or active flag of an existing service-fee rule in place "
+                    + "(scope is immutable). Rate 0.00 is allowed — e.g. fee-free cities or experiences. Admin only.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Service-fee rule updated"),
+            @ApiResponse(responseCode = "400", description = "Invalid rate or effective window"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "403", description = "Not authorized (admin only)"),
+            @ApiResponse(responseCode = "404", description = "Service-fee rule not found")
+    })
+    @PutMapping("/service-fee/{id}")
+    public ResponseEntity<ServiceFeeRuleResponse> updateServiceFee(Authentication authentication,
+                                                                   @PathVariable UUID id,
+                                                                   @Valid @RequestBody UpdateServiceFeeRuleRequest request) {
+        return ResponseEntity.ok(rateAdminService.updateServiceFeeRule(id, request, adminId(authentication)));
+    }
+
     @PostMapping("/service-fee/{id}/deactivate")
     public ResponseEntity<ServiceFeeRuleResponse> deactivateServiceFee(Authentication authentication,
                                                                        @PathVariable UUID id) {

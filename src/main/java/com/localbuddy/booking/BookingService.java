@@ -117,9 +117,13 @@ public class BookingService {
                 .orElseThrow(() -> new BadRequestException("Invalid user"));
         log.info("LOGGED_IN_BOOKING_TIMING userLookupMs={}", System.currentTimeMillis() - stepStart);
 
+        // Any signed-in account (traveler, host, admin) can book as a customer. The only
+        // role-specific rule is that skipping payment is an admin-only privilege — enforced
+        // here on the JWT-derived user, never trusted from the client.
         stepStart = System.currentTimeMillis();
-        if (traveler.getRole() != UserRole.LOGGED_IN_USER) {
-            throw new BadRequestException("Only travelers can create bookings");
+        boolean skipPayment = Boolean.TRUE.equals(request.skipPayment());
+        if (skipPayment && !traveler.isAdminTier()) {
+            throw new BadRequestException("Only admins can book without payment");
         }
         log.info("LOGGED_IN_BOOKING_TIMING roleCheckMs={}", System.currentTimeMillis() - stepStart);
 
@@ -146,6 +150,11 @@ public class BookingService {
                 .orElseThrow(() -> new ResourceNotFoundException("Experience not found"));
 
         log.info("LOGGED_IN_BOOKING_TIMING experienceLookupMs={}", System.currentTimeMillis() - stepStart);
+
+        if (traveler.getRole() == UserRole.LOCAL
+                && experience.getLocalProfile().getUser().getId().equals(loggedInUserId)) {
+            throw new BadRequestException("You can't book your own experience");
+        }
 
         stepStart = System.currentTimeMillis();
         trustSafetyService.requireUserCanHost(
@@ -229,7 +238,16 @@ public class BookingService {
         applyBands(booking, bands);
         booking.setPrivateBooking(privateBooking);
         booking.setSeatsBlocked(seatsToBook);
-        booking.setStatus(BookingStatus.PENDING_PAYMENT);
+        // Admin skip-payment bookings are confirmed on the spot with no Payment row —
+        // the same shape as console-created bookings — and flagged so finance can
+        // exclude them (no ledger entry, no invoice, nothing to refund).
+        if (skipPayment) {
+            booking.setStatus(BookingStatus.CONFIRMED);
+            booking.setPaymentWaived(true);
+            booking.setAcceptedAt(Instant.now());
+        } else {
+            booking.setStatus(BookingStatus.PENDING_PAYMENT);
+        }
 
         booking.setPricePerGuest(pricePerGuest);
         booking.setOriginalAmount(originalAmount);
@@ -267,7 +285,13 @@ public class BookingService {
             log.info("LOGGED_IN_BOOKING_TIMING saveBookingMs={}", System.currentTimeMillis() - stepStart);
 
             stepStart = System.currentTimeMillis();
-            eventPublisher.publishEvent(new BookingCreatedEvent(savedBooking.getId()));
+            if (skipPayment) {
+                // Already confirmed — send the confirmation directly (like console bookings)
+                // instead of the created/awaiting-payment notification.
+                bookingConfirmationNotifier.sendConfirmation(savedBooking);
+            } else {
+                eventPublisher.publishEvent(new BookingCreatedEvent(savedBooking.getId()));
+            }
             log.info("LOGGED_IN_BOOKING_TIMING publishEventMs={}", System.currentTimeMillis() - stepStart);
 
             stepStart = System.currentTimeMillis();
@@ -288,27 +312,11 @@ public class BookingService {
 
     @Transactional(readOnly = true)
     public List<BookingResponse> getMyBookings(UUID userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new BadRequestException("Invalid user"));
-
-        if (user.getRole() == UserRole.LOGGED_IN_USER) {
-            return bookingRepository.findByLoggedInUserIdOrderByRequestedAtDesc(userId)
-                    .stream()
-                    .map(this::toResponse)
-                    .toList();
-        }
-
-        if (user.getRole() == UserRole.LOCAL) {
-            LocalProfile localProfile = localProfileRepository.findByUserId(userId)
-                    .orElseThrow(() -> new BadRequestException("Local profile not found"));
-
-            return bookingRepository.findByLocalProfileIdOrderByRequestedAtDesc(localProfile.getId())
-                    .stream()
-                    .map(b -> toResponse(b, false))
-                    .toList();
-        }
-
-        return bookingRepository.findAll()
+        // "My trips" is the caller's own traveler bookings for every role. Hosts see
+        // incoming bookings via their host surfaces and admins via /api/admin — this
+        // endpoint must never widen beyond the personal scope (an admin's account page
+        // used to leak every user's bookings through the old findAll fallback).
+        return bookingRepository.findByLoggedInUserIdOrderByRequestedAtDesc(userId)
                 .stream()
                 .map(this::toResponse)
                 .toList();
@@ -511,7 +519,8 @@ public class BookingService {
                 includeEmergencyContact ? booking.getEmergencyContactLastName() : null,
                 includeEmergencyContact ? booking.getEmergencyContactEmail() : null,
                 includeEmergencyContact ? booking.getEmergencyContactPhone() : null,
-                includeEmergencyContact ? booking.getEmergencyContactRelationship() : null
+                includeEmergencyContact ? booking.getEmergencyContactRelationship() : null,
+                booking.isPaymentWaived()
         );
     }
 
@@ -765,7 +774,7 @@ public class BookingService {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
 
-        if (user.getRole() == UserRole.ADMIN) {
+        if (user.isAdminTier()) {
             return toResponse(booking);
         }
 
@@ -778,8 +787,8 @@ public class BookingService {
             return toResponse(booking);
         }
 
-        if (user.getRole() == UserRole.LOGGED_IN_USER &&
-                booking.getLoggedInUser() != null &&
+        // Own traveler booking — any role (hosts/admins book as customers too).
+        if (booking.getLoggedInUser() != null &&
                 booking.getLoggedInUser().getId().equals(userId)) {
             return toResponse(booking);
         }

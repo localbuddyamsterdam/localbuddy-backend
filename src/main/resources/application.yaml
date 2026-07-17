@@ -111,6 +111,16 @@ app:
       allowed-origins: ${WEBAUTHN_ALLOWED_ORIGINS:}
       rp-name: ${WEBAUTHN_RP_NAME:LocalBuddy}
       challenge-expiration-minutes: ${WEBAUTHN_CHALLENGE_EXPIRATION_MINUTES:5}
+    # Comma-separated emails guaranteed an ACTIVE SUPER_ADMIN account at startup
+    # (see SuperAdminBootstrap). Missing accounts are created with a one-time-logged
+    # temporary password + forced first-login change; existing accounts are promoted,
+    # passwords untouched. Empty = inert. This is the operator-level failsafe: set it
+    # in the Azure App Service configuration, not in this file.
+    super-admins: ${SUPER_ADMIN_EMAILS:}
+    # Break-glass: set to ONE of the emails above and restart to issue that account a
+    # fresh temporary password (logged once, sessions revoked, change forced). Clear
+    # the variable again straight after use.
+    super-admin-reset: ${SUPER_ADMIN_RESET:}
 
   frontend:
     base-url: ${FRONTEND_BASE_URL:http://localhost:3000}

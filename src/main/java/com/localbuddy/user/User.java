@@ -109,6 +109,15 @@ public class User {
         return preferredName != null && !preferredName.isBlank() ? preferredName : getFullName();
     }
 
+    /**
+     * True for the admin tier — ADMIN and SUPER_ADMIN. Use wherever "is this an
+     * admin?" is the question, so super admins automatically pass every admin
+     * check. Derived, not a mapped column (field-access JPA ignores it).
+     */
+    public boolean isAdminTier() {
+        return role == UserRole.ADMIN || role == UserRole.SUPER_ADMIN;
+    }
+
     @PrePersist
     protected void onCreate() {
         Instant now = Instant.now();

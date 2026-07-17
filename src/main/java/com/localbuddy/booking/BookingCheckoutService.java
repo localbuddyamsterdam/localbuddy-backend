@@ -31,6 +31,12 @@ public class BookingCheckoutService {
         BookingResponse booking = bookingService.createBooking(loggedInUserId, request);
         long bookingMs = System.currentTimeMillis() - bookingStart;
 
+        // Admin skip-payment: the booking is already CONFIRMED (role enforced inside
+        // createBooking) — no payment/Stripe leg at all, so checkout is null.
+        if (Boolean.TRUE.equals(request.skipPayment())) {
+            return new BookingCheckoutResponse(booking, null);
+        }
+
         long checkoutStart = System.currentTimeMillis();
         PaymentCheckoutResponse checkout = paymentService.createCheckout(
                 loggedInUserId,

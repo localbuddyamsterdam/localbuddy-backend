@@ -9,7 +9,6 @@ import com.localbuddy.localprofile.LocalProfile;
 import com.localbuddy.localprofile.LocalProfileRepository;
 import com.localbuddy.user.User;
 import com.localbuddy.user.UserRepository;
-import com.localbuddy.user.UserRole;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,10 +40,9 @@ public class ReviewService {
         User reviewer = userRepository.findById(reviewerUserId)
                 .orElseThrow(() -> new BadRequestException("Invalid user"));
 
-        if (reviewer.getRole() != UserRole.LOGGED_IN_USER) {
-            throw new BadRequestException("Only travelers can create reviews");
-        }
-
+        // Any role may review a trip they took themselves — the ownership check below
+        // (booking.loggedInUser == reviewer) is the real gate, and hosts can never review
+        // their own experience because self-booking is blocked at creation.
         Booking booking = bookingRepository.findById(request.bookingId())
                 .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
 

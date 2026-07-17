@@ -49,7 +49,12 @@ public class ServiceFeeResolver {
                 return rate;
             }
         }
-        rate = firstRate(serviceFeeRuleRepository.findActive(ScopeType.PLATFORM, null, now));
+        return platformRate(now);
+    }
+
+    /** Platform-wide default rate (PLATFORM rule, else yaml fallback) — what content pages display. */
+    public BigDecimal platformRate(Instant now) {
+        BigDecimal rate = firstRate(serviceFeeRuleRepository.findActive(ScopeType.PLATFORM, null, now));
         return rate != null ? rate : configDefaultRate;
     }
 
