@@ -6,6 +6,7 @@ import com.localbuddy.common.exception.BadRequestException;
 import com.localbuddy.common.exception.UnauthorizedException;
 import com.localbuddy.notification.NotificationService;
 import com.localbuddy.notification.NotificationType;
+import com.localbuddy.notification.email.EmailTemplateService;
 import com.localbuddy.user.User;
 import com.localbuddy.user.UserRepository;
 import com.localbuddy.user.UserRole;
@@ -31,6 +32,7 @@ public class AuthService {
     private final AuthTokenService authTokenService;
     private final WebAuthnCredentialRepository webAuthnCredentialRepository;
     private final NotificationService notificationService;
+    private final EmailTemplateService emailTemplateService;
     private final ApplicationEventPublisher eventPublisher;
     private final String frontendBaseUrl;
     private final long resetTokenExpirationMinutes;
@@ -43,6 +45,7 @@ public class AuthService {
                        AuthTokenService authTokenService,
                        WebAuthnCredentialRepository webAuthnCredentialRepository,
                        NotificationService notificationService,
+                       EmailTemplateService emailTemplateService,
                        ApplicationEventPublisher eventPublisher,
                        @Value("${app.frontend.base-url:http://localhost:3000}") String frontendBaseUrl,
                        @Value("${app.security.reset-token-expiration-minutes:30}") long resetTokenExpirationMinutes,
@@ -54,6 +57,7 @@ public class AuthService {
         this.authTokenService = authTokenService;
         this.webAuthnCredentialRepository = webAuthnCredentialRepository;
         this.notificationService = notificationService;
+        this.emailTemplateService = emailTemplateService;
         this.eventPublisher = eventPublisher;
         this.frontendBaseUrl = frontendBaseUrl;
         this.resetTokenExpirationMinutes = resetTokenExpirationMinutes;
@@ -240,13 +244,16 @@ public class AuthService {
                     user.getId(), AuthTokenPurpose.PASSWORD_RESET,
                     Duration.ofMinutes(resetTokenExpirationMinutes));
             String link = frontendBaseUrl + "/auth/reset?token=" + token;
-            String body = "We received a request to reset the password for your LocalBuddy account.\n\n"
-                    + "Reset your password:\n" + link
-                    + "\n\nThis link expires in " + resetTokenExpirationMinutes + " minutes."
-                    + "\nIf you didn't request this, you can safely ignore this email — your password stays unchanged.";
+            String intro = "We received a request to reset the password for your LocalBuddy account. "
+                    + "Click below to choose a new one.";
+            String finePrint = "This link expires in " + resetTokenExpirationMinutes + " minutes.\n\n"
+                    + "If you didn't request this, you can safely ignore this email — your password stays unchanged.";
+            String body = intro + "\n\nReset your password: " + link + "\n\n" + finePrint;
+            String html = emailTemplateService.renderActionEmail(new EmailTemplateService.ActionEmailModel(
+                    "Reset your password", intro, "Reset password", link, finePrint));
             notificationService.createEmailNotificationForGuest(
                     user.getEmail(), null, NotificationType.PASSWORD_RESET,
-                    "Reset your LocalBuddy password", body,
+                    "Reset your LocalBuddy password", body, html,
                     "USER", user.getId(), "password-reset:" + token);
         });
     }
@@ -275,13 +282,16 @@ public class AuthService {
                 user.getId(), AuthTokenPurpose.EMAIL_VERIFICATION,
                 Duration.ofHours(verificationTokenExpirationHours));
         String link = frontendBaseUrl + "/auth/verify?token=" + token;
-        String body = "Welcome to LocalBuddy! Please confirm your email address to activate your account.\n\n"
-                + "Verify your email:\n" + link
-                + "\n\nThis link expires in " + verificationTokenExpirationHours + " hours."
-                + "\nIf you didn't create a LocalBuddy account, you can safely ignore this email.";
+        String intro = "Welcome to LocalBuddy! Please confirm your email address to activate your account.";
+        String finePrint = "This link expires in " + verificationTokenExpirationHours + " hours.\n\n"
+                + "If you didn't create a LocalBuddy account, you can safely ignore this email.";
+        // Plain-text fallback part (buttonless clients still get a usable message).
+        String body = intro + "\n\nVerify your email: " + link + "\n\n" + finePrint;
+        String html = emailTemplateService.renderActionEmail(new EmailTemplateService.ActionEmailModel(
+                "Verify your email", intro, "Verify email address", link, finePrint));
         notificationService.createEmailNotificationForGuest(
                 user.getEmail(), null, NotificationType.EMAIL_VERIFICATION,
-                "Verify your LocalBuddy email", body,
+                "Verify your LocalBuddy email", body, html,
                 "USER", user.getId(), "email-verify:" + token);
     }
 
