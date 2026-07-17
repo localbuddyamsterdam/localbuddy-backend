@@ -232,6 +232,81 @@ public class EmailTemplateService {
                 .replace("{{content}}", content);
     }
 
+    /**
+     * A transactional "do this one thing" email: a headline, a short intro, a single prominent
+     * call-to-action button, a muted paste-the-link fallback (for clients that strip buttons),
+     * and fine print. Used for email verification and password reset so the link is a button —
+     * not a giant raw URL. All caller text is HTML-escaped.
+     *
+     * @param headline   e.g. "Verify your email"
+     * @param intro      lead paragraph(s); blank lines start a new paragraph
+     * @param ctaLabel   button text, e.g. "Verify email address"
+     * @param ctaUrl     the action link the button (and fallback) point to
+     * @param finePrint  small print under the button (expiry + "ignore if not you"); paragraphs by blank line
+     */
+    public record ActionEmailModel(
+            String headline,
+            String intro,
+            String ctaLabel,
+            String ctaUrl,
+            String finePrint
+    ) {
+    }
+
+    public String renderActionEmail(ActionEmailModel m) {
+        String content =
+                "<h1 style=\"margin:0 0 14px; font-size:26px; line-height:1.25; font-weight:600; letter-spacing:-0.01em; color:#111114;\">"
+                        + esc(m.headline()) + "</h1>"
+                        + paragraphs(m.intro(), "margin:0 0 16px; font-size:16px; line-height:1.6; color:#3a3a3f;")
+                        // Bulletproof-ish centered CTA button (table wrapper keeps Outlook happy).
+                        + "<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" style=\"margin:26px 0 6px;\">"
+                        + "<tr><td style=\"border-radius:999px;\">"
+                        + "<a class=\"lb-btn-primary\" href=\"" + esc(m.ctaUrl()) + "\" "
+                        + "style=\"display:inline-block; background:#d62f2a; color:#ffffff; font-size:15px; font-weight:600; "
+                        + "line-height:1; padding:15px 30px; border-radius:999px;\">" + esc(m.ctaLabel()) + "</a>"
+                        + "</td></tr></table>"
+                        // Fallback for clients that strip buttons: the raw link, muted and wrappable.
+                        + "<p style=\"margin:18px 0 6px; font-size:13px; line-height:1.55; color:#86868b;\">"
+                        + "Button not working? Copy and paste this link into your browser:</p>"
+                        + "<p style=\"margin:0; font-size:13px; line-height:1.55;\">"
+                        + "<a href=\"" + esc(m.ctaUrl()) + "\" style=\"color:#d62f2a; word-break:break-all;\">"
+                        + esc(m.ctaUrl()) + "</a></p>"
+                        + (blank(m.finePrint()) ? "" :
+                        "<div style=\"height:1px; background:#e6e6e9; margin:24px 0 18px;\"></div>"
+                                + paragraphs(m.finePrint(), "margin:0 0 10px; font-size:13px; line-height:1.55; color:#86868b;"));
+
+        String preheader = firstLine(m.intro());
+        return GENERIC_SHELL
+                .replace("{{title}}", esc(m.headline()))
+                .replace("{{preheader}}", esc(preheader))
+                .replace("{{content}}", content);
+    }
+
+    /** Splits text on blank lines into escaped &lt;p&gt; paragraphs with the given inline style. */
+    private static String paragraphs(String text, String pStyle) {
+        if (blank(text)) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder();
+        for (String para : text.strip().split("\\n\\s*\\n")) {
+            String trimmed = para.strip();
+            if (!trimmed.isEmpty()) {
+                sb.append("<p style=\"").append(pStyle).append("\">")
+                        .append(esc(trimmed).replace("\n", "<br>")).append("</p>");
+            }
+        }
+        return sb.toString();
+    }
+
+    /** First non-blank line, trimmed to 140 chars — used as the hidden preheader. */
+    private static String firstLine(String text) {
+        if (blank(text)) {
+            return "";
+        }
+        String line = text.strip().split("\n", 2)[0].strip();
+        return line.length() > 140 ? line.substring(0, 140) : line;
+    }
+
     /** Escapes text and turns bare http(s) URLs into styled links; newlines become &lt;br&gt;. */
     private String formatMessage(String message) {
         if (message == null || message.isBlank()) {

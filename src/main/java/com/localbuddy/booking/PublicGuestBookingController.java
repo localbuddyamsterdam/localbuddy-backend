@@ -52,4 +52,30 @@ public class PublicGuestBookingController {
 
         return ResponseEntity.ok(bookingService.lookupGuestBooking(request));
     }
+
+    @PostMapping("/cancel")
+    public ResponseEntity<BookingResponse> cancelGuestBooking(
+            HttpServletRequest servletRequest,
+            @Valid @RequestBody GuestCancelBookingRequest request
+    ) {
+        String clientIp = clientIpResolver.resolveClientIp(servletRequest);
+        rateLimitService.checkPublicApiLimit("guest-booking-cancel:" + clientIp);
+
+        return ResponseEntity.ok(bookingService.cancelGuestBooking(
+                request.bookingReference(), request.guestEmail(), request.reason()));
+    }
+
+    @PostMapping("/reschedule")
+    public ResponseEntity<BookingResponse> rescheduleGuestBooking(
+            HttpServletRequest servletRequest,
+            @Valid @RequestBody GuestRescheduleBookingRequest request
+    ) {
+        String clientIp = clientIpResolver.resolveClientIp(servletRequest);
+        rateLimitService.checkPublicApiLimit("guest-booking-reschedule:" + clientIp);
+
+        return ResponseEntity.ok(bookingService.rescheduleGuestBooking(
+                request.bookingReference(),
+                request.guestEmail(),
+                new RescheduleBookingRequest(request.newAvailabilitySlotId(), request.reason())));
+    }
 }

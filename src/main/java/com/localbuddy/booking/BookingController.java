@@ -134,6 +134,19 @@ public class BookingController {
         );
     }
 
+    @PostMapping("/{bookingId}/reschedule-by-traveler")
+    public ResponseEntity<BookingResponse> rescheduleBookingByLoggedInUser(
+            Authentication authentication,
+            @PathVariable UUID bookingId,
+            @Valid @RequestBody RescheduleBookingRequest request
+    ) {
+        UUID userId = UUID.fromString(authentication.getName());
+
+        return ResponseEntity.ok(
+                bookingService.rescheduleBookingByLoggedInUser(userId, bookingId, request)
+        );
+    }
+
     @PostMapping("/checkout")
     public ResponseEntity<BookingCheckoutResponse> createBookingAndCheckout(
             Authentication authentication,
