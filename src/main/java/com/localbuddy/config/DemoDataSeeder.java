@@ -156,6 +156,7 @@ public class DemoDataSeeder implements CommandLineRunner {
             c.setCountry("France");
             c.setLatitude(new BigDecimal("48.856600"));
             c.setLongitude(new BigDecimal("2.352200"));
+            c.setTimezone("Europe/Paris");
             c.setActive(true);
             c.setDisplayOrder(20);
             return cityRepository.save(c);

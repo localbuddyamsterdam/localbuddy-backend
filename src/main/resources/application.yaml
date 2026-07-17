@@ -299,6 +299,24 @@ app:
   support:
     email: ${SUPPORT_EMAIL:admin@test.com}
 
+  trip-safety:
+    # Comma-separated operator emails that receive live SOS alerts. Blank falls back to
+    # app.support.email (and logs a WARN if that is still the dev default admin@test.com).
+    # SET THIS to a MONITORED inbox / on-call address in production — an SOS is safety-critical.
+    sos-recipients: ${SOS_ALERT_EMAILS:}
+    # When true (default), also alert the traveler's emergency contact on an SOS: email
+    # when an address is on file, plus a WhatsApp message when a number is present and
+    # WhatsApp Business is configured. Set false to alert operators only.
+    notify-emergency-contact: ${SOS_NOTIFY_EMERGENCY_CONTACT:true}
+
+  geocoding:
+    # Reverse-geocode SOS coordinates to a street address in the operator alert. Blank
+    # api-key = dormant (SOS still works; the alert shows raw coords + map links). Google
+    # Geocoding-compatible: GET {url}?latlng={lat},{lng}&key={key}.
+    url: ${GEOCODING_URL:https://maps.googleapis.com/maps/api/geocode/json}
+    api-key: ${GEOCODING_API_KEY:}
+    timeout-seconds: ${GEOCODING_TIMEOUT_SECONDS:3}
+
   rate-limit:
     public-api:
       enabled: ${PUBLIC_API_RATE_LIMIT_ENABLED:true}

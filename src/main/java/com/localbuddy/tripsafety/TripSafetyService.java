@@ -1,42 +1,63 @@
 package com.localbuddy.tripsafety;
 
 import com.localbuddy.booking.Booking;
+import com.localbuddy.booking.BookingSource;
 import com.localbuddy.common.exception.BadRequestException;
 import com.localbuddy.common.exception.ResourceNotFoundException;
 import com.localbuddy.notification.NotificationService;
 import com.localbuddy.notification.NotificationType;
 import com.localbuddy.user.User;
 import com.localbuddy.user.UserRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 
 @Service
 public class TripSafetyService {
+
+    private static final Logger log = LoggerFactory.getLogger(TripSafetyService.class);
 
     private final EmergencyContactRepository emergencyContactRepository;
     private final TripSafetyEventRepository eventRepository;
     private final TripSafetyBookingRepository bookingRepository;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
+    private final SosAlertBuilder sosAlertBuilder;
+    private final GeocodingService geocodingService;
     private final String supportEmail;
+    /** Comma-separated operator emails that receive live SOS alerts; blank falls back to support email. */
+    private final String sosRecipientsRaw;
+    /** When true, also alert the traveler's emergency contact on an SOS. */
+    private final boolean notifyEmergencyContactEnabled;
 
     public TripSafetyService(EmergencyContactRepository emergencyContactRepository,
                              TripSafetyEventRepository eventRepository,
                              TripSafetyBookingRepository bookingRepository,
                              UserRepository userRepository,
                              NotificationService notificationService,
-                             @Value("${app.support.email:admin@test.com}") String supportEmail) {
+                             SosAlertBuilder sosAlertBuilder,
+                             GeocodingService geocodingService,
+                             @Value("${app.support.email:admin@test.com}") String supportEmail,
+                             @Value("${app.trip-safety.sos-recipients:}") String sosRecipientsRaw,
+                             @Value("${app.trip-safety.notify-emergency-contact:true}") boolean notifyEmergencyContactEnabled) {
         this.emergencyContactRepository = emergencyContactRepository;
         this.eventRepository = eventRepository;
         this.bookingRepository = bookingRepository;
         this.userRepository = userRepository;
         this.notificationService = notificationService;
+        this.sosAlertBuilder = sosAlertBuilder;
+        this.geocodingService = geocodingService;
         this.supportEmail = supportEmail;
+        this.sosRecipientsRaw = sosRecipientsRaw;
+        this.notifyEmergencyContactEnabled = notifyEmergencyContactEnabled;
     }
 
     // --- Emergency contact -------------------------------------------------
@@ -91,12 +112,70 @@ public class TripSafetyService {
     @Transactional
     public TripSafetyEventResponse raiseSos(UUID userId, UUID bookingId, SosRequest request) {
         Booking booking = requireTraveler(userId, bookingId);
-        TripSafetyEvent event = recordEvent(booking, userId, TripSafetyEventType.SOS,
-                request != null ? request.latitude() : null,
-                request != null ? request.longitude() : null,
-                request != null ? request.message() : null);
+        User user = userRepository.findById(userId).orElse(null);
+        TripSafetyEvent event = eventRepository.save(buildSosEvent(booking, user, request));
+        geocode(event);
+        notifySupport(booking, event, false);
+        notifyEmergencyContact(booking, event);
+        return TripSafetyEventResponse.from(event);
+    }
 
-        notifySupport(booking, event);
+    /**
+     * Anonymous-guest SOS: resolve the guest booking by reference + email, then alert
+     * exactly like an authenticated SOS. Safety is never login-gated. Every mismatch
+     * throws the same opaque 404 so the endpoint can't be used to probe bookings.
+     */
+    @Transactional
+    public TripSafetyEventResponse raiseGuestSos(PublicSosRequest request) {
+        String reference = request.bookingReference() == null ? ""
+                : request.bookingReference().trim().toUpperCase(Locale.ROOT);
+        String email = request.guestEmail() == null ? ""
+                : request.guestEmail().trim().toLowerCase(Locale.ROOT);
+        Booking booking = bookingRepository.findByBookingReference(reference)
+                .orElseThrow(() -> new ResourceNotFoundException("Guest booking not found"));
+        if (booking.getBookingSource() != BookingSource.GUEST_USER
+                || booking.getGuestEmail() == null
+                || !booking.getGuestEmail().equalsIgnoreCase(email)) {
+            throw new ResourceNotFoundException("Guest booking not found");
+        }
+        TripSafetyEvent event = eventRepository.save(buildSosEvent(booking, null, request.toSosRequest()));
+        geocode(event);
+        notifySupport(booking, event, false);
+        notifyEmergencyContact(booking, event);
+        return TripSafetyEventResponse.from(event);
+    }
+
+    /**
+     * Enrich an already-raised SOS from the one-tap chips on the reassurance screen
+     * (situation type, contactability, an added note). Only ever updates an existing
+     * open SOS the traveler owns; re-alerts operators so the new detail reaches them.
+     */
+    @Transactional
+    public TripSafetyEventResponse updateSosDetail(UUID userId, UUID bookingId, UUID eventId, SosDetailRequest request) {
+        Booking booking = requireTraveler(userId, bookingId);
+        TripSafetyEvent event = eventRepository.findById(eventId)
+                .orElseThrow(() -> new ResourceNotFoundException("Safety event not found"));
+        if (event.getBooking() == null || !event.getBooking().getId().equals(bookingId)
+                || event.getEventType() != TripSafetyEventType.SOS) {
+            throw new BadRequestException("Not an SOS event for this booking");
+        }
+        boolean changed = false;
+        if (request != null && request.situationType() != null) {
+            event.setSituationType(request.situationType());
+            changed = true;
+        }
+        if (request != null && request.contactPreference() != null) {
+            event.setContactPreference(request.contactPreference());
+            changed = true;
+        }
+        if (request != null && trimToNull(request.message()) != null) {
+            event.setNote(trimToNull(request.message()));
+            changed = true;
+        }
+        event = eventRepository.save(event);
+        if (changed && !event.isResolved()) {
+            notifySupport(booking, event, true);
+        }
         return TripSafetyEventResponse.from(event);
     }
 
@@ -127,7 +206,130 @@ public class TripSafetyService {
         return TripSafetyEventResponse.from(eventRepository.save(event));
     }
 
+    /** A responder has eyes on this SOS (first acknowledgement wins). */
+    @Transactional
+    public TripSafetyEventResponse acknowledgeSos(UUID eventId, UUID adminId) {
+        TripSafetyEvent event = requireSosEvent(eventId);
+        if (event.getAcknowledgedAt() == null) {
+            event.setAcknowledgedAt(Instant.now());
+            event.setAcknowledgedBy(adminId);
+        }
+        return TripSafetyEventResponse.from(eventRepository.save(event));
+    }
+
+    /** Bump this SOS to on-call and re-fire the operator alert. */
+    @Transactional
+    public TripSafetyEventResponse escalateSos(UUID eventId) {
+        TripSafetyEvent event = requireSosEvent(eventId);
+        event.setEscalatedAt(Instant.now());
+        event = eventRepository.save(event);
+        notifySupport(event.getBooking(), event, true);
+        return TripSafetyEventResponse.from(event);
+    }
+
+    @Transactional(readOnly = true)
+    public long openSosCount() {
+        return eventRepository.countByEventTypeAndResolvedFalse(TripSafetyEventType.SOS);
+    }
+
+    private TripSafetyEvent requireSosEvent(UUID eventId) {
+        TripSafetyEvent event = eventRepository.findById(eventId)
+                .orElseThrow(() -> new ResourceNotFoundException("Safety event not found"));
+        if (event.getEventType() != TripSafetyEventType.SOS) {
+            throw new BadRequestException("Not an SOS event");
+        }
+        return event;
+    }
+
     // --- Helpers -----------------------------------------------------------
+
+    private TripSafetyEvent buildSosEvent(Booking booking, User user, SosRequest request) {
+        TripSafetyEvent event = new TripSafetyEvent();
+        event.setBooking(booking);
+        event.setUser(user);
+        event.setEventType(TripSafetyEventType.SOS);
+        // A missing situation type is treated as a full emergency (fail-safe); a missing
+        // contact preference defaults to "OK to call".
+        event.setSituationType(request != null && request.situationType() != null
+                ? request.situationType() : SosSituationType.EMERGENCY);
+        event.setContactPreference(request != null && request.contactPreference() != null
+                ? request.contactPreference() : SosContactPreference.CALL);
+        if (request != null) {
+            event.setLatitude(request.latitude());
+            event.setLongitude(request.longitude());
+            event.setNote(trimToNull(request.message()));
+            event.setAccuracyMeters(request.accuracyMeters());
+            event.setLocationSource(trimToNull(request.locationSource()));
+            event.setBatteryPercent(request.batteryPercent());
+            event.setDeviceLanguage(trimToNull(request.deviceLanguage()));
+        }
+        return event;
+    }
+
+    /** Best-effort reverse geocode; persists the address on the event. No-op unless a
+     * geocoding provider is configured, and never throws (an SOS must not depend on it). */
+    private void geocode(TripSafetyEvent event) {
+        try {
+            geocodingService.reverseGeocode(event.getLatitude(), event.getLongitude())
+                    .ifPresent(address -> {
+                        event.setGeocodedAddress(address);
+                        eventRepository.save(event);
+                    });
+        } catch (Exception e) {
+            log.warn("SOS reverse-geocode failed (non-fatal): {}", e.getMessage());
+        }
+    }
+
+    /** Alert the traveler's emergency contact (per-booking snapshot, else profile EC) via
+     * email and — when a number is on file — WhatsApp (dormant unless configured). */
+    private void notifyEmergencyContact(Booking booking, TripSafetyEvent event) {
+        if (!notifyEmergencyContactEnabled) {
+            return;
+        }
+        String ecEmail = trimToNull(booking.getEmergencyContactEmail());
+        String ecPhone = trimToNull(booking.getEmergencyContactPhone());
+        if (ecEmail == null && ecPhone == null && booking.getLoggedInUser() != null) {
+            EmergencyContact profileEc = emergencyContactRepository
+                    .findByUserId(booking.getLoggedInUser().getId()).orElse(null);
+            if (profileEc != null) {
+                ecEmail = trimToNull(profileEc.getEmail());
+                ecPhone = trimToNull(profileEc.getContactPhone());
+            }
+        }
+        if (ecEmail == null && ecPhone == null) {
+            return;
+        }
+        String travelerName = booking.getLoggedInUser() != null
+                ? booking.getLoggedInUser().getDisplayName() : booking.getGuestName();
+        if (travelerName == null || travelerName.isBlank()) {
+            travelerName = "Someone you are an emergency contact for";
+        }
+        String reference = booking.getBookingReference();
+        StringBuilder body = new StringBuilder();
+        body.append(travelerName).append(" has raised an SOS during their LocalBuddy experience (booking ")
+                .append(reference).append(").");
+        if (event.getGeocodedAddress() != null) {
+            body.append(" Last known location: ").append(event.getGeocodedAddress()).append('.');
+        } else if (event.getLatitude() != null && event.getLongitude() != null) {
+            body.append(" Location: https://www.google.com/maps/search/?api=1&query=")
+                    .append(event.getLatitude()).append(',').append(event.getLongitude()).append('.');
+        }
+        body.append(" Please try to reach them. If you can't, contact local emergency services.");
+        String subject = "Safety alert: " + travelerName + " raised an SOS";
+        String message = body.toString();
+
+        if (ecEmail != null) {
+            notificationService.createEmailNotificationForGuest(
+                    ecEmail, ecPhone, NotificationType.SOS_RAISED, subject, message,
+                    "BOOKING", booking.getId(), "sos-ec:" + event.getId());
+        }
+        if (ecPhone != null) {
+            // No-ops unless WhatsApp Business is configured; harmless otherwise.
+            notificationService.createWhatsAppNotificationForGuest(
+                    ecEmail, ecPhone, NotificationType.SOS_RAISED, subject, message,
+                    "BOOKING", booking.getId(), "sos-ec-wa:" + event.getId());
+        }
+    }
 
     private TripSafetyEvent recordEvent(Booking booking, UUID userId, TripSafetyEventType type,
                                         Double latitude, Double longitude, String note) {
@@ -142,29 +344,46 @@ public class TripSafetyService {
         return eventRepository.save(event);
     }
 
-    private void notifySupport(Booking booking, TripSafetyEvent event) {
-        String reference = booking.getBookingReference();
-        StringBuilder message = new StringBuilder();
-        message.append("SOS raised for booking ").append(reference).append(".");
-        if (event.getLatitude() != null && event.getLongitude() != null) {
-            message.append(" Location: ").append(event.getLatitude()).append(", ").append(event.getLongitude()).append(".");
-        }
-        if (event.getNote() != null) {
-            message.append(" Message: ").append(event.getNote()).append(".");
-        }
-
+    private void notifySupport(Booking booking, TripSafetyEvent event, boolean update) {
         User traveler = booking.getLoggedInUser();
-        if (traveler != null) {
-            emergencyContactRepository.findByUserId(traveler.getId()).ifPresent(contact ->
-                    message.append(" Emergency contact: ")
-                            .append((contact.getFirstName() + " " + contact.getLastName()).trim())
-                            .append(" (").append(contact.getContactPhone()).append(")."));
-        }
+        EmergencyContact profileEc = traveler != null
+                ? emergencyContactRepository.findByUserId(traveler.getId()).orElse(null)
+                : null;
 
-        notificationService.createEmailNotificationForGuest(
-                supportEmail, null, NotificationType.SAFETY_REPORT_CREATED,
-                "SOS: booking " + reference, message.toString(),
-                "BOOKING", booking.getId(), "sos:" + event.getId());
+        SosAlertBuilder.SosAlertContent alert = sosAlertBuilder.build(booking, event, profileEc, update);
+
+        for (String recipient : resolveSosRecipients()) {
+            // Distinct dedupe key per recipient + per (raise vs update) so operators are not
+            // silently deduped out of a follow-up.
+            String dedupeKey = "sos:" + event.getId() + (update ? ":upd" : "") + ":" + recipient;
+            notificationService.createEmailNotificationForGuest(
+                    recipient, null, NotificationType.SOS_RAISED,
+                    alert.subject(), alert.textBody(), alert.htmlBody(),
+                    "BOOKING", booking.getId(), dedupeKey);
+        }
+    }
+
+    /** Operator emails for SOS alerts; falls back to the support email, and WARNs loudly
+     * when that fallback is still the unset/dev default — an SOS reaching no one is dangerous. */
+    private List<String> resolveSosRecipients() {
+        List<String> recipients = new ArrayList<>();
+        if (sosRecipientsRaw != null && !sosRecipientsRaw.isBlank()) {
+            for (String part : sosRecipientsRaw.split(",")) {
+                String email = part.trim();
+                if (!email.isEmpty()) {
+                    recipients.add(email);
+                }
+            }
+        }
+        if (recipients.isEmpty()) {
+            recipients.add(supportEmail);
+            if (supportEmail == null || supportEmail.isBlank() || supportEmail.equalsIgnoreCase("admin@test.com")) {
+                log.warn("SOS alert is routing to the default/unset support email ({}). Set "
+                        + "app.trip-safety.sos-recipients (SOS_ALERT_EMAILS) to a MONITORED inbox — "
+                        + "an SOS reaching admin@test.com reaches no one.", supportEmail);
+            }
+        }
+        return recipients;
     }
 
     private Booking requireTraveler(UUID userId, UUID bookingId) {

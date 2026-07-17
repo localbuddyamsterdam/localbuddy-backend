@@ -724,6 +724,17 @@ public class PaymentService {
     }
 
     /**
+     * Refund/fee a traveller cancellation of this booking would attract, per the active
+     * cancellation-refund policy. Pass {@code Instant.now()} for a live pre-cancel preview, or the
+     * booking's {@code cancelledAt} to reproduce the refund that already applied. Read-only.
+     */
+    @Transactional(readOnly = true)
+    public RefundCalculationResult previewTravelerRefund(Booking booking, Instant asOf) {
+        return cancellationRefundPolicyService.calculateRefund(
+                booking, BookingCancellationActor.LOGGED_IN_USER, asOf);
+    }
+
+    /**
      * Cancellation refund with an optional admin override. When {@code overrideRefundPercentage}
      * is null the refund is computed from the active cancellation-refund policy (the normal path);
      * when non-null it is used directly (0–100% of the booking total), still routed through the

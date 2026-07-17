@@ -178,7 +178,7 @@ public class BookingService {
         ageBandPricing.validateAgeGate(experience.getMinimumAge(), bands);
 
         stepStart = System.currentTimeMillis();
-        validateSlot(experience, slot, bands.totalGuests());
+        validateSlot(experience, slot, bands.seats());
         log.info("LOGGED_IN_BOOKING_TIMING validateSlotMs={}", System.currentTimeMillis() - stepStart);
 
         stepStart = System.currentTimeMillis();
@@ -188,7 +188,7 @@ public class BookingService {
         BigDecimal pricePerGuest = experience.getPriceAmount();
         BookingPricing pricing = computePricing(privateBooking, slot,
                 pricePerGuest, experience.getPrivatePrice(),
-                bands.totalGuests(), ageBandPricing.billableUnits(bands));
+                bands.seats(), ageBandPricing.billableUnits(bands));
 
         int seatsToBook = pricing.seatsBlocked();
         int newBookedCount = slot.getBookedCount() + seatsToBook;
@@ -293,6 +293,7 @@ public class BookingService {
                 eventPublisher.publishEvent(new BookingCreatedEvent(savedBooking.getId()));
             }
             log.info("LOGGED_IN_BOOKING_TIMING publishEventMs={}", System.currentTimeMillis() - stepStart);
+            publishBookingAudit(savedBooking.getId(), "BOOKED", "Booking created", loggedInUserId, "TRAVELER");
 
             stepStart = System.currentTimeMillis();
             BookingResponse response = toResponse(savedBooking);
@@ -520,7 +521,11 @@ public class BookingService {
                 includeEmergencyContact ? booking.getEmergencyContactEmail() : null,
                 includeEmergencyContact ? booking.getEmergencyContactPhone() : null,
                 includeEmergencyContact ? booking.getEmergencyContactRelationship() : null,
-                booking.isPaymentWaived()
+                booking.isPaymentWaived(),
+                booking.getReferralDiscountAmount(),
+                booking.getExperience().getCity() != null
+                        ? booking.getExperience().getCity().getTimezone()
+                        : null
         );
     }
 
@@ -593,6 +598,7 @@ public class BookingService {
 
         Booking savedBooking = bookingRepository.save(booking);
         createBookingAcceptedNotification(savedBooking);
+        publishBookingAudit(savedBooking.getId(), "ACCEPTED", "Accepted by host", localUserId, "HOST");
 
         return toResponse(savedBooking, false);
     }
@@ -641,7 +647,40 @@ public class BookingService {
         waitlistService.notifyOpenedSpots(slot);
         Booking savedBooking = bookingRepository.save(booking);
         createBookingDeclinedNotification(savedBooking);
+        publishBookingAudit(savedBooking.getId(), "DECLINED", "Declined by host", localUserId, "HOST");
         return toResponse(savedBooking, false);
+    }
+
+    /** Queue a booking-audit entry; written to the timeline after commit by BookingAuditListener. */
+    private void publishBookingAudit(UUID bookingId, String action, String detail, UUID actorUserId, String actorRole) {
+        eventPublisher.publishEvent(new BookingAuditEvent(bookingId, action, detail, actorUserId, actorRole));
+    }
+
+    /**
+     * Refund + cancellation-fee a traveller would incur cancelling this booking, per the active
+     * refund policy (100% refund &gt;24h before start, 0% / full fee inside 24h). For an already
+     * cancelled booking it reproduces the refund that applied at cancellation time. Powers the
+     * confirm popup and the cancelled-booking summary. Owner-scoped.
+     */
+    @Transactional(readOnly = true)
+    public RefundPreviewResponse getTravelerRefundPreview(UUID loggedInUserId, UUID bookingId) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
+
+        if (booking.getLoggedInUser() == null ||
+                !booking.getLoggedInUser().getId().equals(loggedInUserId)) {
+            throw new ResourceNotFoundException("Booking not found");
+        }
+
+        Instant asOf = booking.getCancelledAt() != null ? booking.getCancelledAt() : Instant.now();
+        RefundCalculationResult calc = paymentService.previewTravelerRefund(booking, asOf);
+        BigDecimal refundPercentage = calc.refundPercentage();
+        return new RefundPreviewResponse(
+                booking.getTotalAmount(),
+                calc.refundAmount(),
+                refundPercentage,
+                BigDecimal.valueOf(100).subtract(refundPercentage),
+                booking.getCurrency());
     }
 
     @Transactional
@@ -658,6 +697,9 @@ public class BookingService {
             throw new BadRequestException("Only pending payment or confirmed bookings can be cancelled");
         }
 
+        // A traveller may cancel at any time — including inside 24h — so the freed seats go back on
+        // sale. The refund is governed by the cancellation-refund policy (100% if >24h before start,
+        // 0% / full cancellation fee inside 24h); the client previews it before confirming.
         releaseAvailabilityCapacity(booking);
         handleCancellationPayment(booking, BookingCancellationActor.LOGGED_IN_USER, request.reason());
         booking.setStatus(BookingStatus.CANCELLED_BY_LOGGED_IN_USER);
@@ -666,6 +708,7 @@ public class BookingService {
 
         Booking savedBooking = bookingRepository.save(booking);
         createBookingCancelledNotification(savedBooking);
+        publishBookingAudit(savedBooking.getId(), "CANCELLED", "Cancelled by traveller", loggedInUserId, "TRAVELER");
         return toResponse(savedBooking);
     }
 
@@ -702,6 +745,7 @@ public class BookingService {
 
         Booking savedBooking = bookingRepository.save(booking);
         createBookingCancelledNotification(savedBooking);
+        publishBookingAudit(savedBooking.getId(), "CANCELLED", "Cancelled by host", localUserId, "HOST");
         return toResponse(savedBooking, false);
     }
 
@@ -862,7 +906,7 @@ public class BookingService {
         ageBandPricing.validateAgeGate(experience.getMinimumAge(), bands);
 
         stepStart = System.currentTimeMillis();
-        validateSlot(experience, slot, bands.totalGuests());
+        validateSlot(experience, slot, bands.seats());
         log.info("GUEST_BOOKING_TIMING validateSlotMs={}", System.currentTimeMillis() - stepStart);
 
         stepStart = System.currentTimeMillis();
@@ -872,7 +916,7 @@ public class BookingService {
         BigDecimal pricePerGuest = experience.getPriceAmount();
         BookingPricing pricing = computePricing(privateBooking, slot,
                 pricePerGuest, experience.getPrivatePrice(),
-                bands.totalGuests(), ageBandPricing.billableUnits(bands));
+                bands.seats(), ageBandPricing.billableUnits(bands));
 
         int seatsToBook = pricing.seatsBlocked();
         int newBookedCount = slot.getBookedCount() + seatsToBook;
@@ -979,6 +1023,7 @@ public class BookingService {
             stepStart = System.currentTimeMillis();
             eventPublisher.publishEvent(new BookingCreatedEvent(savedBooking.getId()));
             log.info("GUEST_BOOKING_TIMING publishEventMs={}", System.currentTimeMillis() - stepStart);
+            publishBookingAudit(savedBooking.getId(), "BOOKED", "Guest booking created", null, "GUEST");
 
             stepStart = System.currentTimeMillis();
             BookingResponse response = toResponse(savedBooking);
@@ -1013,7 +1058,7 @@ public class BookingService {
         AgeBandPricing.AgeBands bands = ageBandPricing.resolve(
                 request.adults(), request.teens(), request.children(), request.infants(), request.guestsCount());
         ageBandPricing.validateAgeGate(experience.getMinimumAge(), bands);
-        validateSlot(experience, slot, bands.totalGuests());
+        validateSlot(experience, slot, bands.seats());
 
         boolean privateBooking = Boolean.TRUE.equals(request.privateBooking());
         requirePrivateBookingAllowed(privateBooking, experience, slot);
@@ -1021,7 +1066,7 @@ public class BookingService {
         BigDecimal pricePerGuest = experience.getPriceAmount();
         BookingPricing pricing = computePricing(privateBooking, slot,
                 pricePerGuest, experience.getPrivatePrice(),
-                bands.totalGuests(), ageBandPricing.billableUnits(bands));
+                bands.seats(), ageBandPricing.billableUnits(bands));
 
         int seatsToBook = pricing.seatsBlocked();
         int newBookedCount = slot.getBookedCount() + seatsToBook;
@@ -1311,6 +1356,7 @@ public class BookingService {
 
         int oldTotal = booking.getGuestsCount();
         int newTotal = bands.totalGuests();
+        int newSeats = bands.seats();
         if (newTotal < 1) {
             throw new BadRequestException("A booking must keep at least one guest");
         }
@@ -1331,7 +1377,7 @@ public class BookingService {
         BigDecimal newTotalAmount = newOriginal.subtract(newDiscount)
                 .max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
 
-        int seatsToRelease = seatsConsumed(booking) - newTotal;
+        int seatsToRelease = seatsConsumed(booking) - newSeats;
         if (seatsToRelease > 0) {
             AvailabilitySlot slot = availabilitySlotRepository
                     .findByIdForUpdate(booking.getAvailabilitySlot().getId())
@@ -1342,7 +1388,7 @@ public class BookingService {
 
         applyBands(booking, bands);
         booking.setGuestsCount(newTotal);
-        booking.setSeatsBlocked(newTotal);
+        booking.setSeatsBlocked(newSeats);
         booking.setOriginalAmount(newOriginal);
         booking.setDiscountAmount(newDiscount);
         booking.setTotalAmount(newTotalAmount);
@@ -1454,6 +1500,7 @@ public class BookingService {
 
         Booking savedBooking = bookingRepository.save(booking);
         createBookingCompletedNotification(savedBooking);
+        publishBookingAudit(savedBooking.getId(), "COMPLETED", "Marked completed by host", localUserId, "HOST");
 
         return toResponse(savedBooking, false);
     }
@@ -1474,7 +1521,9 @@ public class BookingService {
             throw new ResourceNotFoundException("Booking not found");
         }
 
-        return rescheduleBooking(booking, request, false);
+        BookingResponse response = rescheduleBooking(booking, request, false);
+        publishBookingAudit(bookingId, "RESCHEDULED", "Rescheduled by host", localUserId, "HOST");
+        return response;
     }
 
     @Transactional

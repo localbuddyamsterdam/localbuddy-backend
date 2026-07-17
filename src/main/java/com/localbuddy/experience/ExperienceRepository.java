@@ -51,13 +51,17 @@ public interface ExperienceRepository extends JpaRepository<Experience, UUID> {
             LEFT JOIN e.category cat
             WHERE e.status = com.localbuddy.experience.ExperienceStatus.APPROVED
               AND (:citySlug IS NULL OR c.slug = :citySlug)
-              AND (:categorySlug IS NULL OR cat.slug = :categorySlug)
+              AND (:filterByCategory = false
+                   OR cat.slug IN :categorySlugs
+                   OR EXISTS (SELECT lc.id FROM Experience e2 JOIN e2.categories lc
+                              WHERE e2.id = e.id AND lc.slug IN :categorySlugs))
               AND (:bookingModes IS NULL OR e.bookingMode IN :bookingModes)
             ORDER BY e.createdAt DESC
             """)
     List<Experience> findApprovedForListing(
             @Param("citySlug") String citySlug,
-            @Param("categorySlug") String categorySlug,
+            @Param("filterByCategory") boolean filterByCategory,
+            @Param("categorySlugs") Collection<String> categorySlugs,
             @Param("bookingModes") Collection<BookingMode> bookingModes
     );
 
@@ -77,7 +81,10 @@ public interface ExperienceRepository extends JpaRepository<Experience, UUID> {
             LEFT JOIN e.category cat
             WHERE e.status = com.localbuddy.experience.ExperienceStatus.APPROVED
               AND (:citySlug IS NULL OR c.slug = :citySlug)
-              AND (:categorySlug IS NULL OR cat.slug = :categorySlug)
+              AND (:filterByCategory = false
+                   OR cat.slug IN :categorySlugs
+                   OR EXISTS (SELECT lc.id FROM Experience e2 JOIN e2.categories lc
+                              WHERE e2.id = e.id AND lc.slug IN :categorySlugs))
               AND (:bookingModes IS NULL OR e.bookingMode IN :bookingModes)
               AND (:maxMinimumAge IS NULL OR e.minimumAge <= :maxMinimumAge)
               AND (
@@ -98,7 +105,10 @@ public interface ExperienceRepository extends JpaRepository<Experience, UUID> {
             LEFT JOIN e.category cat
             WHERE e.status = com.localbuddy.experience.ExperienceStatus.APPROVED
               AND (:citySlug IS NULL OR c.slug = :citySlug)
-              AND (:categorySlug IS NULL OR cat.slug = :categorySlug)
+              AND (:filterByCategory = false
+                   OR cat.slug IN :categorySlugs
+                   OR EXISTS (SELECT lc.id FROM Experience e2 JOIN e2.categories lc
+                              WHERE e2.id = e.id AND lc.slug IN :categorySlugs))
               AND (:bookingModes IS NULL OR e.bookingMode IN :bookingModes)
               AND (:maxMinimumAge IS NULL OR e.minimumAge <= :maxMinimumAge)
               AND (
@@ -115,7 +125,8 @@ public interface ExperienceRepository extends JpaRepository<Experience, UUID> {
             """)
     Page<Experience> searchApproved(
             @Param("citySlug") String citySlug,
-            @Param("categorySlug") String categorySlug,
+            @Param("filterByCategory") boolean filterByCategory,
+            @Param("categorySlugs") Collection<String> categorySlugs,
             @Param("bookingModes") Collection<BookingMode> bookingModes,
             @Param("maxMinimumAge") Integer maxMinimumAge,
             @Param("guests") Integer guests,
@@ -141,7 +152,10 @@ public interface ExperienceRepository extends JpaRepository<Experience, UUID> {
             LEFT JOIN lp.user u
             WHERE e.status = com.localbuddy.experience.ExperienceStatus.APPROVED
               AND (:citySlug IS NULL OR c.slug = :citySlug)
-              AND (:categorySlug IS NULL OR cat.slug = :categorySlug)
+              AND (:filterByCategory = false
+                   OR cat.slug IN :categorySlugs
+                   OR EXISTS (SELECT lc.id FROM Experience e2 JOIN e2.categories lc
+                              WHERE e2.id = e.id AND lc.slug IN :categorySlugs))
               AND (:bookingModes IS NULL OR e.bookingMode IN :bookingModes)
               AND (:maxMinimumAge IS NULL OR e.minimumAge <= :maxMinimumAge)
               AND (:minPrice IS NULL OR e.priceAmount >= :minPrice)
@@ -170,7 +184,10 @@ public interface ExperienceRepository extends JpaRepository<Experience, UUID> {
             LEFT JOIN lp.user u
             WHERE e.status = com.localbuddy.experience.ExperienceStatus.APPROVED
               AND (:citySlug IS NULL OR c.slug = :citySlug)
-              AND (:categorySlug IS NULL OR cat.slug = :categorySlug)
+              AND (:filterByCategory = false
+                   OR cat.slug IN :categorySlugs
+                   OR EXISTS (SELECT lc.id FROM Experience e2 JOIN e2.categories lc
+                              WHERE e2.id = e.id AND lc.slug IN :categorySlugs))
               AND (:bookingModes IS NULL OR e.bookingMode IN :bookingModes)
               AND (:maxMinimumAge IS NULL OR e.minimumAge <= :maxMinimumAge)
               AND (:minPrice IS NULL OR e.priceAmount >= :minPrice)
@@ -193,7 +210,8 @@ public interface ExperienceRepository extends JpaRepository<Experience, UUID> {
             """)
     Page<Experience> searchApprovedAdvanced(
             @Param("citySlug") String citySlug,
-            @Param("categorySlug") String categorySlug,
+            @Param("filterByCategory") boolean filterByCategory,
+            @Param("categorySlugs") Collection<String> categorySlugs,
             @Param("bookingModes") Collection<BookingMode> bookingModes,
             @Param("maxMinimumAge") Integer maxMinimumAge,
             @Param("guests") Integer guests,

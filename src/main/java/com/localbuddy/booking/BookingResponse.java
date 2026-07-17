@@ -72,6 +72,12 @@ public record BookingResponse(
         String emergencyContactPhone,
         String emergencyContactRelationship,
         // True when an admin confirmed this booking without payment ("book as admin").
-        boolean paymentWaived
+        boolean paymentWaived,
+        // Referral discount granted to the referred traveller — completes the discount breakdown
+        // (deal/promo/private amounts are above) so the confirmation can itemize every saving.
+        BigDecimal referralDiscountAmount,
+        // IANA timezone of the experience's city (e.g. "Europe/Amsterdam"), so clients render the
+        // slot's start/end in local wall-clock time instead of raw UTC.
+        String timezone
 ) {
 }

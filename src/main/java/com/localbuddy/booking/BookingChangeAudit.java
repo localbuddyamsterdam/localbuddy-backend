@@ -34,7 +34,12 @@ public class BookingChangeAudit {
     @Column(name = "detail", columnDefinition = "TEXT")
     private String detail;
 
-    /** The acting admin (users.id); resolved to a display name on read. */
+    /** Who made the change: TRAVELER | HOST | ADMIN | GUEST | SYSTEM. Null on legacy rows. */
+    @Column(name = "actor_role", length = 20)
+    private String actorRole;
+
+    /** The acting user (users.id) — traveller, host or admin; null for guest/system actions.
+     *  Resolved to a display name on read. */
     @Column(name = "changed_by_user_id")
     private UUID changedByUserId;
 

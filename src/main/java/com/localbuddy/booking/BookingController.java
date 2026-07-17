@@ -15,10 +15,14 @@ public class BookingController {
 
     private final BookingService bookingService;
     private final BookingCheckoutService bookingCheckoutService;
+    private final BookingAuditService bookingAuditService;
 
-    public BookingController(BookingService bookingService, BookingCheckoutService bookingCheckoutService) {
+    public BookingController(BookingService bookingService,
+                            BookingCheckoutService bookingCheckoutService,
+                            BookingAuditService bookingAuditService) {
         this.bookingService = bookingService;
         this.bookingCheckoutService = bookingCheckoutService;
+        this.bookingAuditService = bookingAuditService;
     }
 
     @PostMapping
@@ -65,6 +69,28 @@ public class BookingController {
     ) {
         UUID userId = UUID.fromString(authentication.getName());
         return ResponseEntity.ok(bookingService.cancelBookingByLoggedInUser(userId, bookingId, request));
+    }
+
+    /** Refund + cancellation-fee the traveller would incur cancelling this booking (for the confirm popup). */
+    @GetMapping("/{bookingId}/refund-preview")
+    public ResponseEntity<RefundPreviewResponse> getRefundPreview(
+            Authentication authentication,
+            @PathVariable UUID bookingId
+    ) {
+        UUID userId = UUID.fromString(authentication.getName());
+        return ResponseEntity.ok(bookingService.getTravelerRefundPreview(userId, bookingId));
+    }
+
+    /** Change timeline for a booking (created / rescheduled / cancelled / …). Owner-scoped: the
+     *  ownership check throws 404 for anyone who can't already read this booking. */
+    @GetMapping("/{bookingId}/history")
+    public ResponseEntity<List<BookingAuditResponse>> getBookingHistory(
+            Authentication authentication,
+            @PathVariable UUID bookingId
+    ) {
+        UUID userId = UUID.fromString(authentication.getName());
+        bookingService.getBookingById(userId, bookingId); // authz gate (throws if not permitted)
+        return ResponseEntity.ok(bookingAuditService.getEvents(bookingId));
     }
 
     @PostMapping("/{bookingId}/cancel-by-local")

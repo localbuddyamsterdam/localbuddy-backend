@@ -14,9 +14,11 @@ import java.util.UUID;
 public class CityService {
 
     private final CityRepository cityRepository;
+    private final CityTimezoneResolver cityTimezoneResolver;
 
-    public CityService(CityRepository cityRepository) {
+    public CityService(CityRepository cityRepository, CityTimezoneResolver cityTimezoneResolver) {
         this.cityRepository = cityRepository;
+        this.cityTimezoneResolver = cityTimezoneResolver;
     }
 
     @Transactional(readOnly = true)
@@ -52,7 +54,7 @@ public class CityService {
         city.setLongitude(request.longitude());
         city.setActive(true);
         city.setDisplayOrder(request.displayOrder() != null ? request.displayOrder() : 0);
-        city.setTimezone(resolveTimezone(request.timezone()));
+        city.setTimezone(resolveTimezone(request.timezone(), name, country));
 
         return toResponse(cityRepository.save(city));
     }
@@ -81,16 +83,20 @@ public class CityService {
         );
     }
 
-    /** Validates an optional IANA zone id, defaulting to Europe/Amsterdam. */
-    private String resolveTimezone(String requested) {
-        if (requested == null || requested.isBlank()) {
-            return "Europe/Amsterdam";
+    /**
+     * The IANA zone for a new city. An explicitly supplied zone is validated and used; otherwise it
+     * is auto-resolved from the city + country (see {@link CityTimezoneResolver}), so the admin only
+     * has to type the city and country.
+     */
+    private String resolveTimezone(String requested, String cityName, String country) {
+        if (requested != null && !requested.isBlank()) {
+            try {
+                return java.time.ZoneId.of(requested.trim()).getId();
+            } catch (Exception ex) {
+                throw new BadRequestException("Unknown timezone: " + requested);
+            }
         }
-        try {
-            return java.time.ZoneId.of(requested.trim()).getId();
-        } catch (Exception ex) {
-            throw new BadRequestException("Unknown timezone: " + requested);
-        }
+        return cityTimezoneResolver.resolve(cityName, country);
     }
 
     private String generateUniqueSlug(String name) {

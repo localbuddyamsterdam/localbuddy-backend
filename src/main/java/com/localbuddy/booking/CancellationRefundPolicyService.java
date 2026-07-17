@@ -26,13 +26,29 @@ public class CancellationRefundPolicyService {
             Booking booking,
             BookingCancellationActor cancelledBy
     ) {
+        return calculateRefund(booking, cancelledBy, Instant.now());
+    }
+
+    /**
+     * Refund/fee this booking would attract if cancelled by {@code cancelledBy} at {@code asOf}.
+     * Pass {@code Instant.now()} to preview a live cancellation; pass the booking's {@code cancelledAt}
+     * to reproduce the tier that applied to an already-cancelled booking (the tier is time-based, so
+     * pricing it "now" for a past cancellation would drift once the start time passes).
+     */
+    @Transactional(readOnly = true)
+    public RefundCalculationResult calculateRefund(
+            Booking booking,
+            BookingCancellationActor cancelledBy,
+            Instant asOf
+    ) {
         if (booking.getAvailabilitySlot() == null ||
                 booking.getAvailabilitySlot().getStartTime() == null) {
             throw new BadRequestException("Booking start time is missing");
         }
 
         BigDecimal hoursBeforeStart = calculateHoursBeforeStart(
-                booking.getAvailabilitySlot().getStartTime()
+                booking.getAvailabilitySlot().getStartTime(),
+                asOf
         );
 
         CancellationRefundPolicy policy = policyRepository
@@ -139,8 +155,8 @@ public class CancellationRefundPolicyService {
     }
 
 
-    private BigDecimal calculateHoursBeforeStart(Instant startTime) {
-        long minutes = Duration.between(Instant.now(), startTime).toMinutes();
+    private BigDecimal calculateHoursBeforeStart(Instant startTime, Instant asOf) {
+        long minutes = Duration.between(asOf, startTime).toMinutes();
 
         if (minutes < 0) {
             minutes = 0;

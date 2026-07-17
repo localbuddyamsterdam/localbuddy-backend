@@ -286,7 +286,8 @@ public class AvailabilitySlotService {
                 privateBookingAvailable,
                 slot.getStatus(),
                 slot.getCreatedAt(),
-                slot.getUpdatedAt()
+                slot.getUpdatedAt(),
+                resolveZone(slot.getExperience()).getId()
         );
     }
 

@@ -276,7 +276,11 @@ public class ExperienceService {
             int size
     ) {
         String city = normalizeSlug(citySlug);
-        String category = normalizeSlug(categorySlug);
+        List<String> categorySlugs = parseCategorySlugs(categorySlug);
+        boolean filterByCategory = !categorySlugs.isEmpty();
+        // The repository IN-clauses need a non-null, non-empty collection even when
+        // the category filter is off (the boolean flag nullifies its effect).
+        Collection<String> categorySlugFilter = filterByCategory ? categorySlugs : List.of("");
 
         int adultCount = adults == null ? 0 : Math.max(0, adults);
         int teenCount = teens == null ? 0 : Math.max(0, teens);
@@ -314,8 +318,8 @@ public class ExperienceService {
 
         Collection<BookingMode> bookingModes = resolveBookingModes(bookingMode, shared);
         Page<Experience> result = experienceRepository.searchApproved(
-                city, category, bookingModes, maxMinimumAge, guests, Instant.now(), dateStart, dateEnd,
-                filterByAvailability, filterByDate, pageable);
+                city, filterByCategory, categorySlugFilter, bookingModes, maxMinimumAge, guests, Instant.now(),
+                dateStart, dateEnd, filterByAvailability, filterByDate, pageable);
 
         List<ExperienceResponse> content = toResponseList(result.getContent());
 
@@ -349,7 +353,11 @@ public class ExperienceService {
             int size
     ) {
         String city = normalizeSlug(citySlug);
-        String category = normalizeSlug(categorySlug);
+        List<String> categorySlugs = parseCategorySlugs(categorySlug);
+        boolean filterByCategory = !categorySlugs.isEmpty();
+        // The repository IN-clauses need a non-null, non-empty collection even when
+        // the category filter is off (the boolean flag nullifies its effect).
+        Collection<String> categorySlugFilter = filterByCategory ? categorySlugs : List.of("");
 
         int adultCount = adults == null ? 0 : Math.max(0, adults);
         int teenCount = teens == null ? 0 : Math.max(0, teens);
@@ -400,9 +408,9 @@ public class ExperienceService {
 
         Collection<BookingMode> bookingModes = resolveBookingModes(bookingMode, shared);
         Page<Experience> result = experienceRepository.searchApprovedAdvanced(
-                city, category, bookingModes, maxMinimumAge, guests, Instant.now(), dateStart, dateEnd,
-                normalizedMinPrice, normalizedMaxPrice, normalizedMinDuration, normalizedMaxDuration, normalizedMinRating,
-                keywordPattern, filterByAvailability, filterByDate, pageable);
+                city, filterByCategory, categorySlugFilter, bookingModes, maxMinimumAge, guests, Instant.now(),
+                dateStart, dateEnd, normalizedMinPrice, normalizedMaxPrice, normalizedMinDuration, normalizedMaxDuration,
+                normalizedMinRating, keywordPattern, filterByAvailability, filterByDate, pageable);
 
         List<ExperienceResponse> content = toResponseList(result.getContent());
 
@@ -420,6 +428,25 @@ public class ExperienceService {
             return null;
         }
         return slug.trim().toLowerCase(Locale.ROOT);
+    }
+
+    /**
+     * Parse the {@code categorySlug} request parameter into a list of normalized slugs.
+     * Accepts a single slug or a comma-separated list (e.g. {@code food,culture}) so the
+     * search can filter by several categories at once. Blanks/duplicates are dropped.
+     */
+    private List<String> parseCategorySlugs(String categorySlug) {
+        if (categorySlug == null || categorySlug.isBlank()) {
+            return List.of();
+        }
+        List<String> slugs = new ArrayList<>();
+        for (String raw : categorySlug.split(",")) {
+            String slug = normalizeSlug(raw);
+            if (slug != null && !slugs.contains(slug)) {
+                slugs.add(slug);
+            }
+        }
+        return slugs;
     }
 
     private void applyCreateRequest(Experience experience, CreateExperienceRequest request) {
@@ -839,8 +866,12 @@ public class ExperienceService {
     private List<Experience> findApprovedExperiences(String citySlug, String categorySlug,
                                                      Collection<BookingMode> bookingModes) {
         String city = normalizeSlug(citySlug);
-        String category = normalizeSlug(categorySlug);
-        return experienceRepository.findApprovedForListing(city, category, bookingModes);
+        List<String> categorySlugs = parseCategorySlugs(categorySlug);
+        boolean filterByCategory = !categorySlugs.isEmpty();
+        // The repository IN-clauses need a non-null, non-empty collection even when
+        // the category filter is off (the boolean flag nullifies its effect).
+        Collection<String> categorySlugFilter = filterByCategory ? categorySlugs : List.of("");
+        return experienceRepository.findApprovedForListing(city, filterByCategory, categorySlugFilter, bookingModes);
     }
 
     private Collection<BookingMode> resolveBookingModes(BookingMode bookingMode, Boolean shared) {

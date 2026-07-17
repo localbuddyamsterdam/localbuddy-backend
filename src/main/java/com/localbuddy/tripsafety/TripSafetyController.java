@@ -73,6 +73,18 @@ public class TripSafetyController {
         return ResponseEntity.status(HttpStatus.CREATED).body(tripSafetyService.raiseSos(userId, bookingId, request));
     }
 
+    @Operation(summary = "Add detail to an SOS", description = "One-tap enrichment (situation type, contactability, an added note) for an already-raised SOS.")
+    @PostMapping("/bookings/{bookingId}/sos/{eventId}/detail")
+    public ResponseEntity<TripSafetyEventResponse> updateSosDetail(
+            Authentication authentication,
+            @PathVariable UUID bookingId,
+            @PathVariable UUID eventId,
+            @Valid @RequestBody(required = false) SosDetailRequest request
+    ) {
+        UUID userId = UUID.fromString(authentication.getName());
+        return ResponseEntity.ok(tripSafetyService.updateSosDetail(userId, bookingId, eventId, request));
+    }
+
     @Operation(summary = "List safety events for a booking", description = "Visible to the booking's traveler and host.")
     @GetMapping("/bookings/{bookingId}/events")
     public ResponseEntity<List<TripSafetyEventResponse>> getBookingEvents(

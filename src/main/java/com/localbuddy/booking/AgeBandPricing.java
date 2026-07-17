@@ -9,10 +9,11 @@ import java.math.BigDecimal;
 /**
  * Resolves party composition into seat count + billable pricing units.
  *
- * <p>Seats (capacity) count every person; price is weighted per age band:
- * adults &amp; teens are full price, children half, infants free (all configurable
- * via {@code app.pricing.age-band.*}). The teen band exists primarily to age-gate
- * 18+ experiences, not to discount.
+ * <p><b>Seats (capacity) count adults and teens only</b> — children and infants ride
+ * along on a companion's seat and never consume slot capacity (see {@link AgeBands#seats()}).
+ * Price is weighted independently per age band: adults &amp; teens full price, children
+ * half, infants free (all configurable via {@code app.pricing.age-band.*}). The teen
+ * band exists primarily to age-gate 18+ experiences, not to discount.
  */
 @Component
 public class AgeBandPricing {
@@ -39,6 +40,13 @@ public class AgeBandPricing {
     }
 
     public record AgeBands(int adults, int teens, int children, int infants, int totalGuests) {
+        /**
+         * Seats consumed against a slot's capacity. Only adults and teens take a seat;
+         * children and infants ride along and never reduce the remaining count.
+         */
+        public int seats() {
+            return adults + teens;
+        }
     }
 
     /**

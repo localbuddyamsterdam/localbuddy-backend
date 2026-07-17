@@ -12,7 +12,17 @@ public record TripSafetyEventResponse(
         String note,
         boolean resolved,
         Instant resolvedAt,
-        Instant createdAt
+        Instant createdAt,
+        SosSituationType situationType,
+        SosContactPreference contactPreference,
+        Double accuracyMeters,
+        String locationSource,
+        Integer batteryPercent,
+        String deviceLanguage,
+        String geocodedAddress,
+        Instant acknowledgedAt,
+        Instant escalatedAt,
+        String resolutionNote
 ) {
     public static TripSafetyEventResponse from(TripSafetyEvent event) {
         return new TripSafetyEventResponse(
@@ -24,7 +34,17 @@ public record TripSafetyEventResponse(
                 event.getNote(),
                 event.isResolved(),
                 event.getResolvedAt(),
-                event.getCreatedAt()
+                event.getCreatedAt(),
+                event.getSituationType(),
+                event.getContactPreference(),
+                event.getAccuracyMeters(),
+                event.getLocationSource(),
+                event.getBatteryPercent(),
+                event.getDeviceLanguage(),
+                event.getGeocodedAddress(),
+                event.getAcknowledgedAt(),
+                event.getEscalatedAt(),
+                event.getResolutionNote()
         );
     }
 }

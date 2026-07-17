@@ -32,12 +32,22 @@ public class BookingAuditService {
     /** Record an admin action on a booking. Never throws — logs and moves on. */
     @Transactional
     public void record(UUID bookingId, String action, String detail, UUID adminUserId) {
+        record(bookingId, action, detail, adminUserId, "ADMIN");
+    }
+
+    /**
+     * Record an action on a booking by {@code actorRole} (TRAVELER | HOST | ADMIN | GUEST | SYSTEM).
+     * {@code actorUserId} is the acting user or null for guest/system actions. Never throws.
+     */
+    @Transactional
+    public void record(UUID bookingId, String action, String detail, UUID actorUserId, String actorRole) {
         try {
             BookingChangeAudit entry = new BookingChangeAudit();
             entry.setBookingId(bookingId);
             entry.setAction(action);
             entry.setDetail(detail);
-            entry.setChangedByUserId(adminUserId);
+            entry.setActorRole(actorRole);
+            entry.setChangedByUserId(actorUserId);
             auditRepository.save(entry);
         } catch (Exception ex) {
             log.warn("Failed to record booking audit (booking={}, action={}): {}", bookingId, action, ex.getMessage());
@@ -60,6 +70,7 @@ public class BookingAuditService {
                         e.getId(),
                         e.getAction(),
                         e.getDetail(),
+                        e.getActorRole(),
                         e.getChangedByUserId(),
                         e.getChangedByUserId() != null ? names.get(e.getChangedByUserId()) : null,
                         e.getChangedAt()))
