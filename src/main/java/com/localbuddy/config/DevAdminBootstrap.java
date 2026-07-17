@@ -51,7 +51,11 @@ public class DevAdminBootstrap implements CommandLineRunner {
                                 changed = true;
                             }
 
-                            if (existingAdmin.getRole() != UserRole.ADMIN) {
+                            // Promote up to ADMIN if needed, but never touch an admin-tier
+                            // account — otherwise this runner would demote a SUPER_ADMIN
+                            // back to ADMIN on every boot (fighting SuperAdminBootstrap
+                            // when the same email is configured for both).
+                            if (!existingAdmin.isAdminTier()) {
                                 existingAdmin.setRole(UserRole.ADMIN);
                                 changed = true;
                             }

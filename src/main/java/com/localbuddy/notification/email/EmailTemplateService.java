@@ -37,7 +37,7 @@ public class EmailTemplateService {
                     + "style=\"display:block;width:100%;max-width:600px;height:240px;object-fit:cover;border:0;\" />"
                     + "</td></tr>";
         } else {
-            hero = "<tr><td style=\"background:#0c1320;padding:46px 32px;text-align:center;\">"
+            hero = "<tr><td style=\"background:#111114;padding:46px 32px;text-align:center;\">"
                     + "<div style=\"font-size:12px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#ffde5d;\">LocalBuddy experience</div>"
                     + "<div style=\"margin-top:8px;font-size:22px;font-weight:600;color:#ffffff;line-height:1.25;\">" + esc(m.experienceTitle()) + "</div>"
                     + "</td></tr>";
@@ -117,7 +117,7 @@ public class EmailTemplateService {
               <table role="presentation" class="lb-container" width="600" align="center" cellpadding="0" cellspacing="0" style="width:600px; max-width:600px; margin:0 auto; background:#ffffff; border-radius:18px; overflow:hidden; box-shadow:0 14px 40px rgba(12,19,32,0.14);">
                 <tr>
                   <td style="background:#ffde5d; padding:18px 32px; text-align:center;">
-                    <span style="font-size:20px; font-weight:600; letter-spacing:-0.01em; color:#0c1320;">
+                    <span style="font-size:20px; font-weight:600; letter-spacing:-0.01em; color:#111114;">
                       <span style="display:inline-block; width:9px; height:9px; border-radius:50%; background:#d62f2a; vertical-align:middle; margin-right:8px;"></span>LocalBuddy
                     </span>
                   </td>
@@ -192,7 +192,7 @@ public class EmailTemplateService {
                   </td>
                 </tr>
                 <tr>
-                  <td style="background:#0c1320; padding:36px 32px 30px; text-align:center;">
+                  <td style="background:#111114; padding:36px 32px 30px; text-align:center;">
                     <span style="font-size:20px; font-weight:600; letter-spacing:-0.01em; color:#ffffff;">
                       <span style="display:inline-block; width:9px; height:9px; border-radius:50%; background:#d62f2a; vertical-align:middle; margin-right:8px;"></span>LocalBuddy
                     </span>
@@ -341,14 +341,14 @@ public class EmailTemplateService {
               <table role="presentation" class="lb-container" width="600" align="center" cellpadding="0" cellspacing="0" style="width:600px; max-width:600px; margin:0 auto; background:#ffffff; border-radius:18px; overflow:hidden; box-shadow:0 14px 40px rgba(12,19,32,0.14);">
                 <tr>
                   <td style="background:#ffde5d; padding:18px 32px; text-align:center;">
-                    <span style="font-size:20px; font-weight:600; letter-spacing:-0.01em; color:#0c1320;"><span style="display:inline-block; width:9px; height:9px; border-radius:50%; background:#d62f2a; vertical-align:middle; margin-right:8px;"></span>LocalBuddy</span>
+                    <span style="font-size:20px; font-weight:600; letter-spacing:-0.01em; color:#111114;"><span style="display:inline-block; width:9px; height:9px; border-radius:50%; background:#d62f2a; vertical-align:middle; margin-right:8px;"></span>LocalBuddy</span>
                   </td>
                 </tr>
                 <tr>
                   <td class="lb-pad" style="padding:32px;">{{content}}</td>
                 </tr>
                 <tr>
-                  <td style="background:#0c1320; padding:32px; text-align:center;">
+                  <td style="background:#111114; padding:32px; text-align:center;">
                     <span style="font-size:20px; font-weight:600; letter-spacing:-0.01em; color:#ffffff;"><span style="display:inline-block; width:9px; height:9px; border-radius:50%; background:#d62f2a; vertical-align:middle; margin-right:8px;"></span>LocalBuddy</span>
                     <p style="margin:12px auto 0; max-width:340px; font-size:13px; line-height:1.6; color:rgba(255,255,255,0.55);">Real experiences with the locals who actually live here. Amsterdam born, Europe bound.</p>
                     <div style="height:1px; background:rgba(255,255,255,0.12); margin:18px 0 14px;"></div>
