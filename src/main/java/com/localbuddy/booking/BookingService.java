@@ -1067,8 +1067,18 @@ public class BookingService {
 
     @Transactional(readOnly = true)
     public BookingResponse lookupGuestBooking(GuestBookingLookupRequest request) {
-        String normalizedReference = requiredTrim(request.bookingReference()).toUpperCase(Locale.ROOT);
-        String normalizedEmail = requiredTrim(request.guestEmail()).toLowerCase(Locale.ROOT);
+        return toResponse(verifyGuestBooking(request.bookingReference(), request.guestEmail()));
+    }
+
+    /**
+     * Loads a guest booking only when the reference AND the email match — the same
+     * ownership check the guest confirmation page and check-in use. This is the sole
+     * authorization for the public guest self-service actions below; a wrong email is
+     * indistinguishable from a missing booking (no enumeration).
+     */
+    private Booking verifyGuestBooking(String reference, String email) {
+        String normalizedReference = requiredTrim(reference).toUpperCase(Locale.ROOT);
+        String normalizedEmail = requiredTrim(email).toLowerCase(Locale.ROOT);
 
         Booking booking = bookingRepository.findByBookingReference(normalizedReference)
                 .orElseThrow(() -> new ResourceNotFoundException("Guest booking not found"));
@@ -1082,7 +1092,38 @@ public class BookingService {
             throw new ResourceNotFoundException("Guest booking not found");
         }
 
-        return toResponse(booking);
+        return booking;
+    }
+
+    /**
+     * A guest cancels their own booking (verified by reference + email). Functionally identical
+     * to a logged-in traveler cancelling — same traveler-initiated refund treatment and the same
+     * status — so the cancellation actor is LOGGED_IN_USER (there is no separate GUEST actor).
+     */
+    @Transactional
+    public BookingResponse cancelGuestBooking(String reference, String email, String reason) {
+        Booking booking = verifyGuestBooking(reference, email);
+
+        if (!isCancellableBookingStatus(booking.getStatus())) {
+            throw new BadRequestException("Only pending payment or confirmed bookings can be cancelled");
+        }
+
+        releaseAvailabilityCapacity(booking);
+        handleCancellationPayment(booking, BookingCancellationActor.LOGGED_IN_USER, reason);
+        booking.setStatus(BookingStatus.CANCELLED_BY_LOGGED_IN_USER);
+        booking.setCancelledAt(Instant.now());
+        booking.setCancellationReason(optionalTrim(reason));
+
+        Booking savedBooking = bookingRepository.save(booking);
+        createBookingCancelledNotification(savedBooking);
+        return toResponse(savedBooking);
+    }
+
+    /** A guest reschedules their own booking (verified by reference + email) to a new slot. */
+    @Transactional
+    public BookingResponse rescheduleGuestBooking(String reference, String email, RescheduleBookingRequest request) {
+        Booking booking = verifyGuestBooking(reference, email);
+        return rescheduleBooking(booking, request, false);
     }
 
     private void createBookingAcceptedNotification(Booking booking) {
@@ -1456,6 +1497,28 @@ public class BookingService {
         createBookingCompletedNotification(savedBooking);
 
         return toResponse(savedBooking, false);
+    }
+
+    /**
+     * A logged-in traveler reschedules their own booking. Previously the confirmation page's
+     * "Reschedule" posted to the host-only endpoint below, which threw "Local profile not found"
+     * for a plain traveler — so traveler reschedule never worked.
+     */
+    @Transactional
+    public BookingResponse rescheduleBookingByLoggedInUser(
+            UUID loggedInUserId,
+            UUID bookingId,
+            RescheduleBookingRequest request
+    ) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
+
+        if (booking.getLoggedInUser() == null ||
+                !booking.getLoggedInUser().getId().equals(loggedInUserId)) {
+            throw new ResourceNotFoundException("Booking not found");
+        }
+
+        return rescheduleBooking(booking, request, true);
     }
 
     @Transactional
