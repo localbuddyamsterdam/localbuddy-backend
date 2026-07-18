@@ -8,6 +8,7 @@ import com.localbuddy.notification.NotificationService;
 import com.localbuddy.notification.NotificationType;
 import com.localbuddy.user.User;
 import com.localbuddy.user.UserRepository;
+import com.localbuddy.user.UserRole;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -360,6 +361,42 @@ public class TripSafetyService {
                     recipient, null, NotificationType.SOS_RAISED,
                     alert.subject(), alert.textBody(), alert.htmlBody(),
                     "BOOKING", booking.getId(), dedupeKey);
+        }
+
+        // Surface it inside the admin console on the initial raise (not on every traveler
+        // chip-tap update); escalation re-fires the operator email above.
+        if (!update) {
+            notifyAdminsInApp(booking, event);
+        }
+    }
+
+    /** Also surface a raised SOS inside the admin console: an in-app notification to every
+     * ADMIN and SUPER_ADMIN account, so a logged-in admin sees it without an inbox. */
+    private void notifyAdminsInApp(Booking booking, TripSafetyEvent event) {
+        List<User> admins = new ArrayList<>();
+        admins.addAll(userRepository.findByRole(UserRole.ADMIN));
+        admins.addAll(userRepository.findByRole(UserRole.SUPER_ADMIN));
+        if (admins.isEmpty()) {
+            return;
+        }
+        String situation = event.getSituationType() != null ? event.getSituationType().name() : "EMERGENCY";
+        String location = event.getGeocodedAddress() != null
+                ? event.getGeocodedAddress()
+                : (event.getLatitude() != null && event.getLongitude() != null
+                        ? event.getLatitude() + ", " + event.getLongitude()
+                        : "location unavailable");
+        String subject = "SOS raised · booking " + booking.getBookingReference();
+        StringBuilder message = new StringBuilder(situation).append(" — ").append(location);
+        if (event.getContactPreference() != null && event.getContactPreference() != SosContactPreference.CALL) {
+            message.append(" · ").append(event.getContactPreference().name());
+        }
+        if (event.getNote() != null) {
+            message.append(" · \"").append(event.getNote()).append('"');
+        }
+        for (User admin : admins) {
+            notificationService.createInAppNotificationForUser(
+                    admin, NotificationType.SOS_RAISED, subject, message.toString(),
+                    "BOOKING", booking.getId(), "sos-admin:" + event.getId() + ":" + admin.getId());
         }
     }
 

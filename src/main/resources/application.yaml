@@ -300,10 +300,10 @@ app:
     email: ${SUPPORT_EMAIL:admin@test.com}
 
   trip-safety:
-    # Comma-separated operator emails that receive live SOS alerts. Blank falls back to
-    # app.support.email (and logs a WARN if that is still the dev default admin@test.com).
-    # SET THIS to a MONITORED inbox / on-call address in production — an SOS is safety-critical.
-    sos-recipients: ${SOS_ALERT_EMAILS:}
+    # Comma-separated operator emails that receive live SOS alerts. Defaults to the
+    # monitored ops inbox; override per environment with SOS_ALERT_EMAILS. SOS also fans
+    # out as an in-app notification to every ADMIN / SUPER_ADMIN account.
+    sos-recipients: ${SOS_ALERT_EMAILS:localbuddyamsterdam@gmail.com}
     # When true (default), also alert the traveler's emergency contact on an SOS: email
     # when an address is on file, plus a WhatsApp message when a number is present and
     # WhatsApp Business is configured. Set false to alert operators only.
