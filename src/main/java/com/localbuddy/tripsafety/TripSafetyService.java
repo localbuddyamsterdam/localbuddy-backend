@@ -93,11 +93,13 @@ public class TripSafetyService {
     @Transactional
     public TripSafetyEventResponse checkIn(UUID userId, UUID bookingId, TripCheckRequest request) {
         Booking booking = requireTraveler(userId, bookingId);
-        return TripSafetyEventResponse.from(recordEvent(booking, userId,
+        TripSafetyEvent event = recordEvent(booking, userId,
                 TripSafetyEventType.CHECK_IN,
                 request != null ? request.latitude() : null,
                 request != null ? request.longitude() : null,
-                request != null ? request.note() : null));
+                request != null ? request.note() : null);
+        notifyHostOfArrival(booking);
+        return TripSafetyEventResponse.from(event);
     }
 
     @Transactional
@@ -343,6 +345,38 @@ public class TripSafetyService {
         event.setLongitude(longitude);
         event.setNote(trimToNull(note));
         return eventRepository.save(event);
+    }
+
+    /**
+     * Tell the host, in-app, that their traveler has checked in at the meeting point.
+     * Deduped per booking so repeated check-in/out cycles don't re-notify. Best-effort —
+     * a failed notification must never fail the check-in itself.
+     */
+    private void notifyHostOfArrival(Booking booking) {
+        try {
+            User host = booking.getLocalProfile() != null ? booking.getLocalProfile().getUser() : null;
+            if (host == null) {
+                return;
+            }
+            String travelerName = booking.getLoggedInUser() != null
+                    ? booking.getLoggedInUser().getDisplayName() : booking.getGuestName();
+            if (travelerName == null || travelerName.isBlank()) {
+                travelerName = "Your traveler";
+            }
+            String experienceTitle = booking.getExperience() != null ? booking.getExperience().getTitle() : null;
+            String subject = travelerName + " has arrived";
+            StringBuilder message = new StringBuilder(travelerName).append(" checked in");
+            if (experienceTitle != null && !experienceTitle.isBlank()) {
+                message.append(" for ").append(experienceTitle);
+            }
+            message.append(" (booking ").append(booking.getBookingReference()).append(").");
+            notificationService.createInAppNotificationForUser(
+                    host, NotificationType.TRAVELER_ARRIVED, subject, message.toString(),
+                    "BOOKING", booking.getId(), "traveler-arrived:" + booking.getId());
+        } catch (Exception e) {
+            log.warn("Host arrival notification failed (non-fatal) for booking {}: {}",
+                    booking.getId(), e.getMessage());
+        }
     }
 
     private void notifySupport(Booking booking, TripSafetyEvent event, boolean update) {
