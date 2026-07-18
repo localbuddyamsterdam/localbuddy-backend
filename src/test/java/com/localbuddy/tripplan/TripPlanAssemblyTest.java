@@ -55,12 +55,14 @@ class TripPlanAssemblyTest {
     private final AvailabilitySlotRepository availabilitySlotRepository = mock(AvailabilitySlotRepository.class);
     private final BookingWindowPolicy bookingWindowPolicy = mock(BookingWindowPolicy.class);
     private final DealService dealService = mock(DealService.class);
+    private final com.localbuddy.media.ExperiencePhotoRepository experiencePhotoRepository =
+            mock(com.localbuddy.media.ExperiencePhotoRepository.class);
     private final ClaudeClient claudeClient = mock(ClaudeClient.class);
     private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
 
     private final TripPlanService tripPlanService = new TripPlanService(
             tripPlanRepository, userRepository, cityRepository, availabilitySlotService, availabilitySlotRepository,
-            bookingWindowPolicy, dealService, claudeClient, objectMapper,
+            bookingWindowPolicy, dealService, experiencePhotoRepository, claudeClient, objectMapper,
             "https://app.example.com", 7, 40, 4, 12000, 6);
 
     private final City city = city();
@@ -138,7 +140,7 @@ class TripPlanAssemblyTest {
     }
 
     private CreateTripPlanRequest request() {
-        return new CreateTripPlanRequest("amsterdam", START, START, 2, "food", null, null, null);
+        return new CreateTripPlanRequest("amsterdam", START, START, 2, "food", null, null, null, null);
     }
 
     @Test
@@ -176,7 +178,7 @@ class TripPlanAssemblyTest {
                 .thenReturn(List.of(morningSlot, afternoonSlot));
 
         CreateTripPlanRequest privateRequest =
-                new CreateTripPlanRequest("amsterdam", START, START, 2, "food", null, true, null);
+                new CreateTripPlanRequest("amsterdam", START, START, 2, "food", null, true, null, null);
         TripPlanResponse response = tripPlanService.createPlan(privateRequest, TRAVELER_ID);
 
         assertTrue(response.privateTour(), "response carries the private-tour flag");

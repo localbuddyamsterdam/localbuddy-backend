@@ -55,6 +55,10 @@ public class TripPlan {
     @Column(name = "private_tour", nullable = false)
     private boolean privateTour = false;
 
+    /** Optional whole-group budget (EUR, all days combined) the plan was asked to fit. */
+    @Column(name = "budget")
+    private Integer budget;
+
     @Column(name = "interests", length = 500)
     private String interests;
 

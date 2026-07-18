@@ -58,6 +58,14 @@ public record GuestTripPlanCheckoutRequest(
         @Size(max = 80, message = "Gift card code cannot exceed 80 characters")
         String giftCardCode,
 
+        /** Stackable promo/voucher codes — same per-booking application as the logged-in bundle. */
+        @Size(max = 5, message = "At most 5 promo codes can be applied")
+        List<@Size(max = 80, message = "Promo code cannot exceed 80 characters") String> promoCodes,
+
+        /** One referral code, applied to a single booking of the bundle (the priciest). */
+        @Size(max = 80, message = "Referral code cannot exceed 80 characters")
+        String referralCode,
+
         // Emergency contact (optional, same all-or-nothing rule as a single booking).
         @Size(max = 100, message = "Emergency contact first name cannot exceed 100 characters")
         String emergencyContactFirstName,

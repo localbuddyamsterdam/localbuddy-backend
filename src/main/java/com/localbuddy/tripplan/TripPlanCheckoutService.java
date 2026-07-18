@@ -7,11 +7,18 @@ import com.localbuddy.booking.CreateGuestBookingRequest;
 import com.localbuddy.common.exception.BadRequestException;
 import com.localbuddy.payment.PaymentGroupResponse;
 import com.localbuddy.payment.PaymentService;
+import com.localbuddy.promo.PromoCodeService;
+import com.localbuddy.referral.ReferralService;
+import com.localbuddy.referral.ValidateReferralCodeRequest;
+import com.localbuddy.referral.ValidateReferralCodeResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,6 +28,12 @@ import java.util.UUID;
  * "Book my whole trip": turns the multi-selected bookable items of a saved AI itinerary
  * into real bookings (one per item, via the exact same validation/locking path as single
  * bookings) and one bundle payment covering all of them.
+ *
+ * <p>Discount parity with the single checkout: stackable promo codes are accepted for the
+ * bundle and applied per booking — each code rides only on the bookings it validates for
+ * (a code scoped to one experience discounts just that item), and a code valid for nothing
+ * rejects the checkout with the reason. One referral code is applied to a single booking
+ * (the priciest). The gift card stays a group-level payment method, exactly as before.
  *
  * <p>Items that fail to book (slot sold out in the meantime, duplicate booking, …) are
  * skipped and reported instead of failing the whole bundle. If nothing could be booked the
@@ -36,15 +49,21 @@ public class TripPlanCheckoutService {
     private final TripPlanService tripPlanService;
     private final BookingService bookingService;
     private final PaymentService paymentService;
+    private final PromoCodeService promoCodeService;
+    private final ReferralService referralService;
 
     public TripPlanCheckoutService(
             TripPlanService tripPlanService,
             BookingService bookingService,
-            PaymentService paymentService
+            PaymentService paymentService,
+            PromoCodeService promoCodeService,
+            ReferralService referralService
     ) {
         this.tripPlanService = tripPlanService;
         this.bookingService = bookingService;
         this.paymentService = paymentService;
+        this.promoCodeService = promoCodeService;
+        this.referralService = referralService;
     }
 
     public TripPlanCheckoutResponse checkoutAsUser(UUID userId, String token, TripPlanCheckoutRequest request) {
@@ -53,10 +72,15 @@ public class TripPlanCheckoutService {
         PartyComposition party = resolveParty(plan.partySize(),
                 request.adults(), request.teens(), request.children(), request.infants());
 
+        BundleCodes codes = resolveBundleCodes(userId, null, selectedItems, party,
+                plan.privateTour(), plan.document().currency(),
+                request.promoCodes(), request.referralCode());
+
         List<UUID> bookingIds = new ArrayList<>();
         List<TripPlanSkippedItem> skipped = new ArrayList<>();
 
         for (TripPlanItem item : selectedItems) {
+            List<String> itemPromoCodes = codes.promoCodesFor(item.id());
             CreateBookingRequest bookingRequest = new CreateBookingRequest(
                     item.experienceId(),
                     item.slotId(),
@@ -67,8 +91,8 @@ public class TripPlanCheckoutService {
                     party.infants(),
                     null,
                     null,
-                    null,
-                    null,
+                    itemPromoCodes.isEmpty() ? null : itemPromoCodes,
+                    codes.referralCodeFor(item.id()),
                     null,
                     // A private plan books every item as a whole-slot buyout at the flat price.
                     plan.privateTour() ? Boolean.TRUE : null,
@@ -109,10 +133,15 @@ public class TripPlanCheckoutService {
         PartyComposition party = resolveParty(plan.partySize(),
                 request.adults(), request.teens(), request.children(), request.infants());
 
+        BundleCodes codes = resolveBundleCodes(null, request.guestEmail(), selectedItems, party,
+                plan.privateTour(), plan.document().currency(),
+                request.promoCodes(), request.referralCode());
+
         List<UUID> bookingIds = new ArrayList<>();
         List<TripPlanSkippedItem> skipped = new ArrayList<>();
 
         for (TripPlanItem item : selectedItems) {
+            List<String> itemPromoCodes = codes.promoCodesFor(item.id());
             CreateGuestBookingRequest bookingRequest = new CreateGuestBookingRequest(
                     item.experienceId(),
                     item.slotId(),
@@ -127,8 +156,8 @@ public class TripPlanCheckoutService {
                     request.guestPhone(),
                     null,
                     null,
-                    null,
-                    null,
+                    itemPromoCodes.isEmpty() ? null : itemPromoCodes,
+                    codes.referralCodeFor(item.id()),
                     request.acceptedTerms(),
                     request.consentVersion(),
                     // A private plan books every item as a whole-slot buyout at the flat price.
@@ -155,6 +184,134 @@ public class TripPlanCheckoutService {
                 null, request.guestEmail(), bookingIds, request.giftCardCode(), plan.tripPlanId());
 
         return new TripPlanCheckoutResponse(paymentGroup, skipped);
+    }
+
+    // ------------------------------------------------------------------
+    // Discount codes across the bundle
+    // ------------------------------------------------------------------
+
+    /** Which promo codes ride on which item, and which single item carries the referral. */
+    private record BundleCodes(Map<String, List<String>> promoByItemId, String referralItemId, String referralCode) {
+
+        static final BundleCodes NONE = new BundleCodes(Map.of(), null, null);
+
+        List<String> promoCodesFor(String itemId) {
+            return promoByItemId.getOrDefault(itemId, List.of());
+        }
+
+        String referralCodeFor(String itemId) {
+            return itemId.equals(referralItemId) ? referralCode : null;
+        }
+    }
+
+    /**
+     * Validates the bundle's codes up front so an invalid code fails the checkout with a clear
+     * message instead of silently skipping items. Each promo is tested per selected item
+     * (scoped codes attach only where they validate); a promo valid for nothing rejects; a
+     * multi-code combination that isn't combinable rejects. The referral is validated once and
+     * attached to the priciest item only — it is one discount, not one per booking.
+     */
+    private BundleCodes resolveBundleCodes(
+            UUID userId,
+            String guestEmail,
+            List<TripPlanItem> selectedItems,
+            PartyComposition party,
+            boolean privateTour,
+            String currency,
+            List<String> promoCodes,
+            String referralCode
+    ) {
+        List<String> cleanCodes = promoCodes == null ? List.of() : promoCodes.stream()
+                .filter(code -> code != null && !code.isBlank())
+                .map(String::trim)
+                .distinct()
+                .toList();
+        String cleanReferral = referralCode == null || referralCode.isBlank() ? null : referralCode.trim();
+        if (cleanCodes.isEmpty() && cleanReferral == null) {
+            return BundleCodes.NONE;
+        }
+
+        Map<String, List<String>> promoByItemId = new LinkedHashMap<>();
+        selectedItems.forEach(item -> promoByItemId.put(item.id(), new ArrayList<>()));
+
+        for (String code : cleanCodes) {
+            boolean appliesAnywhere = false;
+            for (TripPlanItem item : selectedItems) {
+                if (promoApplies(userId, guestEmail, List.of(code), item, party, privateTour, currency)) {
+                    promoByItemId.get(item.id()).add(code);
+                    appliesAnywhere = true;
+                }
+            }
+            if (!appliesAnywhere) {
+                throw new BadRequestException(
+                        "Code " + code.toUpperCase(java.util.Locale.ROOT)
+                                + " can't be applied to any of the selected experiences");
+            }
+        }
+
+        // Where several codes landed on the same item, the combination must also be valid
+        // (non-combinable codes reject with the engine's own message).
+        for (TripPlanItem item : selectedItems) {
+            List<String> itemCodes = promoByItemId.get(item.id());
+            if (itemCodes.size() > 1
+                    && !promoApplies(userId, guestEmail, itemCodes, item, party, privateTour, currency)) {
+                throw new BadRequestException("These codes can't be combined; only one can be applied");
+            }
+        }
+
+        String referralItemId = null;
+        if (cleanReferral != null) {
+            ValidateReferralCodeResponse validation = referralService.validateReferralCode(
+                    userId, new ValidateReferralCodeRequest(cleanReferral, guestEmail));
+            if (!validation.valid()) {
+                throw new BadRequestException(validation.message() != null
+                        ? validation.message()
+                        : "This referral code can't be used");
+            }
+            referralItemId = selectedItems.stream()
+                    .max(Comparator.comparing(item -> estimatedItemBase(item, party, privateTour)))
+                    .map(TripPlanItem::id)
+                    .orElse(null);
+        }
+
+        return new BundleCodes(promoByItemId, referralItemId, cleanReferral);
+    }
+
+    /** True when the promo engine accepts these codes for this item (validation only, no state). */
+    private boolean promoApplies(
+            UUID userId, String guestEmail, List<String> codes,
+            TripPlanItem item, PartyComposition party, boolean privateTour, String currency
+    ) {
+        try {
+            promoCodeService.applyPromoCodesForBooking(
+                    userId, codes, guestEmail,
+                    estimatedItemBase(item, party, privateTour),
+                    currency, item.experienceId());
+            return true;
+        } catch (RuntimeException ex) {
+            return false;
+        }
+    }
+
+    /**
+     * The item's pre-fee subtotal on the same basis BookingService will charge it: adults and
+     * teens pay full price, children half, infants free; private plans carry the flat
+     * whole-group price. Used only to validate codes (min-spend etc.) before booking.
+     */
+    private BigDecimal estimatedItemBase(TripPlanItem item, PartyComposition party, boolean privateTour) {
+        BigDecimal price = item.pricePerGuest() == null ? BigDecimal.ZERO : item.pricePerGuest();
+        if (privateTour) {
+            return price.setScale(2, RoundingMode.HALF_UP);
+        }
+        int fullPayers = (party.adults() != null ? party.adults() : 0)
+                + (party.teens() != null ? party.teens() : 0);
+        int kids = party.children() != null ? party.children() : 0;
+        if (fullPayers + kids == 0) {
+            return price.multiply(BigDecimal.valueOf(party.guestsCount())).setScale(2, RoundingMode.HALF_UP);
+        }
+        return price.multiply(BigDecimal.valueOf(fullPayers))
+                .add(price.multiply(new BigDecimal("0.5")).multiply(BigDecimal.valueOf(kids)))
+                .setScale(2, RoundingMode.HALF_UP);
     }
 
     // ------------------------------------------------------------------

@@ -39,7 +39,15 @@ public record CreateTripPlanRequest(
 
         /** Itinerary text language, from the traveler's UI language; unknown/blank falls back to en. */
         @Size(max = 5, message = "Language cannot exceed 5 characters")
-        String language
+        String language,
+
+        /**
+         * Optional whole-group budget in EUR for the trip's bookable experiences, all days
+         * combined. Guides the model's picks (fit it, or exceed by at most 50%); never blocks.
+         */
+        @Min(value = 1, message = "Budget must be at least 1")
+        @Max(value = 100000, message = "Budget cannot exceed 100000")
+        Integer budget
 ) {
 
     public boolean isPrivateTour() {

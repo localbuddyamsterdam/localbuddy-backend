@@ -21,15 +21,18 @@ import java.util.Map;
 public class PublicAiChatController {
 
     private final AiChatService aiChatService;
+    private final TripBriefParseService tripBriefParseService;
     private final RateLimitService rateLimitService;
     private final ClientIpResolver clientIpResolver;
 
     public PublicAiChatController(
             AiChatService aiChatService,
+            TripBriefParseService tripBriefParseService,
             RateLimitService rateLimitService,
             ClientIpResolver clientIpResolver
     ) {
         this.aiChatService = aiChatService;
+        this.tripBriefParseService = tripBriefParseService;
         this.rateLimitService = rateLimitService;
         this.clientIpResolver = clientIpResolver;
     }
@@ -65,6 +68,22 @@ public class PublicAiChatController {
             rateLimitService.checkPublicApiLimit("ai-chat-daily:" + clientIp, 300, 86400);
         }
         return ResponseEntity.ok(aiChatService.chat(request));
+    }
+
+    @Operation(summary = "Parse a free-text trip wish",
+            description = "Lifts city, dates, budget and party size out of a Trip Genie hero ask so the "
+                    + "planner form arrives prefilled. Best-effort: every field is nullable, and an "
+                    + "unconfigured AI yields an empty parse rather than an error.")
+    @PostMapping("/parse-trip-brief")
+    public ResponseEntity<TripBriefParseResponse> parseTripBrief(
+            HttpServletRequest servletRequest,
+            @Valid @RequestBody TripBriefParseRequest request
+    ) {
+        String clientIp = clientIpResolver.resolveClientIp(servletRequest);
+        // Each call is a (small) paid model generation — keep the same posture as chat.
+        rateLimitService.checkPublicApiLimit("ai-brief-parse:" + clientIp, 10, 60);
+        rateLimitService.checkPublicApiLimit("ai-brief-parse-daily:" + clientIp, 200, 86400);
+        return ResponseEntity.ok(tripBriefParseService.parse(request.text()));
     }
 
     /** The X-Chat-Session header when it looks like a client-generated id; null otherwise. */

@@ -30,6 +30,8 @@ public record TripPlanResponse(
         /** True once the trip's end date has passed and the plan was archived (view-only). */
         boolean archived,
         /** True when the authenticated viewer is the plan's owner (enables swap/refine UI). */
-        boolean owned
+        boolean owned,
+        /** Optional whole-group budget (EUR, whole trip) the plan was asked to fit; null = none. */
+        Integer budget
 ) {
 }

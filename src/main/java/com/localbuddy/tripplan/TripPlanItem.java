@@ -10,6 +10,12 @@ import java.util.UUID;
  * link that starts checkout pre-filled. FOOD / SIGHT items are local suggestions with a
  * maps link; TIP items are practical advice.
  *
+ * <p>SIGHT items additionally distinguish ticketed attractions (museums, towers, cruises —
+ * things a traveler must book themselves) via {@code ticketed}, carrying the venue's own
+ * {@code officialUrl}; free public places (parks, viewpoints, sunset spots) stay
+ * non-ticketed with no official link. Older stored plans lack both fields — they read back
+ * as null/false and simply render without links.
+ *
  * <p>{@code available} is null in the stored document and recomputed against live
  * availability on every read of the plan.
  */
@@ -31,12 +37,15 @@ public record TripPlanItem(
         String placeName,
         String mapsUrl,
         boolean bookable,
-        Boolean available
+        Boolean available,
+        Boolean ticketed,
+        String officialUrl
 ) {
 
     public TripPlanItem withAvailable(Boolean availableFlag) {
         return new TripPlanItem(id, startTimeLocal, kind, title, description, experienceId,
                 experienceSlug, experienceTitle, experienceUrl, bookingUrl, slotId, slotStartTime,
-                slotEndTime, pricePerGuest, placeName, mapsUrl, bookable, availableFlag);
+                slotEndTime, pricePerGuest, placeName, mapsUrl, bookable, availableFlag,
+                ticketed, officialUrl);
     }
 }

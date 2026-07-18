@@ -86,18 +86,43 @@ public class TripPlanController {
         return ResponseEntity.ok(tripPlanService.replaceSoldOutItem(userId, token, itemId));
     }
 
+    @Operation(summary = "List swap options for an itinerary item",
+            description = "Up to 4 DIFFERENT experiences bookable on the item's day (each at its slot closest "
+                    + "to the item's time) for the swap dialog. An optional free-text instruction AI-ranks the "
+                    + "options to the traveler's wish. Owner only.")
+    @PostMapping("/{token}/items/{itemId}/swap-options")
+    public ResponseEntity<TripPlanSwapOptionsResponse> swapOptions(
+            Authentication authentication,
+            @PathVariable String token,
+            @PathVariable String itemId,
+            @Valid @RequestBody(required = false) SwapOptionsRequest request
+    ) {
+        UUID userId = UUID.fromString(authentication.getName());
+        rateLimitService.checkPublicApiLimit("trip-plan-swap-options:" + userId, 20, 60);
+        String instruction = request != null ? request.instruction() : null;
+        if (instruction != null && !instruction.isBlank()) {
+            // Refining with an instruction is a paid model call — throttle it separately.
+            rateLimitService.checkPublicApiLimit("trip-plan-swap-ai:" + userId, 6, 60);
+            rateLimitService.checkPublicApiLimit("trip-plan-swap-ai-daily:" + userId, 60, 86400);
+        }
+        return ResponseEntity.ok(tripPlanService.swapOptions(userId, token, itemId, instruction));
+    }
+
     @Operation(summary = "Swap an itinerary item",
-            description = "Deliberately replaces a bookable item with a DIFFERENT experience on the same day, "
-                    + "closest to the same time — no AI call. Owner only.")
+            description = "Deliberately replaces a bookable item with a DIFFERENT experience on the same day. "
+                    + "The optional body carries the slot picked in the swap dialog; without it the closest-time "
+                    + "candidate is auto-picked. Owner only.")
     @PostMapping("/{token}/items/{itemId}/swap")
     public ResponseEntity<TripPlanResponse> swapItem(
             Authentication authentication,
             @PathVariable String token,
-            @PathVariable String itemId
+            @PathVariable String itemId,
+            @RequestBody(required = false) SwapItemRequest request
     ) {
         UUID userId = UUID.fromString(authentication.getName());
         rateLimitService.checkPublicApiLimit("trip-plan-swap:" + userId, 10, 60);
-        return ResponseEntity.ok(tripPlanService.swapItem(userId, token, itemId));
+        return ResponseEntity.ok(tripPlanService.swapItem(userId, token, itemId,
+                request != null ? request.slotId() : null));
     }
 
     @Operation(summary = "Refine one itinerary day",

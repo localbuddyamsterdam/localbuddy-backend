@@ -73,6 +73,12 @@ public class TripPlanService {
 
     private static final Set<String> ITEM_KINDS = Set.of("EXPERIENCE", "FOOD", "SIGHT", "TIP");
 
+    /** Product rule: a day never carries more than two experiences (prompted AND enforced). */
+    private static final int MAX_EXPERIENCES_PER_DAY = 2;
+
+    /** How many alternatives the swap dialog offers at once. */
+    private static final int MAX_SWAP_OPTIONS = 4;
+
     /**
      * Output contract for the model. Structured outputs guarantee the shape; the ids it
      * echoes back are still validated against the candidate inventory server-side.
@@ -100,7 +106,8 @@ public class TripPlanService {
                           "type": "object",
                           "additionalProperties": false,
                           "required": ["startTimeLocal", "kind", "title", "description",
-                                       "experienceId", "slotId", "placeName", "placeArea"],
+                                       "experienceId", "slotId", "placeName", "placeArea",
+                                       "ticketed", "officialUrl"],
                           "properties": {
                             "startTimeLocal": {"type": "string", "description": "24h HH:mm local time"},
                             "kind": {"type": "string", "enum": ["EXPERIENCE", "FOOD", "SIGHT", "TIP"]},
@@ -109,7 +116,9 @@ public class TripPlanService {
                             "experienceId": {"anyOf": [{"type": "string"}, {"type": "null"}]},
                             "slotId": {"anyOf": [{"type": "string"}, {"type": "null"}]},
                             "placeName": {"anyOf": [{"type": "string"}, {"type": "null"}]},
-                            "placeArea": {"anyOf": [{"type": "string"}, {"type": "null"}]}
+                            "placeArea": {"anyOf": [{"type": "string"}, {"type": "null"}]},
+                            "ticketed": {"type": "boolean", "description": "SIGHT only: true when entry needs a ticket/reservation"},
+                            "officialUrl": {"anyOf": [{"type": "string"}, {"type": "null"}], "description": "Ticketed SIGHT only: the venue's own official website"}
                           }
                         }
                       }
@@ -135,7 +144,8 @@ public class TripPlanService {
                     "type": "object",
                     "additionalProperties": false,
                     "required": ["startTimeLocal", "kind", "title", "description",
-                                 "experienceId", "slotId", "placeName", "placeArea"],
+                                 "experienceId", "slotId", "placeName", "placeArea",
+                                 "ticketed", "officialUrl"],
                     "properties": {
                       "startTimeLocal": {"type": "string", "description": "24h HH:mm local time"},
                       "kind": {"type": "string", "enum": ["EXPERIENCE", "FOOD", "SIGHT", "TIP"]},
@@ -144,7 +154,9 @@ public class TripPlanService {
                       "experienceId": {"anyOf": [{"type": "string"}, {"type": "null"}]},
                       "slotId": {"anyOf": [{"type": "string"}, {"type": "null"}]},
                       "placeName": {"anyOf": [{"type": "string"}, {"type": "null"}]},
-                      "placeArea": {"anyOf": [{"type": "string"}, {"type": "null"}]}
+                      "placeArea": {"anyOf": [{"type": "string"}, {"type": "null"}]},
+                      "ticketed": {"type": "boolean", "description": "SIGHT only: true when entry needs a ticket/reservation"},
+                      "officialUrl": {"anyOf": [{"type": "string"}, {"type": "null"}], "description": "Ticketed SIGHT only: the venue's own official website"}
                     }
                   }
                 }
@@ -159,6 +171,7 @@ public class TripPlanService {
     private final AvailabilitySlotRepository availabilitySlotRepository;
     private final BookingWindowPolicy bookingWindowPolicy;
     private final DealService dealService;
+    private final com.localbuddy.media.ExperiencePhotoRepository experiencePhotoRepository;
     private final ClaudeClient claudeClient;
     private final ObjectMapper objectMapper;
     private final String frontendBaseUrl;
@@ -176,6 +189,7 @@ public class TripPlanService {
             AvailabilitySlotRepository availabilitySlotRepository,
             BookingWindowPolicy bookingWindowPolicy,
             DealService dealService,
+            com.localbuddy.media.ExperiencePhotoRepository experiencePhotoRepository,
             ClaudeClient claudeClient,
             ObjectMapper objectMapper,
             @Value("${app.frontend.base-url:http://localhost:3000}") String frontendBaseUrl,
@@ -192,6 +206,7 @@ public class TripPlanService {
         this.availabilitySlotRepository = availabilitySlotRepository;
         this.bookingWindowPolicy = bookingWindowPolicy;
         this.dealService = dealService;
+        this.experiencePhotoRepository = experiencePhotoRepository;
         this.claudeClient = claudeClient;
         this.objectMapper = objectMapper;
         this.frontendBaseUrl = frontendBaseUrl.endsWith("/")
@@ -245,7 +260,8 @@ public class TripPlanService {
         // validation and persistence — so the plan and its dates always agree.
         CreateTripPlanRequest effective = new CreateTripPlanRequest(
                 request.citySlug(), startDate, endDate, request.partySize(),
-                request.interests(), request.notes(), request.privateTour(), request.language());
+                request.interests(), request.notes(), request.privateTour(), request.language(),
+                request.budget());
 
         // A trip starting today starts NOW, not at midnight: only offer slots that haven't
         // started yet, and tell the model what time it currently is in the city.
@@ -269,7 +285,7 @@ public class TripPlanService {
 
         String language = effective.languageOrDefault();
         String userPrompt = buildUserPrompt(effective, city, zone, dayCount, inventory, deals, nowTimeLocal);
-        String systemPrompt = buildSystemPrompt(dayCount, privateTour, language);
+        String systemPrompt = buildSystemPrompt(dayCount, privateTour, language, effective.budget(), effective.partySize());
 
         JsonNode schema = readSchema(OUTPUT_SCHEMA_JSON);
         AiStructuredResult result = claudeClient.completeStructured(
@@ -294,6 +310,7 @@ public class TripPlanService {
         tripPlan.setPrivateTour(privateTour);
         tripPlan.setInterests(trimToNull(effective.interests()));
         tripPlan.setNotes(trimToNull(effective.notes()));
+        tripPlan.setBudget(effective.budget());
         tripPlan.setStatus(TripPlanStatus.ACTIVE);
         tripPlan.setLanguage(language);
         tripPlan.setPlan(writeDocument(document));
@@ -440,23 +457,205 @@ public class TripPlanService {
 
     /**
      * Deliberate "swap this item" (owner only): replaces a bookable item with a DIFFERENT
-     * experience on the same day, closest to the same time — no AI call, instant. A new time
-     * of the same experience wouldn't change what the traveler asked to change, so the same
+     * experience on the same day. With {@code requestedSlotId} (the swap dialog's pick) that
+     * exact candidate is used — validated against the live candidate set; without it the
+     * closest-to-the-same-time candidate is auto-picked (older clients). A new time of the
+     * same experience wouldn't change what the traveler asked to change, so the same
      * experience is never offered back.
      */
     @Transactional
-    public TripPlanResponse swapItem(UUID userId, String token, String itemId) {
+    public TripPlanResponse swapItem(UUID userId, String token, String itemId, UUID requestedSlotId) {
         ReplacementContext ctx = loadReplacementContext(userId, token, itemId);
 
         List<AvailabilitySlot> candidates = replacementCandidates(ctx, false);
-        AvailabilitySlot replacementSlot =
-                pickClosestFreeSlot(candidates, Set.of(), ctx.target().startTimeLocal(), ctx.zone());
-        if (replacementSlot == null) {
-            throw new ResourceNotFoundException("No bookable alternative was found for that day");
+        AvailabilitySlot replacementSlot;
+        if (requestedSlotId != null) {
+            replacementSlot = candidates.stream()
+                    .filter(slot -> slot.getId().equals(requestedSlotId))
+                    .findFirst()
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "That option is no longer available — pick another one"));
+        } else {
+            replacementSlot = pickClosestFreeSlot(candidates, Set.of(), ctx.target().startTimeLocal(), ctx.zone());
+            if (replacementSlot == null) {
+                throw new ResourceNotFoundException("No bookable alternative was found for that day");
+            }
         }
 
         String description = swapNote(ctx.tripPlan().getLanguage()).formatted(ctx.target().title());
         return applyReplacement(ctx, replacementSlot, false, description, userId);
+    }
+
+    /** Output contract for the swap-options AI ranking: candidate experience ids, best first. */
+    private static final String SWAP_RANK_SCHEMA_JSON = """
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["rankedExperienceIds"],
+              "properties": {
+                "rankedExperienceIds": {
+                  "type": "array",
+                  "items": {"type": "string", "description": "An experienceId copied EXACTLY from the candidate list"}
+                }
+              }
+            }
+            """;
+
+    /**
+     * The swap dialog's option list (owner only): up to {@value #MAX_SWAP_OPTIONS} DIFFERENT
+     * experiences bookable on the item's day, each at its slot closest to the item's current
+     * time, with the card fields (image, rating, price) resolved in one batch. With a free-text
+     * {@code instruction} and a configured model, the candidates are AI-ranked to the
+     * instruction first; otherwise ranked by host rating, then time closeness. Deliberately NOT
+     * transactional — the optional model call must never run inside an open transaction (the
+     * repository/service calls it makes carry their own).
+     */
+    public TripPlanSwapOptionsResponse swapOptions(UUID userId, String token, String itemId, String instruction) {
+        ReplacementContext ctx = loadReplacementContext(userId, token, itemId);
+        List<AvailabilitySlot> candidates = replacementCandidates(ctx, false);
+
+        // One candidate per experience: its slot closest to the item's current time.
+        Map<UUID, List<AvailabilitySlot>> byExperience = candidates.stream()
+                .collect(Collectors.groupingBy(slot -> slot.getExperience().getId(),
+                        LinkedHashMap::new, Collectors.toList()));
+        List<AvailabilitySlot> bestPerExperience = new ArrayList<>();
+        for (List<AvailabilitySlot> slots : byExperience.values()) {
+            AvailabilitySlot pick = pickClosestFreeSlot(slots, Set.of(), ctx.target().startTimeLocal(), ctx.zone());
+            if (pick != null) {
+                bestPerExperience.add(pick);
+            }
+        }
+        if (bestPerExperience.isEmpty()) {
+            throw new ResourceNotFoundException("No bookable alternative was found for that day");
+        }
+
+        int intendedMinutes = parseMinutesOfDay(ctx.target().startTimeLocal());
+        Comparator<AvailabilitySlot> defaultRank = Comparator
+                .comparing((AvailabilitySlot slot) -> hostRating(slot.getExperience()),
+                        Comparator.nullsLast(Comparator.reverseOrder()))
+                .thenComparingInt(slot -> minutesFromIntended(slot, intendedMinutes, ctx.zone()));
+        bestPerExperience.sort(defaultRank);
+
+        String cleanInstruction = instruction == null ? "" : instruction.trim();
+        boolean aiRefined = false;
+        if (cleanInstruction.length() >= 3 && claudeClient.isConfigured()) {
+            List<AvailabilitySlot> ranked = rankSwapCandidatesWithAi(ctx, bestPerExperience, cleanInstruction);
+            if (ranked != null) {
+                bestPerExperience = ranked;
+                aiRefined = true;
+            }
+        }
+
+        List<AvailabilitySlot> top = bestPerExperience.stream().limit(MAX_SWAP_OPTIONS).toList();
+
+        // Cover images for the option cards, one batched query.
+        List<UUID> experienceIds = top.stream().map(slot -> slot.getExperience().getId()).toList();
+        Map<UUID, String> coverByExperienceId = new HashMap<>();
+        for (com.localbuddy.media.ExperiencePhoto photo
+                : experiencePhotoRepository.findCoverPhotosByExperienceIds(experienceIds)) {
+            coverByExperienceId.putIfAbsent(photo.getExperience().getId(), photo.getUrl());
+        }
+
+        List<TripPlanSwapOption> options = top.stream()
+                .map(slot -> {
+                    Experience experience = slot.getExperience();
+                    String about = notBlank(experience.getShortDescription())
+                            ? experience.getShortDescription()
+                            : experience.getDescription();
+                    return new TripPlanSwapOption(
+                            slot.getId(),
+                            experience.getId(),
+                            experience.getSlug(),
+                            experience.getTitle(),
+                            truncate(about == null ? null : about.replaceAll("\\s+", " ").trim(), 160),
+                            experience.getCategory() != null ? experience.getCategory().getName() : null,
+                            TIME_FORMAT.format(slot.getStartTime().atZone(ctx.zone())),
+                            experience.getDurationMinutes(),
+                            ctx.privateTour() ? experience.getPrivatePrice() : experience.getPriceAmount(),
+                            experience.getCurrency(),
+                            hostRating(experience),
+                            experience.getLocalProfile() != null ? experience.getLocalProfile().getTotalReviews() : null,
+                            coverByExperienceId.get(experience.getId()),
+                            experience.getMeetingArea());
+                })
+                .toList();
+
+        return new TripPlanSwapOptionsResponse(options, aiRefined);
+    }
+
+    /** Minutes between a slot's local start and the item's current time (for tie-breaking). */
+    private int minutesFromIntended(AvailabilitySlot slot, int intendedMinutes, ZoneId zone) {
+        int slotMinutes = slot.getStartTime().atZone(zone).toLocalTime().toSecondOfDay() / 60;
+        return Math.abs(slotMinutes - (intendedMinutes == Integer.MAX_VALUE ? 12 * 60 : intendedMinutes));
+    }
+
+    /**
+     * One snappy structured model call ranking the swap candidates to the traveler's
+     * instruction. Returns null on any failure — the caller keeps the default ranking
+     * (options must never break because the model hiccuped).
+     */
+    private List<AvailabilitySlot> rankSwapCandidatesWithAi(
+            ReplacementContext ctx, List<AvailabilitySlot> candidates, String instruction) {
+        try {
+            StringBuilder sb = new StringBuilder();
+            sb.append("The traveler wants to replace this itinerary stop: \"")
+                    .append(ctx.target().title()).append("\" at ").append(ctx.target().startTimeLocal())
+                    .append(" in ").append(ctx.city().getName()).append(".\n");
+            sb.append("THEIR INSTRUCTION for what they'd rather have: ").append(instruction).append("\n");
+            if (ctx.privateTour()) {
+                sb.append("The plan books private whole-group buyouts; listed prices are flat per group.\n");
+            }
+            sb.append("\nCANDIDATE EXPERIENCES (rank ALL of these, best match first):\n");
+            for (AvailabilitySlot slot : candidates) {
+                Experience experience = slot.getExperience();
+                sb.append("- experienceId: ").append(experience.getId())
+                        .append(" | title: ").append(experience.getTitle());
+                if (experience.getCategory() != null) {
+                    sb.append(" | category: ").append(experience.getCategory().getName());
+                }
+                BigDecimal price = ctx.privateTour() ? experience.getPrivatePrice() : experience.getPriceAmount();
+                if (price != null) {
+                    sb.append(" | price: ").append(price).append(" ").append(experience.getCurrency());
+                }
+                sb.append(" | starts: ").append(TIME_FORMAT.format(slot.getStartTime().atZone(ctx.zone())));
+                String about = notBlank(experience.getShortDescription())
+                        ? experience.getShortDescription()
+                        : experience.getDescription();
+                if (notBlank(about)) {
+                    sb.append(" | about: ").append(truncate(about.replaceAll("\\s+", " ").trim(), 140));
+                }
+                sb.append("\n");
+            }
+
+            AiStructuredResult result = claudeClient.completeStructured(
+                    "You rank replacement options for one stop of a traveler's itinerary. "
+                            + "Order the candidate experiences by how well they satisfy the traveler's "
+                            + "instruction (best first). Use ONLY experienceIds copied exactly from the "
+                            + "candidate list; include every candidate exactly once.",
+                    List.of(AiMessage.user(sb.toString())),
+                    readSchema(SWAP_RANK_SCHEMA_JSON),
+                    AiCallOptions.lowLatency(600)
+            );
+
+            // LinkedHashMap: leftovers the model forgot keep their default-ranked order.
+            Map<UUID, AvailabilitySlot> byExperienceId = candidates.stream()
+                    .collect(Collectors.toMap(slot -> slot.getExperience().getId(), Function.identity(),
+                            (first, second) -> first, LinkedHashMap::new));
+            List<AvailabilitySlot> ranked = new ArrayList<>();
+            for (JsonNode idNode : result.json().path("rankedExperienceIds")) {
+                UUID experienceId = parseUuid(idNode.asText(null));
+                AvailabilitySlot slot = experienceId != null ? byExperienceId.remove(experienceId) : null;
+                if (slot != null) {
+                    ranked.add(slot);
+                }
+            }
+            // Anything the model forgot keeps its default order at the tail.
+            ranked.addAll(byExperienceId.values());
+            return ranked.isEmpty() ? null : ranked;
+        } catch (Exception ex) {
+            log.warn("Swap-options AI ranking failed; using default ranking: {}", ex.getMessage());
+            return null;
+        }
     }
 
     /** Everything item replacement needs, loaded and owner-checked once. */
@@ -558,7 +757,7 @@ public class TripPlanService {
                 frontendBaseUrl + "/experience/" + experience.getSlug(),
                 buildBookingUrl(experience, ctx.date(), slotTimeLocal, ctx.partySize(), ctx.privateTour()),
                 replacementSlot.getId(), replacementSlot.getStartTime(), replacementSlot.getEndTime(),
-                itemPrice, null, experienceMapsUrl(experience), true, null);
+                itemPrice, null, experienceMapsUrl(experience), true, null, null, null);
 
         List<TripPlanDay> newDays = ctx.document().days().stream()
                 .map(day -> {
@@ -672,12 +871,21 @@ public class TripPlanService {
                 .collect(Collectors.toCollection(HashSet::new));
         JsonNode modelItems = result.json().path("items");
         List<TripPlanItem> items = new ArrayList<>();
+        int experienceCount = 0;
         for (int i = 0; i < modelItems.size(); i++) {
+            // Same two-experiences-per-day cap as initial generation.
+            if (experienceCount >= MAX_EXPERIENCES_PER_DAY
+                    && "EXPERIENCE".equals(modelItems.get(i).path("kind").asText(""))) {
+                continue;
+            }
             TripPlanItem item = assembleItem(modelItems.get(i),
                     "d" + (dayIndex + 1) + "-r" + (i + 1),
                     date, zone, inventory, usedSlotIds, partySize, privateTour, city);
             if (item != null) {
                 items.add(item);
+                if ("EXPERIENCE".equals(item.kind())) {
+                    experienceCount++;
+                }
             }
         }
         if (items.isEmpty()) {
@@ -710,11 +918,18 @@ public class TripPlanService {
                 (for EXPERIENCE items) experienceId and slotId EXACTLY as given.
                 - LocalBuddy experiences may ONLY come from the provided list, and ONLY at one of the listed \
                 slot start times: set kind="EXPERIENCE" and copy the experienceId and the chosen slotId \
-                EXACTLY as given. Never invent experiences, slots, or times; never reuse a slotId twice.
+                EXACTLY as given. Never invent experiences, slots, or times; never reuse a slotId twice. \
+                The refined day may contain at most TWO EXPERIENCE items.
                 - Non-bookable items are suggestions: kind="FOOD" for cafes/restaurants/markets, kind="SIGHT" for \
                 viewpoints/parks/landmarks/neighborhoods, kind="TIP" for practical advice. For FOOD and SIGHT give \
                 a real, well-known placeName plus its neighborhood in placeArea; prefer beloved local spots over \
                 tourist traps. Do not invent opening hours or prices. For these items experienceId and slotId must be null.
+                - SIGHT tickets: set ticketed=true ONLY when the place genuinely requires a paid ticket or \
+                reservation to enter (museums, towers, cruises, exhibitions) and then set officialUrl to that \
+                venue's OWN official website (https, the venue's real domain — NEVER Google, Maps, TripAdvisor, \
+                Wikipedia or any aggregator); free public places (parks, viewpoints, sunset spots) get \
+                ticketed=false and officialUrl=null, as do all FOOD and TIP items. When unsure about the real \
+                site, use null.
                 - startTimeLocal is 24h "HH:mm" local time. Order items chronologically. No overlaps: respect each \
                 experience's durationMinutes and leave at least 30 minutes of travel time between consecutive items.
                 - BREVITY (the plan is skimmed on a phone): theme 3-5 words; each item description exactly ONE \
@@ -741,6 +956,10 @@ public class TripPlanService {
         sb.append("TRIP: \"").append(document.title()).append("\" — refine ONLY the day of ")
                 .append(day.date()).append("\n");
         sb.append("PARTY SIZE: ").append(partySize).append("\n");
+        if (tripPlan.getBudget() != null) {
+            sb.append("BUDGET: ").append(tripPlan.getBudget())
+                    .append(" EUR total for the whole group across the whole trip — respect it when picking replacements\n");
+        }
         if (privateTour) {
             sb.append("TOUR TYPE: PRIVATE — each experience is a whole-group private buyout\n");
         }
@@ -888,9 +1107,33 @@ public class TripPlanService {
                         + "never translate them.\n";
     }
 
-    private String buildSystemPrompt(long dayCount, boolean privateTour, String language) {
+    /**
+     * The budget prompt rule: fit the whole-group experience total inside the traveler's
+     * number, overshoot by at most 50% when a good plan demands it, and — when the number
+     * is plainly unrealistic — drop the cap, build the cheapest genuinely good plan and
+     * say so honestly in the summary. Empty when no budget was given.
+     */
+    private String budgetRuleText(Integer budget, int partySize) {
+        if (budget == null) {
+            return "";
+        }
+        return """
+                - BUDGET: the traveler set a budget of %d EUR TOTAL for the whole group across the whole \
+                trip. The combined price of your EXPERIENCE items (per-guest price x %d guests for shared \
+                items; the flat group price for private buyouts) should fit inside it — prefer fewer or \
+                cheaper experiences over blowing past it, and fill the gaps with great free FOOD/SIGHT \
+                moments. If no good plan fits, exceed the budget by AT MOST 50%%, never more. If the \
+                budget is far too low for that (shared experiences average roughly 50 EUR per person per \
+                day), ignore the 50%% rule: build the cheapest genuinely good plan — even a single \
+                affordable highlight with free wanders around it — and acknowledge the tight budget in \
+                one warm, honest sentence inside the summary. Never pad a plan just to use budget up.
+                """.formatted(budget, partySize);
+    }
+
+    private String buildSystemPrompt(long dayCount, boolean privateTour, String language, Integer budget, int partySize) {
         String privateRule = privateRuleText(privateTour);
         String languageRule = languageRuleText(language);
+        String budgetRule = budgetRuleText(budget, partySize);
         return ("""
                 You are the AI trip planner for LocalBuddy, a marketplace where travelers book small-group \
                 experiences hosted by locals. You design warm, realistic, city-local itineraries.
@@ -900,13 +1143,21 @@ public class TripPlanService {
                 - LocalBuddy experiences may ONLY come from the provided list, and ONLY at one of the listed \
                 slot start times for that same date: set kind="EXPERIENCE" and copy the experienceId and the \
                 chosen slotId EXACTLY as given. Never invent experiences, slots, or times; never reuse a slotId twice.
-                - Weave 1-3 LocalBuddy experiences into each day when available, at their real slot times. \
-                They are the highlights of the trip — schedule the rest of the day around them.
+                - Weave 1-2 LocalBuddy experiences into each day when available, at their real slot times — \
+                NEVER more than TWO experiences on the same day. They are the highlights of the trip — \
+                schedule the rest of the day around them.
                 - Non-bookable items are suggestions: kind="FOOD" for cafes/restaurants/markets, kind="SIGHT" for \
                 viewpoints/parks/landmarks/neighborhoods (including a sunset spot), kind="TIP" for practical advice. \
                 For FOOD and SIGHT give a real, well-known placeName plus its neighborhood in placeArea; prefer \
                 beloved local spots over tourist traps. Do not invent opening hours or prices. \
                 For these items experienceId and slotId must be null.
+                - SIGHT tickets: set ticketed=true ONLY when the place genuinely requires a paid ticket or \
+                reservation to enter (museums, towers, cruises, exhibitions, attractions) and then set officialUrl \
+                to that venue's OWN official website (https, the venue's real domain — NEVER Google, Maps, \
+                TripAdvisor, Wikipedia or any aggregator). Free public places — parks, squares, viewpoints, \
+                sunset spots, neighborhoods, markets — get ticketed=false and officialUrl=null. Only give an \
+                officialUrl you are confident is the venue's real site; when unsure use null. For FOOD and TIP \
+                items ticketed=false and officialUrl=null always.
                 - Structure each day roughly: breakfast (FOOD), a morning activity, lunch (FOOD), an afternoon \
                 activity, a late-afternoon/sunset moment (SIGHT), and an evening plan (FOOD or an evening EXPERIENCE). \
                 If the first day is marked as already underway, start it from the given current time instead — \
@@ -922,7 +1173,7 @@ public class TripPlanService {
                 - If the provided experience list is empty or sparse, still produce an excellent local itinerary \
                 from FOOD/SIGHT/TIP items and say so in the summary.
                 - tips: exactly 3 practical one-line tips (max 12 words each) for this city and season.
-                """ + privateRule + languageRule).formatted(dayCount);
+                """ + budgetRule + privateRule + languageRule).formatted(dayCount);
     }
 
     private String buildUserPrompt(
@@ -947,6 +1198,10 @@ public class TripPlanService {
                     .append("skip breakfast/lunch/etc. that have already passed; a shorter first day is expected.\n");
         }
         sb.append("PARTY SIZE: ").append(request.partySize()).append("\n");
+        if (request.budget() != null) {
+            sb.append("BUDGET: ").append(request.budget())
+                    .append(" EUR total for the whole group across the whole trip\n");
+        }
         if (request.isPrivateTour()) {
             sb.append("TOUR TYPE: PRIVATE — each experience is a whole-group private buyout\n");
         }
@@ -1059,9 +1314,16 @@ public class TripPlanService {
             JsonNode modelDay = dayIndex < modelDays.size() ? modelDays.get(dayIndex) : null;
 
             List<TripPlanItem> items = new ArrayList<>();
+            int experienceCount = 0;
             if (modelDay != null) {
                 JsonNode modelItems = modelDay.path("items");
                 for (int itemIndex = 0; itemIndex < modelItems.size(); itemIndex++) {
+                    // Hard product rule: at most two experiences per day — the prompt asks for
+                    // it, this enforces it even when the model overshoots.
+                    if (experienceCount >= MAX_EXPERIENCES_PER_DAY
+                            && "EXPERIENCE".equals(modelItems.get(itemIndex).path("kind").asText(""))) {
+                        continue;
+                    }
                     TripPlanItem item = assembleItem(
                             modelItems.get(itemIndex),
                             "d" + (dayIndex + 1) + "-i" + (itemIndex + 1),
@@ -1069,6 +1331,9 @@ public class TripPlanService {
                             request.isPrivateTour(), city);
                     if (item != null) {
                         items.add(item);
+                        if ("EXPERIENCE".equals(item.kind())) {
+                            experienceCount++;
+                        }
                         if (item.bookable() && item.pricePerGuest() != null) {
                             // Private tours carry the flat whole-group price on the item, so it
                             // counts once; shared items are per guest.
@@ -1139,9 +1404,13 @@ public class TripPlanService {
             } else if (placeName != null) {
                 mapsUrl = mapsSearchUrl(placeName, placeArea, city);
             }
+            // Only SIGHT items can be ticketed attractions; their official link must survive
+            // sanitation (https, real host, no search/aggregator domains) or it's dropped.
+            boolean ticketed = "SIGHT".equals(kind) && modelItem.path("ticketed").asBoolean(false);
+            String officialUrl = ticketed ? sanitizeOfficialUrl(textOrNull(modelItem, "officialUrl")) : null;
             return new TripPlanItem(itemId, startTimeLocal, kind, title, description,
                     null, null, null, null, null, null, null, null, null,
-                    placeName, mapsUrl, false, null);
+                    placeName, mapsUrl, false, null, ticketed, officialUrl);
         }
 
         // EXPERIENCE: everything the model claims is validated against real inventory.
@@ -1178,7 +1447,7 @@ public class TripPlanService {
             return new TripPlanItem(itemId, startTimeLocal, kind, title, description,
                     experience.getId(), experience.getSlug(), experience.getTitle(), experienceUrl,
                     null, null, null, null, itemPrice,
-                    null, experienceMapsUrl(experience), false, null);
+                    null, experienceMapsUrl(experience), false, null, null, null);
         }
 
         usedSlotIds.add(slot.getId());
@@ -1188,7 +1457,7 @@ public class TripPlanService {
         return new TripPlanItem(itemId, slotTimeLocal, kind, title, description,
                 experience.getId(), experience.getSlug(), experience.getTitle(), experienceUrl,
                 bookingUrl, slot.getId(), slot.getStartTime(), slot.getEndTime(),
-                itemPrice, null, experienceMapsUrl(experience), true, null);
+                itemPrice, null, experienceMapsUrl(experience), true, null, null, null);
     }
 
     /** Deep link that starts checkout pre-filled; ?private=1 books the whole slot at the flat private price. */
@@ -1308,7 +1577,8 @@ public class TripPlanService {
                 bookableItemIds,
                 tripPlan.getCreatedAt(),
                 tripPlan.getStatus() == TripPlanStatus.ARCHIVED,
-                owned
+                owned,
+                tripPlan.getBudget()
         );
     }
 
@@ -1366,6 +1636,38 @@ public class TripPlanService {
 
     private String urlEncode(String value) {
         return URLEncoder.encode(value, StandardCharsets.UTF_8);
+    }
+
+    /** Hosts that are never a venue's own site — search engines, maps, aggregators, socials. */
+    private static final List<String> BLOCKED_OFFICIAL_HOSTS = List.of(
+            "google.", "goo.gl", "maps.app", "tripadvisor", "wikipedia", "wikivoyage",
+            "facebook", "instagram", "yelp", "getyourguide", "viator", "booking.com",
+            "expedia", "airbnb", "tiqets", "klook");
+
+    /**
+     * Keeps a model-suggested official-venue link only when it plausibly IS one:
+     * https, a real host, not a search/aggregator/social domain, sane length.
+     */
+    private String sanitizeOfficialUrl(String rawUrl) {
+        if (rawUrl == null || rawUrl.isBlank() || rawUrl.length() > 300) {
+            return null;
+        }
+        try {
+            java.net.URI uri = java.net.URI.create(rawUrl.trim());
+            String host = uri.getHost();
+            if (!"https".equalsIgnoreCase(uri.getScheme()) || host == null) {
+                return null;
+            }
+            String lowerHost = host.toLowerCase(java.util.Locale.ROOT);
+            for (String blocked : BLOCKED_OFFICIAL_HOSTS) {
+                if (lowerHost.contains(blocked)) {
+                    return null;
+                }
+            }
+            return uri.toString();
+        } catch (Exception ex) {
+            return null;
+        }
     }
 
     private int parseMinutesOfDay(String time) {

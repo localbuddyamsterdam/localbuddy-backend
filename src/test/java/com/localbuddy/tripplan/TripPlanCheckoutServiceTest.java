@@ -36,9 +36,13 @@ class TripPlanCheckoutServiceTest {
     private final TripPlanService tripPlanService = mock(TripPlanService.class);
     private final BookingService bookingService = mock(BookingService.class);
     private final PaymentService paymentService = mock(PaymentService.class);
+    private final com.localbuddy.promo.PromoCodeService promoCodeService =
+            mock(com.localbuddy.promo.PromoCodeService.class);
+    private final com.localbuddy.referral.ReferralService referralService =
+            mock(com.localbuddy.referral.ReferralService.class);
 
-    private final TripPlanCheckoutService service =
-            new TripPlanCheckoutService(tripPlanService, bookingService, paymentService);
+    private final TripPlanCheckoutService service = new TripPlanCheckoutService(
+            tripPlanService, bookingService, paymentService, promoCodeService, referralService);
 
     private final UUID userId = UUID.randomUUID();
     private final UUID planId = UUID.randomUUID();
@@ -47,13 +51,13 @@ class TripPlanCheckoutServiceTest {
         return new TripPlanItem(id, "10:00", "EXPERIENCE", title, "desc",
                 UUID.randomUUID(), "slug-" + id, title, "https://x/experience/slug-" + id,
                 "https://x/experience/e/book", UUID.randomUUID(), Instant.now(), Instant.now(),
-                new BigDecimal("40.00"), null, null, true, null);
+                new BigDecimal("40.00"), null, null, true, null, null, null);
     }
 
     private TripPlanItem suggestionItem(String id) {
         return new TripPlanItem(id, "09:00", "FOOD", "Breakfast", "desc",
                 null, null, null, null, null, null, null, null, null,
-                "Cafe", "https://maps", false, null);
+                "Cafe", "https://maps", false, null, null, null);
     }
 
     private void stubPlan(TripPlanItem... items) {
@@ -72,7 +76,7 @@ class TripPlanCheckoutServiceTest {
 
     private TripPlanCheckoutRequest request(List<String> itemIds) {
         return new TripPlanCheckoutRequest(itemIds, null, null, null, null, null,
-                null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null);
     }
 
     @Test
