@@ -197,9 +197,23 @@ public class GiftCardService {
         if (cardId == null || amount == null || amount.signum() <= 0) {
             return;
         }
+        // Lock the card row to prevent concurrent redemptions.
+        GiftCard card = giftCardRepository.findByIdForUpdate(cardId).orElse(null);
+        if (card == null) {
+            return;
+        }
+        // Decrement the balance and mark as depleted if exhausted.
+        BigDecimal scaledAmount = amount.setScale(2, RoundingMode.HALF_UP);
+        card.setBalance(card.getBalance().subtract(scaledAmount));
+        if (card.getBalance().signum() == 0) {
+            card.setStatus(GiftCardStatus.DEPLETED);
+        }
+        giftCardRepository.save(card);
+
+        // Record the redemption transaction.
         GiftCardRedemption redemption = new GiftCardRedemption();
-        giftCardRepository.findById(cardId).ifPresent(redemption::setGiftCard);
-        redemption.setAmount(amount.setScale(2, RoundingMode.HALF_UP));
+        redemption.setGiftCard(card);
+        redemption.setAmount(scaledAmount);
         if (userId != null) {
             userRepository.findById(userId).ifPresent(redemption::setRedeemedByUser);
         }
