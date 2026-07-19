@@ -42,7 +42,8 @@ public class AdminWhatsAppController {
     @PostMapping("/template-test")
     public ResponseEntity<WhatsAppSendResult> templateTest(@Valid @RequestBody SendTemplateTestRequest request) {
         return ResponseEntity.ok(whatsAppService.sendTemplate(
-                request.toPhone(), request.templateName(), request.params() == null ? List.of() : request.params()));
+                request.toPhone(), request.templateName(), request.params() == null ? List.of() : request.params(),
+                request.buttonParams()));
     }
 
     public record SendTemplateTestRequest(
@@ -50,7 +51,9 @@ public class AdminWhatsAppController {
             String toPhone,
             @NotBlank(message = "Template name is required")
             String templateName,
-            List<String> params
+            List<String> params,
+            /** Dynamic suffixes for the template's URL buttons, in button-index order, if it has any. */
+            List<String> buttonParams
     ) {
     }
 }

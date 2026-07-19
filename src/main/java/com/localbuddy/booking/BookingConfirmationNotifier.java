@@ -130,7 +130,7 @@ public class BookingConfirmationNotifier {
                 notificationService.createWhatsAppTemplateNotificationForUser(
                         traveler, NotificationType.BOOKING_CONFIRMED, subject, message,
                         whatsAppTemplates.forType(NotificationType.BOOKING_CONFIRMED).orElse(null),
-                        confirmationWaParams(booking, title, ref),
+                        confirmationWaParams(booking, title, ref), confirmationWaButtonParams(booking, ref),
                         "BOOKING", booking.getId(), dedupe + ":WHATSAPP");
             }
         } else if (booking.getGuestEmail() != null && !booking.getGuestEmail().isBlank()) {
@@ -143,7 +143,7 @@ public class BookingConfirmationNotifier {
                         booking.getGuestEmail(), booking.getGuestPhone(),
                         NotificationType.BOOKING_CONFIRMED, subject, message,
                         whatsAppTemplates.forType(NotificationType.BOOKING_CONFIRMED).orElse(null),
-                        confirmationWaParams(booking, title, ref),
+                        confirmationWaParams(booking, title, ref), confirmationWaButtonParams(booking, ref),
                         "BOOKING", booking.getId(), dedupe + ":WHATSAPP");
             }
         }
@@ -164,6 +164,36 @@ public class BookingConfirmationNotifier {
                 && !experience.getMeetingArea().isBlank()
                 ? experience.getMeetingArea() : "Shared before the day";
         return java.util.List.of(name, title, when, meeting, ref);
+    }
+
+    /**
+     * Dynamic URL button suffixes for the booking-confirmed template, in button-index order:
+     * index 0 the booking reference (a "Manage my booking" button linking to {@code /booking/{ref}}),
+     * index 1 an encoded Google Maps query for the meeting point (an "Open in Maps" button whose
+     * static base — {@code https://www.google.com/maps/search/?api=1&query=} — is configured on
+     * the template itself; this works cross-platform, iOS included, without a separate Apple Maps
+     * link). Falls back to lat/long when set, else meeting area + city, else just the city — a
+     * template with a second URL button requires every button's parameter to be present.
+     */
+    private java.util.List<String> confirmationWaButtonParams(Booking booking, String ref) {
+        return java.util.List.of(ref, mapsQuerySuffix(booking.getExperience()));
+    }
+
+    private String mapsQuerySuffix(Experience experience) {
+        if (experience == null) {
+            return "";
+        }
+        if (experience.getLatitude() != null && experience.getLongitude() != null) {
+            return experience.getLatitude().toPlainString() + "%2C" + experience.getLongitude().toPlainString();
+        }
+        String cityName = experience.getCity() != null ? experience.getCity().getName() : null;
+        String meetingArea = experience.getMeetingArea();
+        String query = meetingArea != null && !meetingArea.isBlank()
+                ? (cityName != null && !cityName.isBlank() ? meetingArea + ", " + cityName : meetingArea)
+                : cityName;
+        return query == null || query.isBlank()
+                ? ""
+                : java.net.URLEncoder.encode(query, java.nio.charset.StandardCharsets.UTF_8);
     }
 
     private EmailTemplateService.BookingConfirmationModel buildModel(

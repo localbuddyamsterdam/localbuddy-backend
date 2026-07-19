@@ -61,6 +61,10 @@ public class Notification {
     @Column(name = "wa_params", length = 2000)
     private String waParams;
 
+    /** JSON array of dynamic URL suffixes for the template's URL buttons, in button-index order. */
+    @Column(name = "wa_button_params", length = 500)
+    private String waButtonParams;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 40)
     private NotificationStatus status = NotificationStatus.PENDING;

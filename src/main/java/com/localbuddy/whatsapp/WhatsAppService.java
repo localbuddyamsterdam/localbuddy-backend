@@ -98,6 +98,19 @@ public class WhatsAppService {
      * body placeholders in order; the language is {@code app.whatsapp.template-language}.
      */
     public WhatsAppSendResult sendTemplate(String toPhone, String templateName, List<String> bodyParams) {
+        return sendTemplate(toPhone, templateName, bodyParams, null);
+    }
+
+    /**
+     * Same as above, plus {@code buttonUrlParams}: dynamic suffixes for the template's URL buttons,
+     * in button-index order (index 0 first, etc.) — e.g. a booking reference for a "Manage my
+     * booking" button followed by an encoded map query for an "Open in Maps" button, each appended
+     * to that button's static base URL configured on the template itself in Meta. Stops at the
+     * first null/blank entry (button indices must stay contiguous from 0); null/empty list omits
+     * button components entirely (the template must then have no URL buttons, or Meta rejects it).
+     */
+    public WhatsAppSendResult sendTemplate(
+            String toPhone, String templateName, List<String> bodyParams, List<String> buttonUrlParams) {
         if (!isConfigured()) {
             throw new BadRequestException(
                     "WhatsApp Business API is not configured. Use a click-to-chat link instead.");
@@ -116,6 +129,20 @@ public class WhatsAppService {
                     .map(p -> Map.<String, Object>of("type", "text", "text", p == null ? "" : p))
                     .toList();
             components.add(Map.of("type", "body", "parameters", parameters));
+        }
+        if (buttonUrlParams != null) {
+            for (int i = 0; i < buttonUrlParams.size(); i++) {
+                String param = buttonUrlParams.get(i);
+                if (param == null || param.isBlank()) {
+                    break;
+                }
+                components.add(Map.of(
+                        "type", "button",
+                        "sub_type", "url",
+                        "index", String.valueOf(i),
+                        "parameters", List.of(Map.of("type", "text", "text", param))
+                ));
+            }
         }
 
         Map<String, Object> template = new java.util.LinkedHashMap<>();

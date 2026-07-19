@@ -166,7 +166,8 @@ public class NotificationProcessingService {
             result = whatsAppService.sendTemplate(
                     notification.getRecipientPhone(),
                     notification.getWaTemplate(),
-                    parseWaParams(notification.getWaParams()));
+                    parseWaParams(notification.getWaParams()),
+                    parseWaParams(notification.getWaButtonParams()));
         } else {
             result = whatsAppService.sendMessage(
                     notification.getRecipientPhone(), notification.getMessage());

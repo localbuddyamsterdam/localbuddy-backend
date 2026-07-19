@@ -278,13 +278,36 @@ public class NotificationService {
             UUID relatedEntityId,
             String dedupeKey
     ) {
+        createWhatsAppTemplateNotificationForUser(recipientUser, notificationType, subject, message,
+                waTemplate, waParams, null, relatedEntityType, relatedEntityId, dedupeKey);
+    }
+
+    /**
+     * Same as above, plus dynamic URL suffixes (in button-index order) for the template's URL
+     * buttons — e.g. ["LB-48213", "Noordermarkt%2C%20Amsterdam"] for a "Manage my booking" button
+     * linking to {@code /booking/{ref}} followed by an "Open in Maps" button.
+     */
+    @Transactional
+    public void createWhatsAppTemplateNotificationForUser(
+            User recipientUser,
+            NotificationType notificationType,
+            String subject,
+            String message,
+            String waTemplate,
+            List<String> waParams,
+            List<String> waButtonParams,
+            String relatedEntityType,
+            UUID relatedEntityId,
+            String dedupeKey
+    ) {
         if (recipientUser == null || recipientUser.getPhone() == null
                 || recipientUser.getPhone().trim().isEmpty()) {
             return;
         }
         createNotification(recipientUser, recipientUser.getEmail(), recipientUser.getPhone(),
                 NotificationChannel.WHATSAPP, notificationType, subject, message, null,
-                waTemplate, toParamsJson(waParams), relatedEntityType, relatedEntityId, dedupeKey);
+                waTemplate, toParamsJson(waParams), toParamsJson(waButtonParams),
+                relatedEntityType, relatedEntityId, dedupeKey);
     }
 
     @Transactional
@@ -300,12 +323,32 @@ public class NotificationService {
             UUID relatedEntityId,
             String dedupeKey
     ) {
+        createWhatsAppTemplateNotificationForGuest(recipientEmail, recipientPhone, notificationType,
+                subject, message, waTemplate, waParams, null, relatedEntityType, relatedEntityId, dedupeKey);
+    }
+
+    /** Same as above, plus dynamic URL button suffixes — see the "ForUser" overload for details. */
+    @Transactional
+    public void createWhatsAppTemplateNotificationForGuest(
+            String recipientEmail,
+            String recipientPhone,
+            NotificationType notificationType,
+            String subject,
+            String message,
+            String waTemplate,
+            List<String> waParams,
+            List<String> waButtonParams,
+            String relatedEntityType,
+            UUID relatedEntityId,
+            String dedupeKey
+    ) {
         if (recipientPhone == null || recipientPhone.trim().isEmpty()) {
             return;
         }
         createNotification(null, recipientEmail, recipientPhone,
                 NotificationChannel.WHATSAPP, notificationType, subject, message, null,
-                waTemplate, toParamsJson(waParams), relatedEntityType, relatedEntityId, dedupeKey);
+                waTemplate, toParamsJson(waParams), toParamsJson(waButtonParams),
+                relatedEntityType, relatedEntityId, dedupeKey);
     }
 
     /** Serializes template params to the stored JSON array; null/empty stays null (no components). */
@@ -369,6 +412,26 @@ public class NotificationService {
             UUID relatedEntityId,
             String dedupeKey
     ) {
+        createNotification(recipientUser, recipientEmail, recipientPhone, channel, notificationType,
+                subject, message, htmlBody, waTemplate, waParamsJson, null, relatedEntityType, relatedEntityId, dedupeKey);
+    }
+
+    private void createNotification(
+            User recipientUser,
+            String recipientEmail,
+            String recipientPhone,
+            NotificationChannel channel,
+            NotificationType notificationType,
+            String subject,
+            String message,
+            String htmlBody,
+            String waTemplate,
+            String waParamsJson,
+            String waButtonParamsJson,
+            String relatedEntityType,
+            UUID relatedEntityId,
+            String dedupeKey
+    ) {
         if (notificationRepository.existsByDedupeKey(dedupeKey)) {
             return;
         }
@@ -397,6 +460,7 @@ public class NotificationService {
         notification.setHtmlBody(effectiveHtml);
         notification.setWaTemplate(optionalTrim(waTemplate));
         notification.setWaParams(waParamsJson);
+        notification.setWaButtonParams(waButtonParamsJson);
         notification.setStatus(NotificationStatus.PENDING);
         notification.setDedupeKey(dedupeKey);
         notification.setRelatedEntityType(relatedEntityType);
