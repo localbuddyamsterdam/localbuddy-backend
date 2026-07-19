@@ -2,6 +2,7 @@ package com.localbuddy.notification;
 
 import com.localbuddy.booking.Booking;
 import com.localbuddy.user.User;
+import com.localbuddy.whatsapp.WhatsAppMapsLink;
 import com.localbuddy.whatsapp.WhatsAppTemplates;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -82,6 +83,7 @@ public class BookingReminderService {
                         traveler, NotificationType.BOOKING_REMINDER, subject, message,
                         whatsAppTemplates.forType(NotificationType.BOOKING_REMINDER).orElse(null),
                         reminderWaParams(booking, experienceTitle, reference, startTime),
+                        reminderWaButtonParams(booking, reference),
                         "BOOKING", booking.getId(), dedupeBase + ":WHATSAPP");
             }
         } else if (booking.getGuestEmail() != null && !booking.getGuestEmail().isBlank()) {
@@ -95,6 +97,7 @@ public class BookingReminderService {
                         NotificationType.BOOKING_REMINDER, subject, message,
                         whatsAppTemplates.forType(NotificationType.BOOKING_REMINDER).orElse(null),
                         reminderWaParams(booking, experienceTitle, reference, startTime),
+                        reminderWaButtonParams(booking, reference),
                         "BOOKING", booking.getId(), dedupeBase + ":WHATSAPP");
             }
         }
@@ -109,5 +112,10 @@ public class BookingReminderService {
                 && !booking.getExperience().getMeetingArea().isBlank()
                 ? booking.getExperience().getMeetingArea() : "Shared before the day";
         return List.of(name, title, WHEN_FORMAT.format(startTime), meeting, reference);
+    }
+
+    /** Same "Manage my booking" + "Open in Maps" button pair as the booking-confirmed template. */
+    private List<String> reminderWaButtonParams(Booking booking, String reference) {
+        return List.of(reference, WhatsAppMapsLink.querySuffix(booking.getExperience()));
     }
 }

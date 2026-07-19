@@ -11,6 +11,7 @@ import com.localbuddy.user.User;
 import com.localbuddy.wallet.AppleWalletService;
 import com.localbuddy.wallet.GoogleWalletService;
 import com.localbuddy.wallet.WalletPassData;
+import com.localbuddy.whatsapp.WhatsAppMapsLink;
 import com.localbuddy.whatsapp.WhatsAppTemplates;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -172,28 +173,10 @@ public class BookingConfirmationNotifier {
      * index 1 an encoded Google Maps query for the meeting point (an "Open in Maps" button whose
      * static base — {@code https://www.google.com/maps/search/?api=1&query=} — is configured on
      * the template itself; this works cross-platform, iOS included, without a separate Apple Maps
-     * link). Falls back to lat/long when set, else meeting area + city, else just the city — a
-     * template with a second URL button requires every button's parameter to be present.
+     * link). A template with a second URL button requires every button's parameter to be present.
      */
     private java.util.List<String> confirmationWaButtonParams(Booking booking, String ref) {
-        return java.util.List.of(ref, mapsQuerySuffix(booking.getExperience()));
-    }
-
-    private String mapsQuerySuffix(Experience experience) {
-        if (experience == null) {
-            return "";
-        }
-        if (experience.getLatitude() != null && experience.getLongitude() != null) {
-            return experience.getLatitude().toPlainString() + "%2C" + experience.getLongitude().toPlainString();
-        }
-        String cityName = experience.getCity() != null ? experience.getCity().getName() : null;
-        String meetingArea = experience.getMeetingArea();
-        String query = meetingArea != null && !meetingArea.isBlank()
-                ? (cityName != null && !cityName.isBlank() ? meetingArea + ", " + cityName : meetingArea)
-                : cityName;
-        return query == null || query.isBlank()
-                ? ""
-                : java.net.URLEncoder.encode(query, java.nio.charset.StandardCharsets.UTF_8);
+        return java.util.List.of(ref, WhatsAppMapsLink.querySuffix(booking.getExperience()));
     }
 
     private EmailTemplateService.BookingConfirmationModel buildModel(

@@ -1477,6 +1477,7 @@ public class BookingService {
                         "Your booking has been cancelled: " + booking.getBookingReference(),
                         whatsAppTemplates.forType(NotificationType.BOOKING_CANCELLED).orElse(null),
                         cancellationWaParams(booking),
+                        List.of(booking.getBookingReference()),
                         "BOOKING",
                         booking.getId(),
                         "BOOKING_CANCELLED:TRAVELER:" + booking.getId() + ":WHATSAPP"
@@ -1502,6 +1503,7 @@ public class BookingService {
                         "Your guest booking has been cancelled. Reference: " + booking.getBookingReference(),
                         whatsAppTemplates.forType(NotificationType.BOOKING_CANCELLED).orElse(null),
                         cancellationWaParams(booking),
+                        List.of(booking.getBookingReference()),
                         "BOOKING",
                         booking.getId(),
                         "BOOKING_CANCELLED:GUEST:" + booking.getId() + ":WHATSAPP"
