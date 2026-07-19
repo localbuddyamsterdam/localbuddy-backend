@@ -110,6 +110,16 @@ public class BookingService {
 
     @Transactional
     public BookingResponse createBooking(UUID loggedInUserId, CreateBookingRequest request) {
+        return createBooking(loggedInUserId, request, true);
+    }
+
+    /**
+     * @param notifyTraveler whether the traveler/guest "complete payment" email fires for this
+     *                        booking. False for trip-plan bundle checkouts, which send one combined
+     *                        email covering every item instead — see {@link BookingCreatedEvent}.
+     */
+    @Transactional
+    public BookingResponse createBooking(UUID loggedInUserId, CreateBookingRequest request, boolean notifyTraveler) {
         long totalStart = System.currentTimeMillis();
 
         long stepStart = System.currentTimeMillis();
@@ -290,7 +300,7 @@ public class BookingService {
                 // instead of the created/awaiting-payment notification.
                 bookingConfirmationNotifier.sendConfirmation(savedBooking);
             } else {
-                eventPublisher.publishEvent(new BookingCreatedEvent(savedBooking.getId()));
+                eventPublisher.publishEvent(new BookingCreatedEvent(savedBooking.getId(), notifyTraveler));
             }
             log.info("LOGGED_IN_BOOKING_TIMING publishEventMs={}", System.currentTimeMillis() - stepStart);
             publishBookingAudit(savedBooking.getId(), "BOOKED", "Booking created", loggedInUserId, "TRAVELER");
@@ -865,6 +875,21 @@ public class BookingService {
             String ipAddress,
             String userAgent
     ) {
+        return createGuestBooking(request, ipAddress, userAgent, true);
+    }
+
+    /**
+     * @param notifyTraveler whether the guest "complete payment" email fires for this booking.
+     *                        False for trip-plan bundle checkouts, which send one combined email
+     *                        covering every item instead — see {@link BookingCreatedEvent}.
+     */
+    @Transactional
+    public BookingResponse createGuestBooking(
+            CreateGuestBookingRequest request,
+            String ipAddress,
+            String userAgent,
+            boolean notifyTraveler
+    ) {
         long totalStart = System.currentTimeMillis();
 
         long stepStart = System.currentTimeMillis();
@@ -1021,7 +1046,7 @@ public class BookingService {
             log.info("GUEST_BOOKING_TIMING saveBookingMs={}", System.currentTimeMillis() - stepStart);
 
             stepStart = System.currentTimeMillis();
-            eventPublisher.publishEvent(new BookingCreatedEvent(savedBooking.getId()));
+            eventPublisher.publishEvent(new BookingCreatedEvent(savedBooking.getId(), notifyTraveler));
             log.info("GUEST_BOOKING_TIMING publishEventMs={}", System.currentTimeMillis() - stepStart);
             publishBookingAudit(savedBooking.getId(), "BOOKED", "Guest booking created", null, "GUEST");
 

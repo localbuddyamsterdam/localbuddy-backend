@@ -1,5 +1,6 @@
 package com.localbuddy.tripplan;
 
+import com.localbuddy.booking.BookingNotificationService;
 import com.localbuddy.booking.BookingResponse;
 import com.localbuddy.booking.BookingService;
 import com.localbuddy.booking.CreateBookingRequest;
@@ -40,9 +41,12 @@ class TripPlanCheckoutServiceTest {
             mock(com.localbuddy.promo.PromoCodeService.class);
     private final com.localbuddy.referral.ReferralService referralService =
             mock(com.localbuddy.referral.ReferralService.class);
+    private final BookingNotificationService bookingNotificationService =
+            mock(BookingNotificationService.class);
 
     private final TripPlanCheckoutService service = new TripPlanCheckoutService(
-            tripPlanService, bookingService, paymentService, promoCodeService, referralService);
+            tripPlanService, bookingService, paymentService, promoCodeService, referralService,
+            bookingNotificationService);
 
     private final UUID userId = UUID.randomUUID();
     private final UUID planId = UUID.randomUUID();
@@ -90,7 +94,7 @@ class TripPlanCheckoutServiceTest {
         BookingResponse okBooking = mock(BookingResponse.class);
         when(okBooking.id()).thenReturn(okBookingId);
 
-        when(bookingService.createBooking(eq(userId), any(CreateBookingRequest.class)))
+        when(bookingService.createBooking(eq(userId), any(CreateBookingRequest.class), eq(false)))
                 .thenAnswer(inv -> {
                     CreateBookingRequest req = inv.getArgument(1);
                     if (req.availabilitySlotId().equals(soldOut.slotId())) {
@@ -120,7 +124,7 @@ class TripPlanCheckoutServiceTest {
     void allFailedItemsFailTheCheckout() {
         TripPlanItem item = bookableItem("d1-i2", "Canal walk");
         stubPlan(item);
-        when(bookingService.createBooking(eq(userId), any(CreateBookingRequest.class)))
+        when(bookingService.createBooking(eq(userId), any(CreateBookingRequest.class), eq(false)))
                 .thenThrow(new BadRequestException("Slot is full"));
 
         BadRequestException ex = assertThrows(BadRequestException.class,
@@ -146,7 +150,7 @@ class TripPlanCheckoutServiceTest {
         BookingResponse booking = mock(BookingResponse.class);
         when(booking.id()).thenReturn(UUID.randomUUID());
         ArgumentCaptor<CreateBookingRequest> captor = ArgumentCaptor.forClass(CreateBookingRequest.class);
-        when(bookingService.createBooking(eq(userId), captor.capture())).thenReturn(booking);
+        when(bookingService.createBooking(eq(userId), captor.capture(), eq(false))).thenReturn(booking);
         when(paymentService.createGroupCheckout(any(), any(), any(), any(), any()))
                 .thenReturn(groupResponse());
 

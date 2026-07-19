@@ -19,6 +19,6 @@ public class BookingNotificationEventListener {
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onBookingCreated(BookingCreatedEvent event) {
-        bookingNotificationService.createBookingCreatedNotifications(event.bookingId());
+        bookingNotificationService.createBookingCreatedNotifications(event.bookingId(), event.notifyTraveler());
     }
 }

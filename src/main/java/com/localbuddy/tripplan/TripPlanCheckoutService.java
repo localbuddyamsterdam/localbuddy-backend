@@ -1,5 +1,6 @@
 package com.localbuddy.tripplan;
 
+import com.localbuddy.booking.BookingNotificationService;
 import com.localbuddy.booking.BookingResponse;
 import com.localbuddy.booking.BookingService;
 import com.localbuddy.booking.CreateBookingRequest;
@@ -51,19 +52,22 @@ public class TripPlanCheckoutService {
     private final PaymentService paymentService;
     private final PromoCodeService promoCodeService;
     private final ReferralService referralService;
+    private final BookingNotificationService bookingNotificationService;
 
     public TripPlanCheckoutService(
             TripPlanService tripPlanService,
             BookingService bookingService,
             PaymentService paymentService,
             PromoCodeService promoCodeService,
-            ReferralService referralService
+            ReferralService referralService,
+            BookingNotificationService bookingNotificationService
     ) {
         this.tripPlanService = tripPlanService;
         this.bookingService = bookingService;
         this.paymentService = paymentService;
         this.promoCodeService = promoCodeService;
         this.referralService = referralService;
+        this.bookingNotificationService = bookingNotificationService;
     }
 
     public TripPlanCheckoutResponse checkoutAsUser(UUID userId, String token, TripPlanCheckoutRequest request) {
@@ -106,7 +110,9 @@ public class TripPlanCheckoutService {
                     null
             );
             try {
-                BookingResponse booking = bookingService.createBooking(userId, bookingRequest);
+                // notifyTraveler=false — the bundle sends one combined "complete payment" email
+                // below instead of one per item; the host still gets notified per booking.
+                BookingResponse booking = bookingService.createBooking(userId, bookingRequest, false);
                 bookingIds.add(booking.id());
             } catch (RuntimeException ex) {
                 log.info("Trip-plan item {} could not be booked: {}", item.id(), ex.getMessage());
@@ -118,6 +124,7 @@ public class TripPlanCheckoutService {
 
         PaymentGroupResponse paymentGroup = paymentService.createGroupCheckout(
                 userId, null, bookingIds, request.giftCardCode(), plan.tripPlanId());
+        bookingNotificationService.createBundleBookingCreatedNotification(userId, null, null, paymentGroup);
 
         return new TripPlanCheckoutResponse(paymentGroup, skipped);
     }
@@ -170,7 +177,9 @@ public class TripPlanCheckoutService {
                     request.whatsAppOptIn()
             );
             try {
-                BookingResponse booking = bookingService.createGuestBooking(bookingRequest, clientIp, userAgent);
+                // notifyTraveler=false — the bundle sends one combined "complete payment" email
+                // below instead of one per item; the host still gets notified per booking.
+                BookingResponse booking = bookingService.createGuestBooking(bookingRequest, clientIp, userAgent, false);
                 bookingIds.add(booking.id());
             } catch (RuntimeException ex) {
                 log.info("Trip-plan item {} could not be booked (guest): {}", item.id(), ex.getMessage());
@@ -182,6 +191,8 @@ public class TripPlanCheckoutService {
 
         PaymentGroupResponse paymentGroup = paymentService.createGroupCheckout(
                 null, request.guestEmail(), bookingIds, request.giftCardCode(), plan.tripPlanId());
+        bookingNotificationService.createBundleBookingCreatedNotification(
+                null, request.guestEmail(), request.guestPhone(), paymentGroup);
 
         return new TripPlanCheckoutResponse(paymentGroup, skipped);
     }
