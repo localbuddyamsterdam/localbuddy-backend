@@ -7,6 +7,7 @@ import com.localbuddy.experience.Experience;
 import com.localbuddy.notification.NotificationPreferenceService;
 import com.localbuddy.notification.NotificationService;
 import com.localbuddy.notification.NotificationType;
+import com.localbuddy.notification.email.EmailTemplateService;
 import com.localbuddy.user.User;
 import com.localbuddy.wishlist.WishlistItem;
 import com.localbuddy.wishlist.WishlistItemRepository;
@@ -40,6 +41,7 @@ public class ReminderService {
     private final BookingRepository bookingRepository;
     private final NotificationService notificationService;
     private final NotificationPreferenceService preferenceService;
+    private final EmailTemplateService emailTemplateService;
     private final String frontendBaseUrl;
     private final long[] offsetsHours;
     private final long maxAgeHours;
@@ -48,6 +50,7 @@ public class ReminderService {
                            BookingRepository bookingRepository,
                            NotificationService notificationService,
                            NotificationPreferenceService preferenceService,
+                           EmailTemplateService emailTemplateService,
                            @Value("${app.frontend.base-url:http://localhost:3000}") String frontendBaseUrl,
                            @Value("${app.reminders.offsets-hours:2,24,48}") String offsetsCsv,
                            @Value("${app.reminders.max-age-hours:72}") long maxAgeHours) {
@@ -55,6 +58,7 @@ public class ReminderService {
         this.bookingRepository = bookingRepository;
         this.notificationService = notificationService;
         this.preferenceService = preferenceService;
+        this.emailTemplateService = emailTemplateService;
         this.frontendBaseUrl = frontendBaseUrl;
         this.offsetsHours = Arrays.stream(offsetsCsv.split(","))
                 .map(String::trim).filter(s -> !s.isEmpty())
@@ -83,15 +87,21 @@ public class ReminderService {
                 continue; // already booked/engaged — stop nudging
             }
             String subject = "Still interested in " + exp.getTitle() + "?";
-            String body = "You saved \"" + exp.getTitle() + "\" to your wishlist.\n\nReady to book? "
-                    + frontendBaseUrl + "/experience/" + exp.getSlug();
+            String link = frontendBaseUrl + "/experience/" + exp.getSlug();
+            String body = "You saved \"" + exp.getTitle() + "\" to your wishlist.\n\nReady to book? " + link;
+            String html = emailTemplateService.renderActionEmail(new EmailTemplateService.ActionEmailModel(
+                    subject,
+                    "You saved \"" + exp.getTitle() + "\" to your wishlist. Ready to book?",
+                    "View experience",
+                    link,
+                    null));
             String base = "wishlist-reminder:" + item.getId() + ":" + stage + "h";
 
             notificationService.createInAppNotificationForUser(user, NotificationType.WISHLIST_REMINDER,
                     subject, body, "WISHLIST", item.getId(), base + ":INAPP");
             if (preferenceService.isEmailEnabled(user.getId())) {
                 notificationService.createEmailNotificationForUser(user, NotificationType.WISHLIST_REMINDER,
-                        subject, body, "WISHLIST", item.getId(), base + ":EMAIL");
+                        subject, body, html, "WISHLIST", item.getId(), base + ":EMAIL");
             }
         }
     }
@@ -121,6 +131,12 @@ public class ReminderService {
             String subject = "Finish booking " + title;
             String body = "You started booking \"" + title + "\" but didn't complete payment in time.\n\n"
                     + "Pick up where you left off: " + link;
+            String html = emailTemplateService.renderActionEmail(new EmailTemplateService.ActionEmailModel(
+                    subject,
+                    "You started booking \"" + title + "\" but didn't complete payment in time.",
+                    "Finish booking",
+                    link,
+                    null));
             String base = "abandoned-booking:" + booking.getId() + ":" + stage + "h";
 
             if (booking.getLoggedInUser() != null) {
@@ -129,11 +145,11 @@ public class ReminderService {
                         subject, body, "BOOKING", booking.getId(), base + ":INAPP");
                 if (preferenceService.isEmailEnabled(user.getId())) {
                     notificationService.createEmailNotificationForUser(user, NotificationType.BOOKING_ABANDONED_REMINDER,
-                            subject, body, "BOOKING", booking.getId(), base + ":EMAIL");
+                            subject, body, html, "BOOKING", booking.getId(), base + ":EMAIL");
                 }
             } else if (booking.getGuestEmail() != null && !booking.getGuestEmail().isBlank()) {
                 notificationService.createEmailNotificationForGuest(booking.getGuestEmail(), null,
-                        NotificationType.BOOKING_ABANDONED_REMINDER, subject, body,
+                        NotificationType.BOOKING_ABANDONED_REMINDER, subject, body, html,
                         "BOOKING", booking.getId(), base + ":EMAIL");
             }
         }
