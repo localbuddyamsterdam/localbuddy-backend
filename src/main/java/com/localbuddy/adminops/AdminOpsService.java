@@ -144,6 +144,7 @@ public class AdminOpsService {
 
                 profile.getDisplayName(),
                 profile.getPhoneNumber(),
+                profile.isWhatsappOptIn(),
                 profile.getBio(),
                 profile.getProfilePhotoUrl(),
                 profile.getHostCity(),

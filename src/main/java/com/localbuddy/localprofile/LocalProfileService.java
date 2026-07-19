@@ -215,6 +215,7 @@ public class LocalProfileService {
     private void applyCreateRequest(LocalProfile profile, CreateLocalProfileRequest request) {
         profile.setDisplayName(NameFormatter.titleCase(requiredTrim(request.displayName())));
         profile.setPhoneNumber(requiredTrim(request.phoneNumber()));
+        profile.setWhatsappOptIn(Boolean.TRUE.equals(request.whatsappOptIn()));
         profile.setBio(requiredTrim(request.bio()));
         profile.setProfilePhotoUrl(optionalTrim(request.profilePhotoUrl()));
         profile.setHostCity(requiredTrim(request.hostCity()));
@@ -252,6 +253,7 @@ public class LocalProfileService {
     private void applyUpdateRequest(LocalProfile profile, UpdateLocalProfileRequest request) {
         profile.setDisplayName(NameFormatter.titleCase(requiredTrim(request.displayName())));
         profile.setPhoneNumber(requiredTrim(request.phoneNumber()));
+        profile.setWhatsappOptIn(Boolean.TRUE.equals(request.whatsappOptIn()));
         profile.setBio(requiredTrim(request.bio()));
         profile.setProfilePhotoUrl(optionalTrim(request.profilePhotoUrl()));
         profile.setHostCity(requiredTrim(request.hostCity()));
@@ -355,6 +357,7 @@ public class LocalProfileService {
 
                 profile.getDisplayName(),
                 profile.getPhoneNumber(),
+                profile.isWhatsappOptIn(),
                 profile.getBio(),
                 profile.getProfilePhotoUrl(),
                 profile.getHostCity(),

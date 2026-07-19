@@ -1454,6 +1454,7 @@ public class BookingService {
                     booking.getId(),
                     "BOOKING_CANCELLED:LOCAL:" + booking.getId()
             );
+            sendHostCancelledWhatsApp(booking);
         }
 
         if (!notifyGuest) {
@@ -1510,6 +1511,53 @@ public class BookingService {
                 );
             }
         }
+    }
+
+    /**
+     * Host-facing cancellation (WhatsApp, opt-in via the host's profile) — adds a channel to the
+     * existing host cancellation email above rather than a new event. Falls back to the onboarding
+     * phone when the host never separately set an account phone.
+     */
+    private void sendHostCancelledWhatsApp(Booking booking) {
+        LocalProfile localProfile = booking.getLocalProfile();
+        if (localProfile == null || !localProfile.isWhatsappOptIn()) {
+            return;
+        }
+        var host = localProfile.getUser();
+        String phone = notBlank(host.getPhone()) ? host.getPhone() : localProfile.getPhoneNumber();
+        if (host.getEmail() == null || !notBlank(phone)) {
+            return;
+        }
+
+        String travelerName = booking.getLoggedInUser() != null
+                ? booking.getLoggedInUser().getFullName() : booking.getGuestName();
+        if (travelerName == null || travelerName.isBlank()) {
+            travelerName = "A traveler";
+        }
+        String title = booking.getExperience() != null && booking.getExperience().getTitle() != null
+                ? booking.getExperience().getTitle() : "your experience";
+        String ref = booking.getBookingReference();
+        String hostFirstName = host.getFullName() == null || host.getFullName().isBlank()
+                ? "there" : host.getFullName().trim().split("\\s+")[0];
+
+        String subject = "Booking cancelled — " + title;
+        String message = travelerName + "'s booking for \"" + title + "\" was cancelled. Reference: " + ref + ".";
+        String dedupe = "HOST_BOOKING_CANCELLED:" + booking.getId();
+
+        notificationService.createInAppNotificationForUser(
+                host, NotificationType.HOST_BOOKING_CANCELLED, subject, message,
+                "BOOKING", booking.getId(), dedupe + ":INAPP");
+        notificationService.createWhatsAppTemplateNotificationForGuest(
+                host.getEmail(), phone,
+                NotificationType.HOST_BOOKING_CANCELLED, subject, message,
+                whatsAppTemplates.forType(NotificationType.HOST_BOOKING_CANCELLED).orElse(null),
+                List.of(hostFirstName, travelerName, title, ref),
+                null,
+                "BOOKING", booking.getId(), dedupe + ":WHATSAPP");
+    }
+
+    private boolean notBlank(String value) {
+        return value != null && !value.isBlank();
     }
 
     /** booking-cancelled template body params: {{1}} first name, {{2}} experience title, {{3}} reference. */

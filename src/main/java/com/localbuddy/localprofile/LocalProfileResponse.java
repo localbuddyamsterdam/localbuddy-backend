@@ -15,6 +15,7 @@ public record LocalProfileResponse(
 
         String displayName,
         String phoneNumber,
+        boolean whatsappOptIn,
         String bio,
         String profilePhotoUrl,
         String hostCity,

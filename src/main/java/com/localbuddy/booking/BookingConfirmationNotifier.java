@@ -2,11 +2,13 @@ package com.localbuddy.booking;
 
 import com.localbuddy.calendar.CalendarService;
 import com.localbuddy.experience.Experience;
+import com.localbuddy.localprofile.LocalProfile;
 import com.localbuddy.media.ExperiencePhoto;
 import com.localbuddy.media.ExperiencePhotoRepository;
 import com.localbuddy.notification.NotificationService;
 import com.localbuddy.notification.NotificationType;
 import com.localbuddy.notification.email.EmailTemplateService;
+import com.localbuddy.payment.HostPayoutText;
 import com.localbuddy.user.User;
 import com.localbuddy.wallet.AppleWalletService;
 import com.localbuddy.wallet.GoogleWalletService;
@@ -52,6 +54,7 @@ public class BookingConfirmationNotifier {
     private final EmailTemplateService emailTemplateService;
     private final ExperiencePhotoRepository experiencePhotoRepository;
     private final WhatsAppTemplates whatsAppTemplates;
+    private final HostPayoutText hostPayoutText;
     private final String frontendBaseUrl;
     private final String publicBaseUrl;
 
@@ -62,6 +65,7 @@ public class BookingConfirmationNotifier {
                                        EmailTemplateService emailTemplateService,
                                        ExperiencePhotoRepository experiencePhotoRepository,
                                        WhatsAppTemplates whatsAppTemplates,
+                                       HostPayoutText hostPayoutText,
                                        @Value("${app.frontend.base-url:http://localhost:3000}") String frontendBaseUrl,
                                        @Value("${app.public-base-url:https://localbuddy-backend-b4exhkbjgahme6ge.francecentral-01.azurewebsites.net}") String publicBaseUrl) {
         this.notificationService = notificationService;
@@ -71,6 +75,7 @@ public class BookingConfirmationNotifier {
         this.emailTemplateService = emailTemplateService;
         this.experiencePhotoRepository = experiencePhotoRepository;
         this.whatsAppTemplates = whatsAppTemplates;
+        this.hostPayoutText = hostPayoutText;
         this.frontendBaseUrl = frontendBaseUrl;
         this.publicBaseUrl = publicBaseUrl;
     }
@@ -148,6 +153,58 @@ public class BookingConfirmationNotifier {
                         "BOOKING", booking.getId(), dedupe + ":WHATSAPP");
             }
         }
+
+        sendHostNewBookingNotification(booking, title, ref);
+    }
+
+    /**
+     * Host-facing "you got a new booking" notification (WhatsApp, opt-in via the host's profile —
+     * distinct from the traveler's per-booking opt-in). Fired at the same CONFIRMED point as the
+     * traveler's; the existing pre-payment {@code BOOKING_CREATED} host email only says a booking
+     * started, not that it's real and paid. Falls back to the onboarding phone when the host never
+     * separately set an account phone, since most hosts only ever fill in the former.
+     */
+    private void sendHostNewBookingNotification(Booking booking, String title, String ref) {
+        LocalProfile localProfile = booking.getLocalProfile();
+        if (localProfile == null || !localProfile.isWhatsappOptIn()) {
+            return;
+        }
+        User host = localProfile.getUser();
+        String phone = notBlank(host.getPhone()) ? host.getPhone() : localProfile.getPhoneNumber();
+        if (host.getEmail() == null || !notBlank(phone)) {
+            return;
+        }
+
+        String travelerName = booking.getLoggedInUser() != null
+                ? booking.getLoggedInUser().getFullName() : booking.getGuestName();
+        if (travelerName == null || travelerName.isBlank()) {
+            travelerName = "A traveler";
+        }
+        String when = booking.getAvailabilitySlot() != null && booking.getAvailabilitySlot().getStartTime() != null
+                ? WHEN.format(booking.getAvailabilitySlot().getStartTime())
+                : "an upcoming time";
+        String party = BookingPartySummary.describe(booking);
+        String payout = hostPayoutText.forBooking(booking);
+
+        String subject = "New booking — " + title;
+        String message = travelerName + " booked \"" + title + "\" (" + party + "). When: " + when
+                + ". Reference: " + ref + ".";
+        String dedupe = "HOST_NEW_BOOKING:" + booking.getId();
+
+        notificationService.createInAppNotificationForUser(
+                host, NotificationType.HOST_NEW_BOOKING, subject, message,
+                "BOOKING", booking.getId(), dedupe + ":INAPP");
+        notificationService.createWhatsAppTemplateNotificationForGuest(
+                host.getEmail(), phone,
+                NotificationType.HOST_NEW_BOOKING, subject, message,
+                whatsAppTemplates.forType(NotificationType.HOST_NEW_BOOKING).orElse(null),
+                List.of(firstName(host.getFullName()), travelerName, title, when, party, payout, ref),
+                null,
+                "BOOKING", booking.getId(), dedupe + ":WHATSAPP");
+    }
+
+    private boolean notBlank(String value) {
+        return value != null && !value.isBlank();
     }
 
     /**

@@ -42,6 +42,10 @@ public class LocalProfile {
     @Column(name = "phone_number", nullable = false, length = 40)
     private String phoneNumber;
 
+    /** Host-level WhatsApp opt-in for booking updates (new booking / reminder / cancelled). */
+    @Column(name = "whatsapp_opt_in", nullable = false)
+    private boolean whatsappOptIn = false;
+
     @Column(name = "host_city", nullable = false, length = 100)
     private String hostCity;
 

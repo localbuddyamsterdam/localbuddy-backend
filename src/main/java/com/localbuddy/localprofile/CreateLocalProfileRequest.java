@@ -18,6 +18,9 @@ public record CreateLocalProfileRequest(
         @Size(max = 40, message = "Phone number cannot exceed 40 characters")
         String phoneNumber,
 
+        /** Opt in to WhatsApp updates (new booking / reminder / cancelled); null/false = opted out. */
+        Boolean whatsappOptIn,
+
         @NotBlank(message = "Bio is required")
         @Size(max = 2000, message = "Bio cannot exceed 2000 characters")
         String bio,

@@ -61,7 +61,7 @@ class AdminBookingManagementTest {
             availabilitySlotRepository,
             mock(LocalProfileRepository.class),
             notificationService,
-            new com.localbuddy.whatsapp.WhatsAppTemplates("", "", ""),
+            new com.localbuddy.whatsapp.WhatsAppTemplates("", "", "", "", "", ""),
             mock(ConsentService.class),
             mock(PromoCodeService.class),
             mock(ReferralService.class),
