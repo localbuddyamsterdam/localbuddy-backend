@@ -5,6 +5,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -173,9 +174,21 @@ public class WhatsAppService {
 
             String messageId = extractMessageId(response);
             return new WhatsAppSendResult(messageId, "sent");
+        } catch (RestClientResponseException ex) {
+            // Meta's actual error (code/message/type) lives in the response body, not the
+            // exception message — surface it so a failure reason is actually diagnosable.
+            throw new BadRequestException("Unable to send WhatsApp message: "
+                    + ex.getStatusCode() + " " + truncate(ex.getResponseBodyAsString()));
         } catch (Exception ex) {
             throw new BadRequestException("Unable to send WhatsApp message: " + ex.getMessage());
         }
+    }
+
+    private String truncate(String body) {
+        if (body == null || body.isBlank()) {
+            return "[no body]";
+        }
+        return body.length() > 500 ? body.substring(0, 500) + "…" : body;
     }
 
     @SuppressWarnings("unchecked")
