@@ -199,7 +199,7 @@ public class BookingConfirmationNotifier {
                 NotificationType.HOST_NEW_BOOKING, subject, message,
                 whatsAppTemplates.forType(NotificationType.HOST_NEW_BOOKING).orElse(null),
                 List.of(firstName(host.getFullName()), travelerName, title, when, party, payout, ref),
-                null,
+                List.of(ref, WhatsAppMapsLink.querySuffix(booking.getExperience())),
                 "BOOKING", booking.getId(), dedupe + ":WHATSAPP");
     }
 

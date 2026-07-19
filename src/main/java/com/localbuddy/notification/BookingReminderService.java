@@ -152,7 +152,7 @@ public class BookingReminderService {
                 NotificationType.HOST_BOOKING_REMINDER, subject, message,
                 whatsAppTemplates.forType(NotificationType.HOST_BOOKING_REMINDER).orElse(null),
                 List.of(firstName(host.getFullName()), travelerName, title, when, party, payout, reference),
-                null,
+                List.of(reference, WhatsAppMapsLink.querySuffix(booking.getExperience())),
                 "BOOKING", booking.getId(), dedupe + ":WHATSAPP");
     }
 

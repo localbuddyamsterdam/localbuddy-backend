@@ -1552,7 +1552,7 @@ public class BookingService {
                 NotificationType.HOST_BOOKING_CANCELLED, subject, message,
                 whatsAppTemplates.forType(NotificationType.HOST_BOOKING_CANCELLED).orElse(null),
                 List.of(hostFirstName, travelerName, title, ref),
-                null,
+                List.of(ref),
                 "BOOKING", booking.getId(), dedupe + ":WHATSAPP");
     }
 
