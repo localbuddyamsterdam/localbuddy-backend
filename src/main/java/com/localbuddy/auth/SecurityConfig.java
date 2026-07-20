@@ -19,6 +19,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
@@ -89,6 +90,11 @@ public class SecurityConfig {
     private static void writeError(HttpServletRequest request, HttpServletResponse response,
                                    int status, String error, String message) throws IOException {
         response.setStatus(status);
+        // Set the charset explicitly: these handlers write JSON by hand rather
+        // than through Jackson, and a bare "application/json" leaves the writer
+        // on the servlet default (ISO-8859-1), which turns the em-dash in our
+        // messages into a literal "?".
+        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.getWriter().write("""
                 {"timestamp":"%s","status":%d,"error":"%s","message":"%s","path":"%s"}"""

@@ -15,6 +15,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -123,6 +124,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private void writePasswordChangeRequired(HttpServletRequest request,
                                              HttpServletResponse response) throws IOException {
         response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+        // Hand-written JSON, so pin the charset — see SecurityConfig#writeError.
+        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.getWriter().write("""
                 {"timestamp":"%s","status":403,"error":"Forbidden","code":"%s",\
