@@ -3,7 +3,9 @@ package com.localbuddy.booking;
 import com.localbuddy.notification.NotificationService;
 import com.localbuddy.notification.NotificationType;
 import com.localbuddy.notification.email.EmailTemplateService;
+import com.localbuddy.payment.PaymentGroup;
 import com.localbuddy.payment.PaymentGroupMemberResponse;
+import com.localbuddy.payment.PaymentGroupRepository;
 import com.localbuddy.payment.PaymentGroupResponse;
 import com.localbuddy.user.User;
 import com.localbuddy.user.UserRepository;
@@ -20,17 +22,20 @@ public class BookingNotificationService {
     private final BookingRepository bookingRepository;
     private final UserRepository userRepository;
     private final EmailTemplateService emailTemplateService;
+    private final PaymentGroupRepository paymentGroupRepository;
 
     public BookingNotificationService(
             NotificationService notificationService,
             BookingRepository bookingRepository,
             UserRepository userRepository,
-            EmailTemplateService emailTemplateService
+            EmailTemplateService emailTemplateService,
+            PaymentGroupRepository paymentGroupRepository
     ) {
         this.notificationService = notificationService;
         this.bookingRepository = bookingRepository;
         this.userRepository = userRepository;
         this.emailTemplateService = emailTemplateService;
+        this.paymentGroupRepository = paymentGroupRepository;
     }
 
     @Transactional
@@ -116,18 +121,23 @@ public class BookingNotificationService {
                 paymentGroup.checkoutUrl(),
                 "Total: " + totalText));
         String dedupeKey = "BOOKING_CREATED:GROUP:" + paymentGroup.groupToken();
+        // Resolved so the processor can re-check the group's live status right before sending —
+        // see NotificationProcessingService — and skip a stale nudge for a bundle already paid.
+        UUID groupId = paymentGroupRepository.findByGroupToken(paymentGroup.groupToken())
+                .map(PaymentGroup::getId)
+                .orElse(null);
 
         if (travelerUserId != null) {
             User user = userRepository.findById(travelerUserId).orElse(null);
             if (user != null) {
                 notificationService.createEmailNotificationForUser(
                         user, NotificationType.BOOKING_CREATED, subject, message, html,
-                        "PAYMENT_GROUP", null, dedupeKey);
+                        "PAYMENT_GROUP", groupId, dedupeKey);
             }
         } else {
             notificationService.createEmailNotificationForGuest(
                     guestEmail, guestPhone, NotificationType.GUEST_BOOKING_CREATED, subject, message, html,
-                    "PAYMENT_GROUP", null, dedupeKey);
+                    "PAYMENT_GROUP", groupId, dedupeKey);
         }
     }
 }

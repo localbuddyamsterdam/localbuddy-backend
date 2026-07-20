@@ -2,10 +2,14 @@ package com.localbuddy.notification;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.localbuddy.booking.BookingRepository;
+import com.localbuddy.booking.BookingStatus;
 import com.localbuddy.calendar.CalendarService;
 import com.localbuddy.notification.email.EmailProviderService;
 import com.localbuddy.notification.email.EmailSendRequest;
 import com.localbuddy.notification.email.EmailSendResult;
+import com.localbuddy.payment.PaymentGroupRepository;
+import com.localbuddy.payment.PaymentGroupStatus;
 import com.localbuddy.whatsapp.WhatsAppSendResult;
 import com.localbuddy.whatsapp.WhatsAppService;
 import org.slf4j.Logger;
@@ -22,22 +26,33 @@ public class NotificationProcessingService {
 
     private static final Logger log = LoggerFactory.getLogger(NotificationProcessingService.class);
 
+    /** Dedupe-key prefixes of the traveler/guest "complete payment" nudges — see isStalePendingPaymentNudge. */
+    private static final String TRAVELER_PENDING_PAYMENT_PREFIX = "BOOKING_CREATED:TRAVELER:";
+    private static final String GUEST_PENDING_PAYMENT_PREFIX = "GUEST_BOOKING_CREATED:";
+    private static final String GROUP_PENDING_PAYMENT_PREFIX = "BOOKING_CREATED:GROUP:";
+
     private final NotificationRepository notificationRepository;
     private final EmailProviderService emailProviderService;
     private final WhatsAppService whatsAppService;
     private final CalendarService calendarService;
     private final ObjectMapper objectMapper;
+    private final BookingRepository bookingRepository;
+    private final PaymentGroupRepository paymentGroupRepository;
 
     public NotificationProcessingService(NotificationRepository notificationRepository,
                                          EmailProviderService emailProviderService,
                                          WhatsAppService whatsAppService,
                                          CalendarService calendarService,
-                                         ObjectMapper objectMapper) {
+                                         ObjectMapper objectMapper,
+                                         BookingRepository bookingRepository,
+                                         PaymentGroupRepository paymentGroupRepository) {
         this.notificationRepository = notificationRepository;
         this.emailProviderService = emailProviderService;
         this.whatsAppService = whatsAppService;
         this.calendarService = calendarService;
         this.objectMapper = objectMapper;
+        this.bookingRepository = bookingRepository;
+        this.paymentGroupRepository = paymentGroupRepository;
     }
 
     @Transactional
@@ -99,6 +114,14 @@ public class NotificationProcessingService {
             return;
         }
 
+        if (isStalePendingPaymentNudge(notification)) {
+            notification.setStatus(NotificationStatus.SKIPPED);
+            notification.setFailureReason("Booking already confirmed before this payment reminder was due to send");
+            notification.setUpdatedAt(Instant.now());
+            notificationRepository.save(notification);
+            return;
+        }
+
         // Attach a calendar invite (.ics) to booking confirmations so Gmail/Outlook show an
         // event card at the top of the email. Best-effort — never blocks the send.
         String icsContent = null;
@@ -139,6 +162,34 @@ public class NotificationProcessingService {
 
         notification.setUpdatedAt(Instant.now());
         notificationRepository.save(notification);
+    }
+
+    /**
+     * The traveler/guest "complete payment" nudge is created the instant a booking (or bundle)
+     * exists — before the customer has necessarily paid. By the time this ~10s-polled row is
+     * actually sent, a fast payer (saved card, Apple Pay) may already be done, and sending it
+     * after the fact reads as a broken confirmation. Skip it once the underlying booking/payment
+     * group has moved past "awaiting payment". The host's own copy of BOOKING_CREATED
+     * ("BOOKING_CREATED:LOCAL:...") is unaffected — it stays informational regardless of timing.
+     */
+    private boolean isStalePendingPaymentNudge(Notification notification) {
+        String dedupeKey = notification.getDedupeKey();
+        UUID relatedEntityId = notification.getRelatedEntityId();
+        if (dedupeKey == null || relatedEntityId == null) {
+            return false;
+        }
+        if (dedupeKey.startsWith(TRAVELER_PENDING_PAYMENT_PREFIX) || dedupeKey.startsWith(GUEST_PENDING_PAYMENT_PREFIX)) {
+            return bookingRepository.findById(relatedEntityId)
+                    .map(booking -> booking.getStatus() != BookingStatus.PENDING_PAYMENT)
+                    .orElse(false);
+        }
+        if (dedupeKey.startsWith(GROUP_PENDING_PAYMENT_PREFIX)) {
+            return paymentGroupRepository.findById(relatedEntityId)
+                    .map(group -> group.getStatus() != PaymentGroupStatus.PENDING
+                            && group.getStatus() != PaymentGroupStatus.PROCESSING)
+                    .orElse(false);
+        }
+        return false;
     }
 
     private void processWhatsApp(Notification notification) {
