@@ -159,6 +159,38 @@ public class NotificationService {
         );
     }
 
+    /**
+     * A branded "do this one thing" email with a real CTA button (via
+     * {@link EmailTemplateService#renderActionEmail}). The plain-text fallback
+     * carries the link inline for clients that strip HTML. Use for emails whose
+     * whole point is to send the recipient somewhere — edit your application,
+     * review a submission, etc.
+     */
+    @Transactional
+    public void createActionEmailForUser(
+            User recipientUser,
+            NotificationType notificationType,
+            String subject,
+            String intro,
+            String ctaLabel,
+            String ctaUrl,
+            String finePrint,
+            String relatedEntityType,
+            UUID relatedEntityId,
+            String dedupeKey
+    ) {
+        if (recipientUser == null || recipientUser.getEmail() == null) {
+            return;
+        }
+        String html = emailTemplateService.renderActionEmail(
+                new EmailTemplateService.ActionEmailModel(subject, intro, ctaLabel, ctaUrl, finePrint));
+        String message = intro + "\n\n" + ctaLabel + ": " + ctaUrl;
+        createEmailNotificationForUser(
+                recipientUser, notificationType, subject, message, html,
+                relatedEntityType, relatedEntityId, dedupeKey
+        );
+    }
+
     @Transactional
     public void createEmailNotificationForGuest(
             String recipientEmail,

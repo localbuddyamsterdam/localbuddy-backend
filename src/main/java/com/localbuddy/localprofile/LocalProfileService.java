@@ -40,6 +40,8 @@ public class LocalProfileService {
     private final MediaStorageProvider storageProvider;
     /** Hard cap admins can assign (app.platform.max-commission-rate); guards host payouts. */
     private final BigDecimal maxCommissionRate;
+    /** Frontend origin for deep links in host-application emails (edit form, admin queue). */
+    private final String frontendBaseUrl;
 
     public LocalProfileService(LocalProfileRepository localProfileRepository,
                                UserRepository userRepository,
@@ -47,7 +49,8 @@ public class LocalProfileService {
                                CityRepository cityRepository,
                                ExperienceCategoryRepository categoryRepository,
                                MediaStorageProvider storageProvider,
-                               @Value("${app.platform.max-commission-rate:0.50}") BigDecimal maxCommissionRate) {
+                               @Value("${app.platform.max-commission-rate:0.50}") BigDecimal maxCommissionRate,
+                               @Value("${app.frontend.base-url:http://localhost:3000}") String frontendBaseUrl) {
         this.localProfileRepository = localProfileRepository;
         this.userRepository = userRepository;
         this.notificationService = notificationService;
@@ -55,6 +58,7 @@ public class LocalProfileService {
         this.categoryRepository = categoryRepository;
         this.storageProvider = storageProvider;
         this.maxCommissionRate = maxCommissionRate;
+        this.frontendBaseUrl = frontendBaseUrl;
     }
 
     @Transactional
@@ -149,6 +153,11 @@ public class LocalProfileService {
         }
 
         LocalProfile savedProfile = localProfileRepository.save(profile);
+        // An approved host editing their profile pushes it back to SUBMITTED for
+        // re-review, so treat it as a resubmission and alert the admins.
+        if (previousStatus == LocalApprovalStatus.APPROVED) {
+            notifyAdminsOfLocalProfileSubmission(savedProfile);
+        }
         return toResponse(savedProfile);
     }
 
@@ -195,6 +204,7 @@ public class LocalProfileService {
 
         LocalProfile savedProfile = localProfileRepository.save(profile);
         createLocalProfileSubmittedNotification(savedProfile);
+        notifyAdminsOfLocalProfileSubmission(savedProfile);
         return toResponse(savedProfile);
     }
 
@@ -705,12 +715,16 @@ public class LocalProfileService {
     }
 
     private void createLocalProfileChangesRequestedNotification(LocalProfile profile) {
-        notificationService.createEmailNotificationForUser(
+        String reason = nullSafe(profile.getChangesRequestedReason());
+        notificationService.createActionEmailForUser(
                 profile.getUser(),
                 NotificationType.LOCAL_PROFILE_CHANGES_REQUESTED,
                 "Changes requested for your LocalBuddy profile",
-                "Admin requested changes for your LocalBuddy profile: "
-                        + nullSafe(profile.getChangesRequestedReason()),
+                "Our team reviewed your host application and needs a few changes before it can be approved."
+                        + (reason.isBlank() ? "" : "\n\nWhat to update:\n" + reason),
+                "Update my application",
+                frontendLink("/become-host"),
+                "Open your application, make the changes above, and submit it again for review.",
                 "LOCAL_PROFILE",
                 profile.getId(),
                 "LOCAL_PROFILE_CHANGES_REQUESTED:" + profile.getId() + ":" + profile.getReviewedAt()
@@ -718,15 +732,66 @@ public class LocalProfileService {
     }
 
     private void createLocalProfileRejectedNotification(LocalProfile profile) {
-        notificationService.createEmailNotificationForUser(
+        String reason = nullSafe(profile.getRejectionReason());
+        notificationService.createActionEmailForUser(
                 profile.getUser(),
                 NotificationType.LOCAL_PROFILE_REJECTED,
-                "Your LocalBuddy profile was rejected",
-                "Your LocalBuddy profile was rejected: " + nullSafe(profile.getRejectionReason()),
+                "Your LocalBuddy profile was not approved",
+                "Unfortunately your host application wasn't approved this time."
+                        + (reason.isBlank() ? "" : "\n\nReason:\n" + reason),
+                "Reapply",
+                frontendLink("/become-host"),
+                "You can update your details and reapply whenever you're ready.",
                 "LOCAL_PROFILE",
                 profile.getId(),
                 "LOCAL_PROFILE_REJECTED:" + profile.getId() + ":" + profile.getReviewedAt()
         );
+    }
+
+    /**
+     * Notify every admin that a host application is waiting for review — sent on
+     * submit and on every resubmit. Each admin gets their own email (dedupe keyed
+     * per recipient + this submission's timestamp so a later resubmit re-notifies).
+     */
+    private void notifyAdminsOfLocalProfileSubmission(LocalProfile profile) {
+        List<User> admins = new ArrayList<>(userRepository.findByRole(UserRole.ADMIN));
+        admins.addAll(userRepository.findByRole(UserRole.SUPER_ADMIN));
+        String applicantName = displayNameFor(profile);
+        Instant when = profile.getResubmittedAt() != null ? profile.getResubmittedAt() : profile.getSubmittedAt();
+        for (User admin : admins) {
+            notificationService.createActionEmailForUser(
+                    admin,
+                    NotificationType.LOCAL_PROFILE_SUBMITTED,
+                    "New host application to review",
+                    applicantName + " submitted a host application for " + nullSafe(profile.getHostCity())
+                            + " and it's waiting for your review.",
+                    "Review application",
+                    frontendLink("/admin"),
+                    "You're receiving this because you're a LocalBuddy admin.",
+                    "LOCAL_PROFILE",
+                    profile.getId(),
+                    "LOCAL_PROFILE_ADMIN_REVIEW:" + profile.getId() + ":" + admin.getId() + ":" + when
+            );
+        }
+    }
+
+    /** Applicant's best display name for admin-facing copy (legal name, else preferred/display). */
+    private String displayNameFor(LocalProfile profile) {
+        String legal = ((nullSafe(profile.getLegalFirstName()) + " " + nullSafe(profile.getLegalLastName())).trim());
+        if (!legal.isBlank()) {
+            return legal;
+        }
+        String preferred = nullSafe(profile.getPreferredName());
+        return preferred.isBlank() ? "A new host" : preferred;
+    }
+
+    /** Join the configured frontend origin with a path, tolerating a trailing slash. */
+    private String frontendLink(String path) {
+        String base = frontendBaseUrl == null ? "" : frontendBaseUrl.trim();
+        if (base.endsWith("/")) {
+            base = base.substring(0, base.length() - 1);
+        }
+        return base + path;
     }
 
     @Transactional(readOnly = true)
