@@ -157,6 +157,17 @@ public class LocalProfileService {
         LocalProfile profile = localProfileRepository.findByUserId(userId)
                 .orElseThrow(() -> new BadRequestException("Local profile not found"));
 
+        // Submitting something already awaiting review is a no-op, not a failure.
+        // Rejecting it turns an ordinary double-click — or any client that saves
+        // then submits — into a 400 for a profile that is exactly where it should
+        // be, with nothing the user can do to clear it. This also covers an
+        // approved host editing their profile: the update flips them back to
+        // SUBMITTED, so the submit that follows lands here rather than on the
+        // error below.
+        if (profile.getApprovalStatus() == LocalApprovalStatus.SUBMITTED) {
+            return toResponse(profile);
+        }
+
         if (profile.getApprovalStatus() != LocalApprovalStatus.DRAFT &&
                 profile.getApprovalStatus() != LocalApprovalStatus.CHANGES_REQUESTED &&
                 profile.getApprovalStatus() != LocalApprovalStatus.REJECTED) {

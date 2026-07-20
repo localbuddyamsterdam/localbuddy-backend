@@ -42,6 +42,13 @@ public class SecurityConfig {
                 .httpBasic(httpBasic -> httpBasic.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        // `/api/auth/**` is public, but `/me` is the one endpoint under it
+                        // that describes the *caller*, so it needs a principal. Matched
+                        // ahead of the blanket permitAll below: otherwise a request with a
+                        // bad or expired token reaches the handler with a null
+                        // Authentication, which it dereferences into a 500 instead of the
+                        // clean 401 this rule produces. (Rules are first-match-wins.)
+                        .requestMatchers("/api/auth/me").authenticated()
                         .requestMatchers(
                                 "/api/health",
                                 "/actuator/health",
