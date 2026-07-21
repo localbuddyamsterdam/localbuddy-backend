@@ -6,6 +6,8 @@ import com.localbuddy.experience.Experience;
 import com.localbuddy.experience.PriceInputMode;
 import com.localbuddy.localprofile.LocalProfile;
 import com.localbuddy.payment.Payment;
+import com.localbuddy.promo.DiscountBearer;
+import com.localbuddy.promo.DiscountBearerResolver;
 import com.localbuddy.promo.PromoCode;
 import org.springframework.stereotype.Service;
 
@@ -27,15 +29,18 @@ public class PricingEngine {
     private final CommissionResolver commissionResolver;
     private final ServiceFeeResolver serviceFeeResolver;
     private final VatService vatService;
+    private final DiscountBearerResolver discountBearerResolver;
 
     public PricingEngine(PricingCalculator calculator,
                          CommissionResolver commissionResolver,
                          ServiceFeeResolver serviceFeeResolver,
-                         VatService vatService) {
+                         VatService vatService,
+                         DiscountBearerResolver discountBearerResolver) {
         this.calculator = calculator;
         this.commissionResolver = commissionResolver;
         this.serviceFeeResolver = serviceFeeResolver;
         this.vatService = vatService;
+        this.discountBearerResolver = discountBearerResolver;
     }
 
     /** Computes the breakdown for a booking (no persistence) — useful for previews. */
@@ -105,6 +110,8 @@ public class PricingEngine {
      * HOST-borne discounts (and bookings with no promo) return zero, preserving legacy behaviour.
      */
     private BigDecimal platformBorneDiscount(Booking booking) {
+        Experience experience = booking.getExperience();
+
         // Referral discounts are always a platform marketing cost — the host earns on
         // the pre-discount price, so add the referral discount back to the host base.
         BigDecimal referral = booking.getReferralDiscountAmount() != null
@@ -114,24 +121,28 @@ public class PricingEngine {
         if (applied != null && !applied.isEmpty()) {
             BigDecimal total = referral;
             for (BookingPromoCode code : applied) {
-                total = total.add(platformShareOf(code.getPromoCode(), code.getDiscountAmount()));
+                total = total.add(platformShareOf(code.getPromoCode(), code.getDiscountAmount(), experience));
             }
             return total;
         }
         // Fallback for bookings created before multi-code stacking (single promo + total discount).
-        return referral.add(platformShareOf(booking.getPromoCode(), booking.getDiscountAmount()));
+        return referral.add(platformShareOf(booking.getPromoCode(), booking.getDiscountAmount(), experience));
     }
 
-    private BigDecimal platformShareOf(PromoCode promo, BigDecimal discount) {
-        if (promo == null || discount == null || discount.signum() <= 0 || promo.getDiscountBearer() == null) {
+    private BigDecimal platformShareOf(PromoCode promo, BigDecimal discount, Experience experience) {
+        if (promo == null || discount == null || discount.signum() <= 0) {
             return BigDecimal.ZERO;
         }
-        return switch (promo.getDiscountBearer()) {
+
+        // Resolve the discount bearer using the three-level precedence
+        DiscountBearer bearer = discountBearerResolver.resolveBearer(promo, experience);
+        BigDecimal platformShare = discountBearerResolver.resolvePlatformSharePercentage(promo, experience);
+
+        return switch (bearer) {
             case HOST -> BigDecimal.ZERO;
             case PLATFORM -> discount;
             case SPLIT -> discount
-                    .multiply(promo.getPlatformSharePercentage() != null
-                            ? promo.getPlatformSharePercentage() : BigDecimal.ZERO)
+                    .multiply(platformShare != null ? platformShare : BigDecimal.ZERO)
                     .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
         };
     }

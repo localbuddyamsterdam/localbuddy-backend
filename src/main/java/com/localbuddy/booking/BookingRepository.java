@@ -45,6 +45,12 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
             BookingStatus status
     );
 
+    /**
+     * Host console listing filtered to one status — eager-fetches the same ToOne associations as the
+     * unfiltered host query so a host's booking list stays a single query rather than N+1.
+     */
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {
+            "experience", "experience.city", "localProfile", "availabilitySlot", "loggedInUser"})
     List<Booking> findByLocalProfileIdAndStatusOrderByRequestedAtDesc(
             UUID localProfileId,
             BookingStatus status

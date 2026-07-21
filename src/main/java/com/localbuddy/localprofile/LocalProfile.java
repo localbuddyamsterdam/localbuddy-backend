@@ -2,6 +2,7 @@ package com.localbuddy.localprofile;
 
 import com.localbuddy.experience.City;
 import com.localbuddy.experience.ExperienceCategory;
+import com.localbuddy.promo.DiscountBearer;
 import com.localbuddy.user.User;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -163,6 +164,15 @@ public class LocalProfile {
     /** Optional per-host commission override; used when an experience has none. */
     @Column(name = "commission_rate", precision = 5, scale = 4)
     private BigDecimal commissionRate;
+
+    /** Per-host discount bearer policy (HOST / PLATFORM / SPLIT); used if experience has no override. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "default_discount_bearer", nullable = false, length = 20)
+    private DiscountBearer defaultDiscountBearer = DiscountBearer.HOST;
+
+    /** Platform's share of SPLIT-type discounts on this host's experiences; 0–100. */
+    @Column(name = "default_platform_share_percentage", precision = 5, scale = 2)
+    private BigDecimal defaultPlatformSharePercentage;
 
     @Column(name = "stripe_connect_account_id", length = 255)
     private String stripeConnectAccountId;

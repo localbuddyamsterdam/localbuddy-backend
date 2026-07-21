@@ -1,6 +1,7 @@
 package com.localbuddy.experience;
 
 import com.localbuddy.localprofile.LocalProfile;
+import com.localbuddy.promo.DiscountBearer;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -107,6 +108,15 @@ public class Experience {
     /** Optional per-experience commission override; supersedes the host's rate. */
     @Column(name = "commission_rate", precision = 5, scale = 4)
     private BigDecimal commissionRate;
+
+    /** Optional per-experience discount bearer override (HOST / PLATFORM / SPLIT); null → use host's default. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "discount_bearer", length = 20)
+    private DiscountBearer discountBearer;
+
+    /** Platform's share of SPLIT-type discounts for this experience; 0–100; used if bearer is SPLIT. */
+    @Column(name = "platform_share_percentage", precision = 5, scale = 2)
+    private BigDecimal platformSharePercentage;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "price_input_mode", nullable = false, length = 10)

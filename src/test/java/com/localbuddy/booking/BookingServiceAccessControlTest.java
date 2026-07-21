@@ -24,12 +24,14 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -133,5 +135,56 @@ class BookingServiceAccessControlTest {
 
         assertEquals(bookingId, response.id());
         verifyNoInteractions(conversationRepository);
+    }
+
+    @Test
+    @DisplayName("host booking list queries only the profile resolved from the caller's principal")
+    void hostBookingsAreScopedToTheCallersOwnProfile() {
+        UUID callerUserId = UUID.randomUUID();
+        UUID callersProfileId = UUID.randomUUID();
+        UUID someoneElsesProfileId = UUID.randomUUID();
+
+        LocalProfile callersProfile = new LocalProfile();
+        callersProfile.setId(callersProfileId);
+        when(localProfileRepository.findByUserId(callerUserId)).thenReturn(Optional.of(callersProfile));
+        when(bookingRepository.findByLocalProfileIdOrderByRequestedAtDesc(callersProfileId))
+                .thenReturn(List.of());
+
+        service.getHostBookings(callerUserId, null);
+
+        // The profile id must come from the principal, never from the caller — this is the
+        // enumeration guard that keeps host A out of host B's bookings.
+        verify(bookingRepository).findByLocalProfileIdOrderByRequestedAtDesc(callersProfileId);
+        verify(bookingRepository, org.mockito.Mockito.never())
+                .findByLocalProfileIdOrderByRequestedAtDesc(someoneElsesProfileId);
+    }
+
+    @Test
+    @DisplayName("a caller with no local profile is not a host and cannot list host bookings")
+    void nonHostCannotListHostBookings() {
+        UUID userId = UUID.randomUUID();
+        when(localProfileRepository.findByUserId(userId)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class, () -> service.getHostBookings(userId, null));
+
+        verifyNoInteractions(bookingRepository);
+    }
+
+    @Test
+    @DisplayName("status filter still resolves the host from the principal")
+    void hostBookingsWithStatusFilterStayScoped() {
+        UUID callerUserId = UUID.randomUUID();
+        UUID callersProfileId = UUID.randomUUID();
+
+        LocalProfile callersProfile = new LocalProfile();
+        callersProfile.setId(callersProfileId);
+        when(localProfileRepository.findByUserId(callerUserId)).thenReturn(Optional.of(callersProfile));
+        when(bookingRepository.findByLocalProfileIdAndStatusOrderByRequestedAtDesc(
+                callersProfileId, BookingStatus.REQUESTED)).thenReturn(List.of());
+
+        service.getHostBookings(callerUserId, BookingStatus.REQUESTED);
+
+        verify(bookingRepository)
+                .findByLocalProfileIdAndStatusOrderByRequestedAtDesc(callersProfileId, BookingStatus.REQUESTED);
     }
 }

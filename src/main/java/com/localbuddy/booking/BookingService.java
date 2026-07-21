@@ -324,6 +324,35 @@ public class BookingService {
     }
 
     /**
+     * The host-side counterpart to {@link #getMyBookings}: the inbound bookings on the
+     * authenticated host's own experiences. This is the "host surface" that method's comment
+     * refers to.
+     * <p>
+     * The host is resolved from the authenticated principal and the profile id is never accepted
+     * from the client, so a host can only ever enumerate their own bookings. A caller with no
+     * local profile is simply not a host and gets a 404 rather than an empty list, so the
+     * endpoint never doubles as an existence probe.
+     * <p>
+     * Responses are mapped host-facing ({@code includeEmergencyContact = false}) — the traveller's
+     * emergency contact is withheld for the reasons documented on {@link #toResponse(Booking, boolean)}.
+     *
+     * @param status optional filter; {@code null} returns every status, newest first.
+     */
+    @Transactional(readOnly = true)
+    public List<BookingResponse> getHostBookings(UUID hostUserId, BookingStatus status) {
+        LocalProfile host = localProfileRepository.findByUserId(hostUserId)
+                .orElseThrow(() -> new ResourceNotFoundException("Local profile not found"));
+
+        List<Booking> bookings = (status == null)
+                ? bookingRepository.findByLocalProfileIdOrderByRequestedAtDesc(host.getId())
+                : bookingRepository.findByLocalProfileIdAndStatusOrderByRequestedAtDesc(host.getId(), status);
+
+        return bookings.stream()
+                .map(booking -> toResponse(booking, false))
+                .toList();
+    }
+
+    /**
      * Resolved pricing + seat usage for a booking, accounting for the private
      * (whole-slot buyout) option.
      */
